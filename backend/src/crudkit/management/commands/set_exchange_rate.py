@@ -38,8 +38,8 @@ class Command(BaseCommand):
         if options["from_date"]:
             try:
                 from_date = datetime.datetime.strptime(options["from_date"], "%Y-%m-%d").date()
-            except ValueError:
-                raise CommandError("Invalid from-date format. Use YYYY-MM-DD.")
+            except ValueError as e:
+                raise CommandError("Invalid from-date format. Use YYYY-MM-DD.") from e
         else:
             from_date = timezone.now().date()
 
@@ -47,8 +47,8 @@ class Command(BaseCommand):
         if options["to_date"]:
             try:
                 to_date = datetime.datetime.strptime(options["to_date"], "%Y-%m-%d").date()
-            except ValueError:
-                raise CommandError("Invalid to-date format. Use YYYY-MM-DD.")
+            except ValueError as e:
+                raise CommandError("Invalid to-date format. Use YYYY-MM-DD.") from e
 
             if to_date < from_date:
                 raise CommandError("End date must be after start date.")

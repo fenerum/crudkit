@@ -94,7 +94,9 @@ urlpatterns = [..., path("", include("crudkit_frontend.urls"))]
 ```
 
 Static assets are served by `django.contrib.staticfiles` (or WhiteNoise et
-al.) from `crudkit_frontend/static/`. Contributors hacking on the SPA itself
+al.) from `crudkit_frontend/static/`, under whatever `STATIC_URL` the project
+uses — nothing assumes the default `static/` prefix. Contributors hacking on
+the SPA itself
 run the Vite dev server from [../frontend](../frontend/) against any CrudKit
 backend; `npm run build` there regenerates the bundled assets.
 

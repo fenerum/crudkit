@@ -1,5 +1,6 @@
 """Minimal settings for a CrudKit-based project."""
 
+import os
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -54,7 +55,8 @@ DATABASES = {
     }
 }
 
-STATIC_URL = "static/"
+# Overridable so CI can prove the SPA works under any static prefix.
+STATIC_URL = os.environ.get("DEMO_STATIC_URL", "static/")
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

@@ -15,6 +15,9 @@ concurrency:
 jobs:
   demo:
     runs-on: ubuntu-latest
+    env:
+      # Deliberately not "static/": proves the SPA has no hardcoded prefix.
+      DEMO_STATIC_URL: media-x/
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,10 +65,12 @@ jobs:
           grep -F 'id="crudkit-config"' /tmp/index.html
           grep -F 'CrudKit Demo' /tmp/index.html
           ! grep -F '{{ crudkit_config_json }}' /tmp/index.html
+          grep -F 'window.__CRUDKIT_STATIC_URL__ = "/media-x/"' /tmp/index.html
+          ! grep -F '/static/crudkit_frontend' /tmp/index.html
 
           # The hashed bundle referenced by the shell must be served from the
-          # wheel's static files.
-          asset=$(grep -o '/static/crudkit_frontend/assets/[^"]*\.js' /tmp/index.html | head -1)
+          # wheel's static files under the project's (non-default) STATIC_URL.
+          asset=$(grep -o '/media-x/crudkit_frontend/assets/[^"]*\.js' /tmp/index.html | head -1)
           test -n "$asset"
           code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$asset")
           echo "GET $asset -> $code"

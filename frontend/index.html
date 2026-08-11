@@ -7,6 +7,9 @@
     <!-- Rendered by Django in prod; ignored in Vite dev. -->
     <meta name="csrf-token" content="{{ csrf_token }}" />
     <script id="crudkit-config" type="application/json">{{ crudkit_config_json }}</script>
+    <!-- Non-module script, so Vite leaves it alone and it runs before the
+         deferred bundle: runtime-built asset URLs resolve against it. -->
+    <script>window.__CRUDKIT_STATIC_URL__ = {{ crudkit_static_url_json }};</script>
     <title>{{ crudkit_app_name|default:"CrudKit" }}</title>
   </head>
   <body>

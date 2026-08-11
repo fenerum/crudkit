@@ -28,10 +28,19 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
-      - name: Assert Django template placeholders survived the build
+      - name: Assert the built shell is Django-template clean
         run: |
-          grep -F '{{ crudkit_config_json }}' backend/src/crudkit_frontend/templates/crudkit_frontend/index.html
-          grep -F '{{ csrf_token }}' backend/src/crudkit_frontend/templates/crudkit_frontend/index.html
+          shell=backend/src/crudkit_frontend/templates/crudkit_frontend/index.html
+          grep -F '{{ crudkit_config_json }}' "$shell"
+          grep -F '{{ csrf_token }}' "$shell"
+          grep -F 'window.__CRUDKIT_STATIC_URL__ = {{ crudkit_static_url_json }};' "$shell"
+          grep -F '{% load static %}' "$shell"
+          grep -F '{% static "crudkit_frontend/' "$shell"
+          # No hardcoded static prefix anywhere: the shell uses {% static %}
+          # and the bundle builds URLs at runtime from STATIC_URL.
+          ! grep -F '/static/' "$shell"
+          ! grep -rF --include='*.js' --include='*.css' '/static/crudkit_frontend' \
+            backend/src/crudkit_frontend/static/crudkit_frontend/
 
   # Single stable context for branch protection; matrix job names change over time.
   frontend:

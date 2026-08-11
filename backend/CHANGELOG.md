@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.2.0 (2026-08-11)
+## 0.2.1 (2026-08-11)
+
+- `crudkit_frontend`: asset URLs are no longer hardcoded to `/static/`. The
+  SPA shell references its assets via `{% static %}` tags (so
+  `ManifestStaticFilesStorage` users also get hashed, cache-busted URLs), and
+  the JS bundle builds asset/chunk URLs at runtime from Django's
+  `STATIC_URL`, exposed by the shell as `window.__CRUDKIT_STATIC_URL__` via
+  the `crudkit_config` context processor. Projects with a custom
+  `STATIC_URL` (e.g. `assets/`) now work out of the box.
 
 - The distribution is published on PyPI as **`crudkit`** (the planned
   `django-crudkit` name was rejected as too similar to an existing project).

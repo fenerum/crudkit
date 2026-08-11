@@ -59,6 +59,18 @@ class CurrencyField(models.CharField):
         kwargs.setdefault("default", DEFAULT_CURRENCY)
         super().__init__(*args, **kwargs)
 
+    def deconstruct(self):
+        # Settings-derived choices/default must not be baked into migrations:
+        # projects with different CRUDKIT_CURRENCY_CHOICES / default currency
+        # would see spurious model/migration drift. They are re-applied from
+        # settings by __init__ on load.
+        name, path, args, kwargs = super().deconstruct()
+        if dict(kwargs.get("choices") or {}) == dict(CURRENCY_CHOICES):
+            kwargs.pop("choices", None)
+        if kwargs.get("default") == DEFAULT_CURRENCY:
+            kwargs.pop("default", None)
+        return name, path, args, kwargs
+
     def contribute_to_class(self, cls, name, **kwargs):
         """
         Add additional methods to the model class when this field is added.

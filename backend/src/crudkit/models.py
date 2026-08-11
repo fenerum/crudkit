@@ -778,7 +778,9 @@ class ExchangeRate(BaseCrudKitModel):
     objects = ExchangeRateManager()
 
     # The target currency this rate applies to
-    currency = CurrencyField(help_text=_(f"The target currency. Base currency is {DEFAULT_CURRENCY}."))
+    # Settings values must not appear in field kwargs: they would be baked
+    # into migrations and drift per-project.
+    currency = CurrencyField(help_text=_("The target currency, relative to the configured base currency."))
 
     # The time period this rate is valid for
     from_date = models.DateField(default=timezone.now)
@@ -788,9 +790,7 @@ class ExchangeRate(BaseCrudKitModel):
     rate = models.DecimalField(
         max_digits=16,
         decimal_places=8,
-        help_text=_(
-            f"Exchange rate from {DEFAULT_CURRENCY} to target currency (1 {DEFAULT_CURRENCY} = X target currency)"
-        ),
+        help_text=_("Exchange rate from the base currency to the target currency (1 base = X target)"),
     )
 
     class Meta:

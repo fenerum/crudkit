@@ -63,6 +63,3 @@ extend-exclude = ["migrations"]
 
 [tool.ruff.lint]
 select = ["E4", "E7", "E9", "F", "I", "B"]
-# B904 (raise ... from) is suppressed for now: the extracted code predates the
-# rule and adding `from` clauses changes traceback chaining output.
-ignore = ["B904"]

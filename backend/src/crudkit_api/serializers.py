@@ -266,14 +266,14 @@ class MoneyFieldSerializer(serializers.Field):
         if isinstance(data, dict) and "amount" in data:
             try:
                 return float(data["amount"])
-            except (ValueError, TypeError):
-                raise serializers.ValidationError("Invalid decimal value for amount")
+            except (ValueError, TypeError) as e:
+                raise serializers.ValidationError("Invalid decimal value for amount") from e
 
         # Handle direct input (string or number)
         try:
             return float(data)
-        except (ValueError, TypeError):
-            raise serializers.ValidationError("Invalid decimal value")
+        except (ValueError, TypeError) as e:
+            raise serializers.ValidationError("Invalid decimal value") from e
 
 
 _serializer_field_mapping = serializers.ModelSerializer.serializer_field_mapping.copy()
@@ -297,8 +297,8 @@ class GenericRelationField(serializers.Field):
         mdl, pk = parse_ck_id(data)
         try:
             return get_model_types()[mdl].objects.get(pk=pk)
-        except KeyError:
-            raise serializers.ValidationError(f"Model {mdl} not found")
+        except KeyError as e:
+            raise serializers.ValidationError(f"Model {mdl} not found") from e
 
 
 class GenericSerializer(serializers.ModelSerializer):
@@ -350,7 +350,7 @@ class GenericSerializer(serializers.ModelSerializer):
             instance.clean()
         except DjangoValidationError as e:
             # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(e.message_dict)
+            raise serializers.ValidationError(e.message_dict) from e
 
         return instance
 
@@ -363,7 +363,7 @@ class GenericSerializer(serializers.ModelSerializer):
             instance.clean()
         except DjangoValidationError as e:
             # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(e.message_dict)
+            raise serializers.ValidationError(e.message_dict) from e
 
         return instance
 

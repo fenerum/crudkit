@@ -37,13 +37,13 @@ class Command(BaseCommand):
 
         try:
             app_label, model_name = model_path.split(".")
-        except ValueError:
-            raise CommandError("--model must be in app_label.ModelName format")
+        except ValueError as e:
+            raise CommandError("--model must be in app_label.ModelName format") from e
 
         try:
             model_cls = apps.get_model(app_label, model_name)
-        except LookupError:
-            raise CommandError(f"Model {model_path} not found")
+        except LookupError as e:
+            raise CommandError(f"Model {model_path} not found") from e
 
         if not issubclass(model_cls, BaseCrudKitModel):
             raise CommandError(f"{model_path} is not a BaseCrudKitModel")

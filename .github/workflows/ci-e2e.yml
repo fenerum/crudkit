@@ -37,17 +37,36 @@ jobs:
         run: |
           uv venv /tmp/e2e
           uv pip install --python /tmp/e2e "django-crudkit[api] @ file://$PWD/$(ls backend/dist/*.whl)"
-      - name: Migrate
-        run: /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput
+      - name: Migrate and create a user
+        run: |
+          /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput
+          /tmp/e2e/bin/python examples/demo/manage.py shell -c "
+          from django.contrib.auth.models import User
+          User.objects.create_superuser('e2e', password='e2e-password')"
       - name: Boot the demo server and probe it
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py runserver 127.0.0.1:8000 --noreload > /tmp/server.log 2>&1 &
           trap 'cat /tmp/server.log' EXIT
           curl -s --retry 30 --retry-delay 1 --retry-connrefused -o /dev/null http://127.0.0.1:8000/
-          code=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/v1/BOK/metadata/)
+
+          token=$(curl -sf -X POST -H 'Content-Type: application/json' \
+            -d '{"username":"e2e","password":"e2e-password"}' \
+            http://127.0.0.1:8000/api/v1/token/ \
+            | /tmp/e2e/bin/python -c 'import json,sys; print(json.load(sys.stdin)["access"])')
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $token" \
+            http://127.0.0.1:8000/api/v1/BOK/metadata/)
           echo "GET /api/v1/BOK/metadata/ -> $code"
           test "$code" = "200"
+
           curl -s http://127.0.0.1:8000/ > /tmp/index.html
           grep -F 'id="crudkit-config"' /tmp/index.html
           grep -F 'CrudKit Demo' /tmp/index.html
           ! grep -F '{{ crudkit_config_json }}' /tmp/index.html
+
+          # The hashed bundle referenced by the shell must be served from the
+          # wheel's static files.
+          asset=$(grep -o '/static/crudkit_frontend/assets/[^"]*\.js' /tmp/index.html | head -1)
+          test -n "$asset"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$asset")
+          echo "GET $asset -> $code"
+          test "$code" = "200"

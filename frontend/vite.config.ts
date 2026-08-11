@@ -12,9 +12,33 @@ export default defineConfig(({ command, mode }) => {
 
   return {
     plugins: [react()],
-    // Production assets are served by Django's staticfiles app; the dev
-    // server keeps the default "/" base.
+    // Production assets are served by Django's staticfiles app under the
+    // project's own STATIC_URL. The build-time base is only a placeholder:
+    // postbuild.mjs rewrites it to {% static %} tags in the shell, and
+    // renderBuiltUrl below replaces it with a runtime expression in the JS.
+    // The dev server keeps the default "/" base.
     base: command === 'build' ? '/static/crudkit_frontend/' : '/',
+    experimental: {
+      renderBuiltUrl(filename, { hostType }) {
+        if (hostType === 'js') {
+          // Asset and chunk URLs referenced from JS must resolve against the
+          // consuming project's STATIC_URL at runtime; the global is set by
+          // an inline script in the Django-rendered shell.
+          return {
+            runtime: `(window.__CRUDKIT_STATIC_URL__ || "/static/") + ${JSON.stringify(
+              `crudkit_frontend/${filename}`
+            )}`,
+          };
+        }
+        if (hostType === 'css') {
+          // No url() assets in CSS today; relative keeps any future ones
+          // free of a hardcoded prefix.
+          return { relative: true };
+        }
+        // html: fall back to base; postbuild.mjs rewrites to {% static %}.
+        return undefined;
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

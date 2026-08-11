@@ -45,7 +45,12 @@ into `../backend/src/crudkit_frontend/templates/crudkit_frontend/index.html`,
 so the built SPA ships inside the `crudkit` wheel and is served by the
 `crudkit_frontend` Django app. The shell is rendered as a Django template; the
 `{{ csrf_token }}` and `{{ crudkit_config_json }}` placeholders survive the
-Vite build untouched (asserted by `scripts/postbuild.mjs`).
+Vite build untouched, and `scripts/postbuild.mjs` rewrites the asset URLs to
+`{% static %}` tags so they resolve against the consuming project's
+`STATIC_URL`. Asset URLs referenced from JS (logo, favicon, future chunks)
+are built at runtime from `window.__CRUDKIT_STATIC_URL__`, which the shell
+sets from Django's `STATIC_URL`. postbuild asserts all of this — the emitted
+shell and bundle contain no hardcoded `/static/` prefix.
 
 Sourcemaps are not emitted by default (the `.js.map` is ~6.6 MB and would
 ship in the wheel). To debug a production bundle, build with:

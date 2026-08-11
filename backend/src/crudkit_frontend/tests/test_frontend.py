@@ -54,6 +54,25 @@ class CrudkitConfigContextProcessorTests(TestCase):
         response = self.client.get("/")
         self.assertContains(response, "<title>CrudKit</title>", html=False)
 
+    def test_static_url_in_context(self):
+        context = crudkit_config(request=None)
+        self.assertEqual(context["crudkit_static_url_json"], '"/static/"')
+
+        response = self.client.get("/")
+        self.assertContains(response, 'window.__CRUDKIT_STATIC_URL__ = "/static/"')
+        self.assertContains(response, "/static/crudkit_frontend/assets/favicon.svg")
+
+    @override_settings(STATIC_URL="media-x/")
+    def test_nonstandard_static_url_prefix(self):
+        # Django auto-prefixes STATIC_URL with "/" on access.
+        context = crudkit_config(request=None)
+        self.assertEqual(context["crudkit_static_url_json"], '"/media-x/"')
+
+        response = self.client.get("/")
+        self.assertContains(response, 'window.__CRUDKIT_STATIC_URL__ = "/media-x/"')
+        self.assertContains(response, "/media-x/crudkit_frontend/assets/favicon.svg")
+        self.assertNotContains(response, "/static/")
+
 
 @override_settings(TEMPLATES=STUB_TEMPLATES, ROOT_URLCONF="crudkit_frontend.tests.urls")
 class SpaViewTests(TestCase):

@@ -104,3 +104,20 @@ class CrudKitPositiveIntegerFieldTests(TestCase):
         _, expected_pk = parse_ck_id(value)
         result = self.field.get_db_prep_value(value, connection)
         self.assertEqual(result, expected_pk)
+
+    def test_get_db_prep_value_with_model_instance(self):
+        """A FK default callable may return a model instance (e.g.
+        CaseReason.get_default-style defaults); schema-time evaluation then
+        passes the instance itself down to the target field."""
+
+        class _FakeInstance:
+            pk = "TST123"
+
+        result = self.field.get_db_prep_value(_FakeInstance(), connection)
+        self.assertEqual(result, 123)
+
+    def test_get_prep_value_with_model_instance_int_pk(self):
+        class _FakeInstance:
+            pk = 42
+
+        self.assertEqual(self.field.get_prep_value(_FakeInstance()), 42)

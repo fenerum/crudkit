@@ -49,6 +49,10 @@ class CrudKitIDField(models.BigAutoField):
         return get_ck_id(self.model.TYPE_ID, super().to_python(value))
 
     def get_prep_value(self, value):
+        if hasattr(value, "pk"):
+            # Model instance, e.g. from a FK default callable returning an
+            # object; its pk is either a CK-ID string or a raw int.
+            value = value.pk
         if type(value) is int:
             return value
         if value == "":
@@ -60,6 +64,8 @@ class CrudKitIDField(models.BigAutoField):
         return super().get_prep_value(pk)
 
     def get_db_prep_value(self, value, connection, prepared=False):
+        if hasattr(value, "pk"):
+            value = value.pk
         if type(value) is int:
             return super().get_prep_value(value)
         if value == "":
@@ -91,6 +97,10 @@ class CrudKitPositiveIntegerField(models.PositiveIntegerField):
         return get_ck_id(self.model.TYPE_ID, super().to_python(value))
 
     def get_prep_value(self, value):
+        if hasattr(value, "pk"):
+            # Model instance, e.g. from a FK default callable returning an
+            # object; its pk is either a CK-ID string or a raw int.
+            value = value.pk
         if type(value) is int:
             return value
         if value == "":
@@ -102,6 +112,8 @@ class CrudKitPositiveIntegerField(models.PositiveIntegerField):
         return super().get_prep_value(pk)
 
     def get_db_prep_value(self, value, connection, prepared=False):
+        if hasattr(value, "pk"):
+            value = value.pk
         if type(value) is int:
             return super().get_prep_value(value)
         if value == "":

@@ -183,8 +183,8 @@ class BaseCrudKitManager(models.Manager):
                 ).related_object.pk,
                 **kwargs,
             )
-        except ExternalObject.DoesNotExist:
-            raise self.model.DoesNotExist
+        except ExternalObject.DoesNotExist as e:
+            raise self.model.DoesNotExist from e
 
 
 class BaseCrudKitModel(models.Model):

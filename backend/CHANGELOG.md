@@ -2,6 +2,10 @@
 
 ## 0.2.0 (2026-08-11)
 
+- The distribution is published on PyPI as **`crudkit`** (the planned
+  `django-crudkit` name was rejected as too similar to an existing project).
+  The importable packages (`crudkit`, `crudkit_api`, `crudkit_assistant`,
+  `crudkit_frontend`) are unchanged.
 - `crudkit_frontend`: new Django app that ships the built CrudKit web SPA
   inside the wheel. The Vite build emits hashed assets into
   `crudkit_frontend/static/` and the SPA shell into

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Django management entry point for the django-crudkit test project."""
+"""Django management entry point for the crudkit test project."""
 
 import os
 import sys

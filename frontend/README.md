@@ -1,6 +1,6 @@
 # CrudKit frontend
 
-The metadata-driven web SPA for [django-crudkit](../backend/). Vite + React 18
+The metadata-driven web SPA for [crudkit](../backend/). Vite + React 18
 + TypeScript + Tailwind, talking to the generic CrudKit REST API at `/api/v1/`.
 
 ## Development
@@ -42,7 +42,7 @@ fields, use `StandaloneFieldWrapper` from `context/FormContext.jsx`.
 `npm run build` emits hashed assets into
 `../backend/src/crudkit_frontend/static/crudkit_frontend/` and the SPA shell
 into `../backend/src/crudkit_frontend/templates/crudkit_frontend/index.html`,
-so the built SPA ships inside the `django-crudkit` wheel and is served by the
+so the built SPA ships inside the `crudkit` wheel and is served by the
 `crudkit_frontend` Django app. The shell is rendered as a Django template; the
 `{{ csrf_token }}` and `{{ crudkit_config_json }}` placeholders survive the
 Vite build untouched (asserted by `scripts/postbuild.mjs`).

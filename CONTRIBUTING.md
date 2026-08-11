@@ -2,7 +2,7 @@
 
 ## Repository layout
 
-- `backend/` — the `django-crudkit` Python package: `crudkit` (models, fields,
+- `backend/` — the `crudkit` Python package: `crudkit` (models, fields,
   registry), `crudkit_api` (generic DRF API), `crudkit_assistant` (AI assistant
   over WebSockets), `crudkit_frontend` (serves the bundled SPA; has no models).
 - `frontend/` — the React SPA source. `npm run build` emits the built app
@@ -53,7 +53,7 @@ clean venv and boots `examples/demo` against it.
    entry (with date) are in place on `main`.
 2. Tag the release commit `vX.Y.Z` and push the tag.
 3. The `publish-python` workflow builds the SPA, then the sdist and wheel, and
-   publishes to [PyPI](https://pypi.org/project/django-crudkit/) via Trusted
+   publishes to [PyPI](https://pypi.org/project/crudkit/) via Trusted
    Publishing (no tokens; the `pypi` GitHub environment provides the OIDC
    identity).
 

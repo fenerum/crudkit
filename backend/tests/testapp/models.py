@@ -1,4 +1,4 @@
-"""Fixture models for the django-crudkit test suite.
+"""Fixture models for the crudkit test suite.
 
 These stand in for a consuming project's domain models (the package's tests
 were originally written against a CRM).

@@ -1,4 +1,4 @@
-# django-crudkit
+# crudkit
 
 A metadata-driven CRUD framework for Django. Define models; get typed object
 IDs, soft delete, merge, change logging, an activity feed, saved views,
@@ -33,8 +33,8 @@ fields (`AISummaryField`, `AICategoryField`, `AIBooleanField`, `AITagsField`,
 ## Installation
 
 ```
-pip install django-crudkit[api]          # REST API included
-pip install django-crudkit[assistant]    # + per-object AI assistant (Channels)
+pip install crudkit[api]          # REST API included
+pip install crudkit[assistant]    # + per-object AI assistant (Channels)
 ```
 
 ```python

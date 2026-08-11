@@ -1,4 +1,4 @@
-"""Django settings for running the django-crudkit test suite.
+"""Django settings for running the crudkit test suite.
 
 SQLite by default; set DATABASE_URL (postgres://...) to run against Postgres
 as CI does.

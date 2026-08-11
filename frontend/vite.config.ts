@@ -31,7 +31,7 @@ export default defineConfig(({ command, mode }) => {
       },
     },
     build: {
-      // Build straight into the django-crudkit package so the SPA ships in
+      // Build straight into the crudkit package so the SPA ships in
       // the wheel. index.html is moved to the app's templates dir by
       // scripts/postbuild.mjs.
       outDir: path.resolve(

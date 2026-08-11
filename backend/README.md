@@ -67,13 +67,43 @@ urlpatterns = [path("api/v1/", include("crudkit_api.urls"))]
 | `CRUDKIT_GRAVATAR_FALLBACK_EMAIL` | fallback avatar email (gravatar `mp` default otherwise) |
 | `CRUDKIT_DASHBOARD_WIDGETS` | dotted path to a `dashboard_for_user(user)` widget provider |
 | `CRUDKIT_ASSISTANT_NAME`, `CRUDKIT_ASSISTANT_SYSTEM_PROMPT`, `CRUDKIT_ASSISTANT_AVATAR_URL` | assistant branding |
+| `CRUDKIT_FRONTEND_CONFIG` | dict injected into the bundled SPA at runtime (`app_name`, `logo_url`, ...) |
+| `CRUDKIT_FRONTEND_LOGIN_REQUIRED` | redirect anonymous users of the SPA view to `LOGIN_URL` |
+
+## Bundled frontend
+
+The wheel ships the built CrudKit web SPA. To serve it, add the app, the
+context processor, a config dict, and a catch-all url include (last!):
+
+```python
+INSTALLED_APPS = [..., "crudkit_frontend"]
+
+TEMPLATES = [{
+    ...,
+    "OPTIONS": {"context_processors": [
+        ...,
+        "crudkit_frontend.context_processors.crudkit_config",
+    ]},
+}]
+
+CRUDKIT_FRONTEND_CONFIG = {"app_name": "My App"}  # injected into the SPA at runtime
+CRUDKIT_FRONTEND_LOGIN_REQUIRED = False  # True → redirect anonymous users to LOGIN_URL
+
+# urls.py — must be the LAST pattern; everything unmatched serves the SPA
+urlpatterns = [..., path("", include("crudkit_frontend.urls"))]
+```
+
+Static assets are served by `django.contrib.staticfiles` (or WhiteNoise et
+al.) from `crudkit_frontend/static/`. Contributors hacking on the SPA itself
+run the Vite dev server from [../frontend](../frontend/) against any CrudKit
+backend; `npm run build` there regenerates the bundled assets.
 
 ## Running the tests
 
 ```
 cd backend
 uv sync --all-extras
-uv run manage.py test crudkit crudkit_api crudkit_assistant tests
+uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests
 ```
 
 ## License

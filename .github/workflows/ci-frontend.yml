@@ -3,9 +3,7 @@ name: frontend
 on:
   push:
     branches: [main]
-    paths: ["frontend/**", ".github/workflows/ci-frontend.yml"]
   pull_request:
-    paths: ["frontend/**", ".github/workflows/ci-frontend.yml"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -34,3 +32,11 @@ jobs:
         run: |
           grep -F '{{ crudkit_config_json }}' backend/src/crudkit_frontend/templates/crudkit_frontend/index.html
           grep -F '{{ csrf_token }}' backend/src/crudkit_frontend/templates/crudkit_frontend/index.html
+
+  # Single stable context for branch protection; matrix job names change over time.
+  frontend:
+    needs: [test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"

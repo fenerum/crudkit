@@ -3,9 +3,7 @@ name: backend
 on:
   push:
     branches: [main]
-    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
   pull_request:
-    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -70,3 +68,11 @@ jobs:
       - name: Tests (Postgres)
         working-directory: backend
         run: uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests --noinput
+
+  # Single stable context for branch protection; matrix job names change over time.
+  backend:
+    needs: [test, test-postgres]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - run: test "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "false"

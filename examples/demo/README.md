@@ -1,6 +1,6 @@
 # CrudKit demo project
 
-A from-scratch Django project on `django-crudkit`: two models (`Author` AUT,
+A from-scratch Django project on `crudkit`: two models (`Author` AUT,
 `Book` BOK) and the generic REST API — no per-model serializers, viewsets or
 routes.
 

@@ -1,5 +1,5 @@
 [project]
-name = "django-crudkit"
+name = "crudkit"
 version = "0.2.0"
 description = "A metadata-driven CRUD framework for Django: typed object IDs, soft delete, merge, change log, activity feed, saved views, AI fields and a generic REST API."
 readme = "README.md"
@@ -32,7 +32,7 @@ api = [
     "drf-extra-fields>=3.7",
 ]
 assistant = [
-    "django-crudkit[api]",
+    "crudkit[api]",
     "channels>=4.1",
 ]
 

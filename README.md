@@ -2,8 +2,8 @@
 
 An open-source, metadata-driven CRUD application framework:
 
-- **[backend/](backend/)** — `django-crudkit` (PyPI): Django models, generic REST API and AI assistant. Typed object IDs, soft delete, merge, change log, activity feed, saved views, AI fields.
-- **[frontend/](frontend/)** — the metadata-driven React SPA. Built with Vite and bundled into the `django-crudkit` wheel, served by the `crudkit_frontend` Django app.
+- **[backend/](backend/)** — `crudkit` (PyPI): Django models, generic REST API and AI assistant. Typed object IDs, soft delete, merge, change log, activity feed, saved views, AI fields.
+- **[frontend/](frontend/)** — the metadata-driven React SPA. Built with Vite and bundled into the `crudkit` wheel, served by the `crudkit_frontend` Django app.
 
 ## Bundled frontend
 

@@ -36,7 +36,7 @@ jobs:
       - name: Install the wheel into a fresh venv
         run: |
           uv venv /tmp/e2e
-          uv pip install --python /tmp/e2e "django-crudkit[api] @ file://$PWD/$(ls backend/dist/*.whl)"
+          uv pip install --python /tmp/e2e "crudkit[api] @ file://$PWD/$(ls backend/dist/*.whl)"
       - name: Migrate and create a user
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput

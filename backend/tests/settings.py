@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "crudkit",
     "crudkit_assistant",
+    "crudkit_frontend",
     "tests.testapp",
 ]
 
@@ -45,6 +46,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "crudkit_frontend.context_processors.crudkit_config",
             ],
         },
     },

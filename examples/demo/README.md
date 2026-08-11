@@ -18,3 +18,19 @@ Then explore:
 - `GET /api/v1/BOK/metadata/` — the model schema the frontend renders from
 - `POST /api/v1/BOK/` — create (`{"title": "...", "author": "AUT1"}`)
 - `GET /api/v1/search/?_q=...` — global search
+
+## The bundled web UI
+
+The demo also wires up `crudkit_frontend`, which serves the CrudKit SPA at
+`/`. Build the frontend once, then `runserver` serves the full UI:
+
+```
+cd ../../frontend
+npm ci
+npm run build     # emits assets + index.html into backend/src/crudkit_frontend/
+cd ../examples/demo
+uv run manage.py runserver
+```
+
+Then open http://localhost:8000/ and log in with your superuser. The app name
+comes from the `CRUDKIT_FRONTEND_CONFIG` setting ("CrudKit Demo" here).

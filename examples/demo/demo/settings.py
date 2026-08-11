@@ -17,6 +17,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "rest_framework",
     "crudkit",
+    "crudkit_frontend",
     "library",
 ]
 
@@ -40,6 +41,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "crudkit_frontend.context_processors.crudkit_config",
             ],
         },
     },
@@ -69,3 +71,7 @@ REST_FRAMEWORK = {
 
 CELERY_TASK_ALWAYS_EAGER = True
 CRUDKIT_DEFAULT_CURRENCY = "EUR"
+
+CRUDKIT_FRONTEND_CONFIG = {
+    "app_name": "CrudKit Demo",
+}

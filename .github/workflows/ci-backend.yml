@@ -37,7 +37,7 @@ jobs:
         run: uv run manage.py makemigrations --check --dry-run
       - name: Tests (SQLite)
         working-directory: backend
-        run: uv run manage.py test crudkit crudkit_api crudkit_assistant tests --noinput
+        run: uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests --noinput
 
   test-postgres:
     runs-on: ubuntu-latest
@@ -69,4 +69,4 @@ jobs:
         run: uv run manage.py migrate
       - name: Tests (Postgres)
         working-directory: backend
-        run: uv run manage.py test crudkit crudkit_api crudkit_assistant tests --noinput
+        run: uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests --noinput

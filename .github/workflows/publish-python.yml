@@ -2,7 +2,7 @@ name: publish-python
 
 on:
   push:
-    tags: ["python-v*"]
+    tags: ["v*"]
 
 jobs:
   build:

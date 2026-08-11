@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.2.0 (unreleased)
+## 0.2.0 (2026-08-11)
 
 - `crudkit_frontend`: new Django app that ships the built CrudKit web SPA
   inside the wheel. The Vite build emits hashed assets into

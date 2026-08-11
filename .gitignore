@@ -9,3 +9,7 @@ db.sqlite3
 node_modules/
 frontend/dist/
 uv.lock
+
+# Vite build output shipped inside the wheel (built in CI, not committed)
+backend/src/crudkit_frontend/static/
+backend/src/crudkit_frontend/templates/

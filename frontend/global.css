@@ -1,0 +1,1642 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   Crudkit Design System — Core Tokens
+   Dark-mode only. Linear-inspired. Cool-neutral grays, indigo primary.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* Surface / Elevation */
+  --bg-0: #08090B;
+  --bg-1: #0B0C0E;
+  --bg-2: #111317;
+  --bg-3: #171A1F;
+  --bg-4: #1E2127;
+  --bg-5: #262A31;
+
+  /* Foreground */
+  --fg-1: #FFFFFF;
+  --fg-2: #E5E5E5;
+  --fg-3: #CCCCCC;
+  --fg-4: #999999;
+
+  /* Borders */
+  --border-1: rgba(255, 255, 255, 0.06);
+  --border-2: rgba(255, 255, 255, 0.10);
+  --border-3: rgba(255, 255, 255, 0.14);
+
+  /* Primary / Brand */
+  --primary-50:  #EEEFFF;
+  --primary-100: #D9DBFF;
+  --primary-200: #B5B8FF;
+  --primary-300: #9093FF;
+  --primary-400: #7B7FFF;
+  --primary-500: #5D62F5;
+  --primary-600: #464BD8;
+  --primary-700: #363AAE;
+  --primary-glow: rgba(123, 127, 255, 0.20);
+
+  /* Semantic */
+  --success: #3DD68C;
+  --success-bg: rgba(61, 214, 140, 0.12);
+  --warn: #F5B544;
+  --warn-bg: rgba(245, 181, 68, 0.12);
+  --danger: #F0616D;
+  --danger-bg: rgba(240, 97, 109, 0.12);
+  --info: #4BA3F5;
+  --info-bg: rgba(75, 163, 245, 0.12);
+
+  /* Pipeline stages / tag hues */
+  --stage-slate:  #8A94A6;
+  --stage-blue:   #4BA3F5;
+  --stage-violet: #9B6BFF;
+  --stage-amber:  #F5B544;
+  --stage-green:  #3DD68C;
+  --stage-rose:   #F0616D;
+
+  /* Avatar palette (24 muted hues) */
+  --avatar-01: #A47CE8; --avatar-02: #E87C9E; --avatar-03: #E8A47C;
+  --avatar-04: #C8E87C; --avatar-05: #7CE8B4; --avatar-06: #7CC8E8;
+  --avatar-07: #7C8EE8; --avatar-08: #B47CE8; --avatar-09: #E87CC8;
+  --avatar-10: #D89472; --avatar-11: #9DB472; --avatar-12: #72B49D;
+  --avatar-13: #729DB4; --avatar-14: #7C94D8; --avatar-15: #A47CD8;
+  --avatar-16: #D87CA4; --avatar-17: #C49472; --avatar-18: #94C472;
+  --avatar-19: #72C494; --avatar-20: #7294C4; --avatar-21: #9472C4;
+  --avatar-22: #C47294; --avatar-23: #B8B272; --avatar-24: #72B8B2;
+
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --text-2xs: 10px;
+  --text-xs:  11px;
+  --text-sm:  12px;
+  --text-md:  13px;
+  --text-lg:  14px;
+  --text-xl:  16px;
+  --text-2xl: 20px;
+  --text-3xl: 24px;
+  --text-4xl: 32px;
+  --text-5xl: 44px;
+  --text-6xl: 60px;
+
+  --leading-tight: 1.15;
+  --leading-snug:  1.35;
+  --leading-body:  1.5;
+
+  --track-tight:    -0.035em;
+  --track-snug:     -0.02em;
+  --track-normal:    0;
+  --track-wide:      0.04em;
+  --track-eyebrow:   0.12em;
+
+  /* Spacing */
+  --s-1: 4px;   --s-2: 8px;   --s-3: 12px;  --s-4: 16px;
+  --s-5: 20px;  --s-6: 24px;  --s-8: 32px;  --s-10: 40px;
+  --s-14: 56px; --s-20: 80px;
+
+  /* Radii */
+  --r-sm: 4px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --r-xl: 12px;
+  --r-full: 9999px;
+
+  /* Shadows (overlays only) */
+  --shadow-menu:   0 8px 24px -6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-modal:  0 20px 60px -10px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-focus:  0 0 0 2px rgba(123, 127, 255, 0.40);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in:  cubic-bezier(0.4, 0, 1, 1);
+  --dur-fast: 120ms;
+  --dur-med:  180ms;
+  --dur-slow: 260ms;
+
+  /* Layout */
+  --sidebar-w: 240px;
+  --topbar-h: 44px;
+  --inspector-w: 400px;
+  --row-h: 36px;
+
+  /* Translucent surfaces — kept as tokens so light theme can override. */
+  --topbar-bg: rgba(11, 12, 14, 0.8);
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+html, body {
+  background: var(--bg-1);
+  color: var(--fg-1);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  line-height: var(--leading-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  margin: 0;
+}
+
+::selection {
+  background: var(--primary-glow);
+  color: var(--fg-1);
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 10px; border: 2px solid var(--bg-1); }
+::-webkit-scrollbar-thumb:hover { background: var(--bg-5); }
+
+/* react-native-web emits <Text>/<View> as <div dir="auto"> with a baked-in
+   default color that overrides the theme token set on ancestor containers
+   (.ck-lrow, .ck-list-head, .ck-vt-cell-v, etc.), making cell text render
+   dark on the dark surface. Force inheritance so --fg-* flows through.
+   Light mode is unaffected: --fg-1 still resolves to the dark value there. */
+div[dir="auto"],
+div[dir="auto"] > * {
+  color: inherit;
+}
+
+/* ==========================================================================
+   Light theme overrides
+   Activated by [data-theme="light"] on <html>. Same token names — only the
+   values change, so all components reflow automatically.
+   ========================================================================== */
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Surface / Elevation — warm-neutral grays, paper-white base */
+  --bg-0: #F4F5F7;
+  --bg-1: #FFFFFF;
+  --bg-2: #FAFAFB;
+  --bg-3: #F1F2F4;
+  --bg-4: #E8EAEE;
+  --bg-5: #DCDFE4;
+
+  /* Foreground */
+  --fg-1: #15171A;
+  --fg-2: #44474D;
+  --fg-3: #6B7079;
+  --fg-4: #9CA0A8;
+
+  /* Borders */
+  --border-1: rgba(15, 17, 20, 0.08);
+  --border-2: rgba(15, 17, 20, 0.12);
+  --border-3: rgba(15, 17, 20, 0.18);
+
+  /* Primary — slightly darker indigo for AA contrast on white */
+  --primary-50:  #F1F2FF;
+  --primary-100: #E0E2FF;
+  --primary-200: #C2C5FF;
+  --primary-300: #9498FF;
+  --primary-400: #5D62F5;
+  --primary-500: #464BD8;
+  --primary-600: #363AAE;
+  --primary-700: #272A82;
+  --primary-glow: rgba(93, 98, 245, 0.18);
+
+  /* Semantic — pull saturation up for white backdrops */
+  --success: #1FA770;
+  --success-bg: rgba(31, 167, 112, 0.10);
+  --warn: #C68C12;
+  --warn-bg: rgba(198, 140, 18, 0.12);
+  --danger: #D63643;
+  --danger-bg: rgba(214, 54, 67, 0.10);
+  --info: #2879D6;
+  --info-bg: rgba(40, 121, 214, 0.10);
+
+  /* Pipeline stages */
+  --stage-slate:  #6B7079;
+  --stage-blue:   #2879D6;
+  --stage-violet: #7848E0;
+  --stage-amber:  #C68C12;
+  --stage-green:  #1FA770;
+  --stage-rose:   #D63643;
+
+  /* Shadows — deeper, with cooler tint */
+  --shadow-menu:   0 6px 16px -4px rgba(15, 17, 20, 0.10), 0 2px 4px rgba(15, 17, 20, 0.06);
+  --shadow-modal:  0 18px 48px -8px rgba(15, 17, 20, 0.18), 0 4px 12px rgba(15, 17, 20, 0.08);
+  --shadow-focus:  0 0 0 2px rgba(93, 98, 245, 0.32);
+
+  /* Translucent topbar — paper-white at 80% opacity. */
+  --topbar-bg: rgba(255, 255, 255, 0.8);
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: var(--bg-4);
+  border: 2px solid var(--bg-1);
+}
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: var(--bg-5); }
+
+[data-theme="light"] kbd {
+  background: var(--bg-3);
+  box-shadow: 0 1px 0 var(--border-2);
+}
+
+/* The primary-button kbd chip overrides we set for dark mode invert
+   readability on light: a translucent-white chip on indigo loses contrast.
+   Use a dark chip on the primary fill instead. */
+[data-theme="light"] .ck-btn-primary .ck-kbd,
+[data-theme="light"] .ck-btn-danger .ck-kbd,
+[data-theme="light"] .ck-btn-success .ck-kbd {
+  color: #FFFFFF;
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: none;
+}
+
+@layer base {
+  h1 { font-size: var(--text-5xl); line-height: var(--leading-tight); letter-spacing: var(--track-tight); font-weight: 600; color: var(--fg-1); }
+  h2 { font-size: var(--text-4xl); line-height: var(--leading-tight); letter-spacing: var(--track-tight); font-weight: 600; color: var(--fg-1); }
+  h3 { font-size: var(--text-3xl); line-height: var(--leading-snug); letter-spacing: var(--track-snug); font-weight: 600; color: var(--fg-1); }
+  h4 { font-size: var(--text-2xl); line-height: var(--leading-snug); letter-spacing: var(--track-snug); font-weight: 600; color: var(--fg-1); }
+  h5 { font-size: var(--text-xl);  line-height: var(--leading-snug); letter-spacing: var(--track-snug); font-weight: 600; color: var(--fg-1); }
+
+  a {
+    color: var(--primary-300);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  a:hover { color: var(--primary-200); }
+
+  /* Foreign-key value links inside a record need higher contrast than the
+     default a-tag color in light mode, where primary-300 reads pastel on a
+     near-white surface. Apply this class on FK link renderers. */
+  .ck-fk-link { color: var(--primary-300); }
+  .ck-fk-link:hover { color: var(--primary-200); }
+  [data-theme="light"] .ck-fk-link { color: var(--primary-500); }
+  [data-theme="light"] .ck-fk-link:hover { color: var(--primary-600); }
+
+  hr {
+    border: none;
+    border-top: 1px solid var(--border-1);
+    margin: var(--s-4) 0;
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    color: var(--fg-2);
+  }
+}
+
+/* ==========================================================================
+   Utility classes used across the app
+   ========================================================================== */
+
+@layer components {
+  .eyebrow {
+    font-size: var(--text-2xs);
+    font-weight: 600;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-3);
+  }
+
+  .ck-kbd {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--fg-2);
+    background: var(--bg-3);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-sm);
+    padding: 1px 5px;
+    line-height: 1;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
+  }
+  /* Inside a primary (indigo) button, the kbd needs to be a dark chip on a
+     light overlay so it stays readable against the indigo background. */
+  .ck-btn-primary .ck-kbd {
+    color: #0B0C0E;
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(0, 0, 0, 0.25);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  }
+  /* Inside ghost / secondary / danger / success, default styling already works. */
+  .ck-btn-danger .ck-kbd,
+  .ck-btn-success .ck-kbd {
+    color: #0B0C0E;
+    background: rgba(255, 255, 255, 0.55);
+    border-color: rgba(0, 0, 0, 0.2);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .ck-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---- Topbar ---- */
+  .ck-topbar {
+    height: var(--topbar-h);
+    background: var(--topbar-bg);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border-1);
+  }
+
+  /* ---- Cards ---- */
+  .ck-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-lg);
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-card-hover:hover {
+    background: var(--bg-3);
+    border-color: var(--border-2);
+  }
+
+  /* ---- Dense list rows (lrow) ---- */
+  .ck-list-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    height: 32px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--fg-3);
+    border-bottom: 1px solid var(--border-1);
+  }
+  .ck-lrow {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    height: var(--row-h);
+    border-bottom: 1px solid var(--border-1);
+    font-size: 12px;
+    color: var(--fg-1);
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .ck-lrow:hover { background: var(--bg-2); }
+  .ck-lrow.is-selected { background: rgba(123,127,255,0.08); }
+  .ck-lh-c {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* ---- Buttons ---- */
+  .ck-btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    height: 28px; padding: 0 12px;
+    border-radius: var(--r-md);
+    font-family: var(--font-sans); font-size: var(--text-sm); font-weight: 500;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+    white-space: nowrap;
+  }
+  .ck-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ck-btn-sm { height: 26px; padding: 0 10px; font-size: var(--text-xs); }
+  .ck-btn-lg { height: 32px; padding: 0 14px; font-size: var(--text-md); }
+  .ck-btn-primary { background: var(--primary-400); color: #fff; }
+  .ck-btn-primary:hover:not(:disabled) { background: var(--primary-300); }
+  .ck-btn-primary .ck-kbd { color: rgba(255, 255, 255, 0.85); }
+  .ck-btn-secondary { background: var(--bg-3); color: var(--fg-1); border-color: var(--border-1); }
+  .ck-btn-secondary:hover:not(:disabled) { background: var(--bg-4); }
+  .ck-btn-ghost { background: transparent; color: var(--fg-2); }
+  .ck-btn-ghost:hover:not(:disabled) { background: var(--bg-3); color: var(--fg-1); }
+  .ck-btn-danger { background: var(--danger); color: #0B0C0E; }
+  .ck-btn-danger:hover:not(:disabled) { background: #f37e88; }
+  .ck-btn-success { background: var(--success); color: #0B0C0E; }
+  .ck-btn-success:hover:not(:disabled) { background: #5edca0; }
+
+  .ck-icon-btn {
+    width: 26px; height: 26px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: var(--r-md);
+    color: var(--fg-2); cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .ck-icon-btn:hover { background: var(--bg-3); color: var(--fg-1); }
+  .ck-icon-btn-sm { width: 24px; height: 24px; }
+
+  /* ---- Chip filter button ---- */
+  .ck-chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: transparent;
+    border: 1px dashed var(--border-2);
+    border-radius: var(--r-full);
+    padding: 3px 10px;
+    font-size: var(--text-xs);
+    color: var(--fg-2);
+    cursor: pointer;
+    font-family: var(--font-sans);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-chip:hover { border-color: var(--border-3); color: var(--fg-1); background: var(--bg-2); }
+
+  /* ---- Checkbox (dark, custom; bypasses @tailwindcss/forms plain-white look) ---- */
+  .ck-checkbox {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    margin: 0;
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-sm);
+    background: var(--bg-2);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+    position: relative;
+  }
+  .ck-checkbox:hover { border-color: var(--border-3); }
+  .ck-checkbox:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+  .ck-checkbox:checked {
+    background: var(--primary-400);
+    border-color: var(--primary-400);
+  }
+  .ck-checkbox:checked::after {
+    content: "";
+    position: absolute;
+    width: 4px;
+    height: 8px;
+    border: solid #0B0C0E;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg) translate(-1px, -1px);
+  }
+  .ck-checkbox:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .ck-checkbox.is-error { border-color: var(--danger); }
+
+  /* ---- Form inputs ---- */
+  .ck-input {
+    width: 100%;
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-sm);
+    padding: 6px 10px;
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    outline: none;
+    transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out);
+  }
+  .ck-input::placeholder { color: var(--fg-3); }
+  .ck-input:hover { border-color: var(--border-2); }
+  .ck-input:focus { border-color: var(--primary-400); box-shadow: var(--shadow-focus); }
+  .ck-input:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* ---- Avatar wrapper ---- */
+  .ck-avatar-wrap { position: relative; display: inline-flex; }
+  .ck-avatar {
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: var(--r-full);
+    color: #0B0C0E;
+    font-weight: 600;
+    font-family: var(--font-sans);
+    overflow: hidden;
+  }
+  .ck-avatar-status {
+    position: absolute; bottom: -1px; right: -1px;
+    width: 8px; height: 8px;
+    border-radius: var(--r-full);
+    border: 2px solid var(--bg-1);
+  }
+  .ck-status-online { background: var(--success); }
+  .ck-status-away   { background: var(--warn); }
+  .ck-status-busy   { background: var(--danger); }
+
+  /* ---- Badge ---- */
+  .ck-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 2px 8px;
+    border-radius: var(--r-full);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    border: 1px solid var(--border-1);
+    background: var(--bg-3);
+    color: var(--fg-2);
+    white-space: nowrap;
+  }
+
+  /* ---- Dot ---- */
+  .ck-dot { display: inline-block; border-radius: var(--r-full); flex: 0 0 auto; }
+
+  /* ---- Priority bars ---- */
+  .ck-prio { display: inline-flex; gap: 2px; align-items: center; }
+  .ck-prio-bar { width: 2px; height: 9px; background: var(--fg-4); border-radius: 1px; }
+  .ck-prio-bar.is-on { background: var(--fg-1); }
+
+  /* React-Native-Web's <Text> renders with its own inline color which breaks
+     CSS inheritance from our dark theme. These helpers force descendants
+     (Text, Link, View) to take the wrapper's foreground token. Use sparingly:
+     wrap a region whose children must adopt a specific foreground. */
+  .ck-fg-1, .ck-fg-1 *:not(a):not([class*="ck-btn"]):not([class*="ck-badge"]):not([class*="ck-avatar"]) { color: var(--fg-1); }
+  .ck-fg-2, .ck-fg-2 *:not(a):not([class*="ck-btn"]):not([class*="ck-badge"]):not([class*="ck-avatar"]) { color: var(--fg-2); }
+  .ck-fg-3, .ck-fg-3 *:not(a):not([class*="ck-btn"]):not([class*="ck-badge"]):not([class*="ck-avatar"]) { color: var(--fg-3); }
+
+  /* ---- Tab strip (detail tabs) ---- */
+  .ck-tab {
+    background: transparent; border: none;
+    color: var(--fg-2);
+    font-size: var(--text-sm); font-weight: 500;
+    padding: 10px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: var(--font-sans);
+    display: inline-flex; align-items: center; gap: 6px;
+    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-tab:hover { color: var(--fg-1); }
+  .ck-tab.is-on { color: var(--fg-1); border-bottom-color: var(--primary-400); }
+  .ck-tab-count {
+    font-family: var(--font-mono);
+    font-size: var(--text-2xs);
+    color: var(--fg-3);
+    background: var(--bg-3);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  /* ---- View switch (segmented control) ---- */
+  .ck-view-switch {
+    display: inline-flex;
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-md);
+    padding: 2px;
+  }
+  .ck-view-switch button {
+    background: transparent;
+    border: none;
+    color: var(--fg-2);
+    font-size: var(--text-xs);
+    padding: 3px 8px;
+    border-radius: var(--r-sm);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-sans);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .ck-view-switch button.is-on { background: var(--bg-4); color: var(--fg-1); }
+
+  /* ---- Pipeline column ---- */
+  .ck-pipe-col { width: 280px; flex: 0 0 280px; display: flex; flex-direction: column; gap: 8px; }
+  .ck-pipe-head { display: flex; align-items: center; justify-content: space-between; padding: 4px 6px; }
+  .ck-pipe-name { font-size: var(--text-sm); font-weight: 600; color: var(--fg-1); }
+  .ck-pipe-count { font-size: var(--text-xs); color: var(--fg-3); font-family: var(--font-mono); }
+  .ck-pipe-sub { font-size: var(--text-2xs); color: var(--fg-3); font-family: var(--font-mono); padding: 0 6px 4px; }
+
+  /* ---- Deal card ---- */
+  .ck-deal-card {
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-lg);
+    padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 6px;
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-deal-card:hover { background: var(--bg-3); border-color: var(--border-2); }
+  .ck-deal-card.is-selected { border-color: var(--primary-400); background: rgba(123,127,255,0.06); }
+
+  .ck-dc-head { display: flex; align-items: center; justify-content: space-between; }
+  .ck-dc-id   { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+  .ck-dc-title {
+    font-size: 13px; font-weight: 500; color: var(--fg-1);
+    letter-spacing: -0.01em; line-height: 1.35;
+  }
+  .ck-dc-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ck-dc-foot { display: flex; align-items: center; gap: 8px; padding-top: 4px; }
+  .ck-dc-amt  {
+    font-family: var(--font-mono); font-size: 11px; color: var(--fg-1);
+    font-weight: 500; font-variant-numeric: tabular-nums;
+  }
+  .ck-dc-meta { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--fg-3); }
+  .ck-dc-spacer { flex: 1; }
+
+  /* ---- Tag chip (in card) ---- */
+  .ck-tag {
+    font-size: var(--text-2xs);
+    color: var(--fg-2);
+    background: var(--bg-3);
+    border-radius: 3px;
+    padding: 1px 6px;
+    white-space: nowrap;
+  }
+  .ck-deal-card:hover .ck-tag { background: var(--bg-4); }
+
+  /* ---- Timeline activity ---- */
+  .ck-act-list { display: flex; flex-direction: column; gap: 14px; position: relative; }
+  .ck-act-list::before {
+    content: '';
+    position: absolute;
+    left: 11px; top: 4px; bottom: 4px;
+    width: 1px;
+    background: var(--border-1);
+  }
+  .ck-act { display: flex; gap: 12px; position: relative; }
+  .ck-act-ic {
+    width: 24px; height: 24px;
+    border-radius: var(--r-full);
+    background: var(--bg-3);
+    border: 1px solid var(--border-1);
+    display: inline-flex; align-items: center; justify-content: center;
+    color: var(--fg-2);
+    flex: 0 0 24px;
+    position: relative; z-index: 1;
+  }
+  .ck-act-body { flex: 1; font-size: var(--text-sm); padding-top: 4px; min-width: 0; }
+  .ck-act-who { color: var(--fg-1); font-weight: 600; }
+  .ck-act-what { color: var(--fg-2); }
+  .ck-act-when { color: var(--fg-3); }
+  .ck-act-text {
+    color: var(--fg-1);
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-md);
+    padding: 8px 10px;
+    margin-top: 6px;
+    line-height: var(--leading-body);
+  }
+  /* Email header inside an activity row — mirrors a real mail-client header:
+     avatar + sender + subject stacked, To:/Cc: on subtle muted lines. */
+  .ck-email-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+    border-bottom: 1px solid var(--border-1);
+  }
+  .ck-email-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .ck-email-from { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
+  .ck-email-from-name { font-weight: 600; color: var(--fg-1); font-size: 13px; }
+  .ck-email-from-addr { color: var(--fg-3); font-size: 12px; font-family: var(--font-mono); }
+  .ck-email-subject { font-size: 13px; color: var(--fg-1); }
+  .ck-email-recip {
+    display: flex; gap: 6px; align-items: baseline;
+    font-size: 12px; color: var(--fg-2);
+  }
+  .ck-email-recip-l { color: var(--fg-3); flex-shrink: 0; }
+
+  /* Internal notes: subtle but unmistakably yellow so private content is
+     visually flagged. Mixing the dim --warn token (an amber) with bg gave a
+     muddy tan; anchor on a saturated yellow (#FACC15) instead, then keep the
+     mix low so the wash stays calm against the dark/light surface. */
+  .ck-act.is-internal .ck-act-text {
+    background: color-mix(in oklab, #FACC15 16%, var(--bg-2));
+    border-color: color-mix(in oklab, #FACC15 45%, var(--border-1));
+  }
+  /* Failed-to-send / scheduled emails: highlight the body too. */
+  .ck-act.is-error .ck-act-text {
+    background: color-mix(in oklab, var(--danger) 10%, var(--bg-2));
+    border-color: color-mix(in oklab, var(--danger) 35%, var(--border-1));
+  }
+  /* AI suggestions: light-blue wash so generated content is visibly distinct
+     from human activity. */
+  .ck-act.is-ai-suggestion .ck-act-text {
+    background: color-mix(in oklab, var(--info) 14%, var(--bg-2));
+    border-color: color-mix(in oklab, var(--info) 40%, var(--border-1));
+  }
+  /* Row currently targeted by the composer's Reply: faint outline so the
+     user can see which message they're replying to. */
+  .ck-act.is-replying .ck-act-text,
+  .ck-act.is-replying iframe {
+    outline: 1px solid color-mix(in oklab, var(--primary-400) 55%, transparent);
+    outline-offset: 1px;
+  }
+
+  /* ---- Inline note / feed body (trusted in-app HTML, e.g. Tiptap output) ---- */
+  .ck-note-body p { margin: 0 0 8px; }
+  .ck-note-body p:last-child { margin-bottom: 0; }
+  .ck-note-body h1, .ck-note-body h2, .ck-note-body h3, .ck-note-body h4 {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--fg-1);
+    margin: 12px 0 4px;
+    letter-spacing: var(--track-snug);
+  }
+  .ck-note-body ul, .ck-note-body ol { margin: 0 0 8px; padding-left: 20px; }
+  .ck-note-body li { margin-bottom: 2px; }
+  .ck-note-body a { color: var(--primary-300); }
+  .ck-note-body a:hover { color: var(--primary-200); }
+  .ck-note-body code {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    background: var(--bg-3);
+    border-radius: 3px;
+    padding: 1px 5px;
+  }
+  .ck-note-body pre {
+    background: var(--bg-3);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-md);
+    padding: 10px;
+    overflow-x: auto;
+    margin: 0 0 8px;
+  }
+  .ck-note-body pre code { background: none; padding: 0; }
+  .ck-note-body blockquote {
+    margin: 0 0 8px;
+    padding: 4px 12px;
+    border-left: 3px solid var(--border-2);
+    color: var(--fg-2);
+  }
+  .ck-note-body hr {
+    border: none;
+    border-top: 1px solid var(--border-1);
+    margin: 12px 0;
+  }
+  .ck-note-body strong { font-weight: 600; color: var(--fg-1); }
+  .ck-note-body table { border-collapse: collapse; margin: 0 0 8px; }
+  .ck-note-body td, .ck-note-body th {
+    border: 1px solid var(--border-1);
+    padding: 4px 8px;
+  }
+
+  /* ===== Theme toggle (sun/moon segmented switch) ===== */
+  .ck-theme-toggle {
+    display: inline-flex;
+    background: var(--bg-3);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-full);
+    padding: 2px;
+    gap: 0;
+  }
+  .ck-theme-toggle button {
+    background: transparent;
+    border: none;
+    color: var(--fg-3);
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--r-full);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .ck-theme-toggle button:hover { color: var(--fg-1); }
+  .ck-theme-toggle button.is-on {
+    background: var(--bg-1);
+    color: var(--fg-1);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+  [data-theme="light"] .ck-theme-toggle button.is-on {
+    box-shadow: 0 1px 2px rgba(15, 17, 20, 0.08);
+  }
+
+  /* ===== Tabbed record detail (variant D from the design system) ===== */
+  .ck-vt-tabs {
+    display: flex; align-items: center; gap: 2px;
+    border-bottom: 1px solid var(--border-1);
+    padding: 0;
+  }
+  .ck-vt-tab {
+    background: transparent; border: none; color: var(--fg-3);
+    font-family: var(--font-sans); font-size: 12px; font-weight: 500;
+    padding: 10px 14px; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px;
+    border-bottom: 2px solid transparent; margin-bottom: -1px;
+    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-vt-tab:hover { color: var(--fg-1); }
+  .ck-vt-tab.is-on { color: var(--fg-1); border-bottom-color: var(--primary-400); }
+  .ck-vt-tab.is-empty { color: var(--fg-4); }
+  .ck-vt-tab.is-empty .ck-vt-tab-count { background: transparent; color: var(--fg-4); }
+  .ck-vt-tab.is-empty:hover { color: var(--fg-2); }
+  .ck-vt-tab.is-empty.is-on { color: var(--fg-1); }
+  .ck-vt-tab-count {
+    font-family: var(--font-mono); font-size: 10px; color: var(--fg-3);
+    background: var(--bg-3); padding: 1px 5px; border-radius: var(--r-sm);
+  }
+  .ck-vt-body { padding: 24px 0 48px; display: flex; flex-direction: column; gap: 24px; }
+  /* Stack of per-row grids that visually merge into one bordered container.
+     Each row gets its own `.ck-vt-cells` grid so rows can have different
+     column counts (1, 2, 3, 4 fields per line); the radii + duplicate borders
+     between adjacent rows are stripped here so the container reads as one. */
+  .ck-vt-prop { display: flex; flex-direction: column; }
+  .ck-vt-cells {
+    display: grid; gap: 1px;
+    background: var(--border-1);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .ck-vt-prop > .ck-vt-cells:not(:first-child) {
+    border-top: none;
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+  .ck-vt-prop > .ck-vt-cells:not(:last-child) {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  @media (max-width: 900px) {
+    .ck-vt-cells { grid-template-columns: 1fr !important; }
+  }
+  .ck-vt-cell {
+    background: var(--bg-2);
+    padding: 8px 14px;
+    display: flex; flex-direction: row; align-items: center; gap: 12px;
+    min-width: 0; min-height: 36px;
+  }
+  .ck-vt-cell:hover { background: var(--bg-3); }
+  .ck-vt-cell-l {
+    flex: 0 0 auto;
+    min-width: 120px;
+    font-size: 11px; color: var(--fg-3); letter-spacing: 0.02em;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ck-vt-cell-l .ck-req { color: var(--danger); margin-left: 2px; }
+  .ck-vt-cell-v {
+    flex: 1 1 0;
+    font-size: 13px; color: var(--fg-1);
+    min-width: 0; max-width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+  .ck-vt-cell-v > * {
+    min-width: 0; max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  /* Cells holding WYSIWYG iframe (view) or a rich-text editor / multi-line
+     textarea (edit) render as a stack: label on top, value as a full-width
+     block below. The default row layout (label left, value right) only suits
+     short scalar values. */
+  .ck-vt-cell:has(iframe),
+  .ck-vt-cell:has(.ck-tiptap-editor),
+  .ck-vt-cell:has(textarea) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 10px 14px;
+    min-height: 0;
+  }
+  .ck-vt-cell:has(iframe) .ck-vt-cell-l,
+  .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-l,
+  .ck-vt-cell:has(textarea) .ck-vt-cell-l {
+    min-width: 0;
+  }
+  .ck-vt-cell:has(iframe) .ck-vt-cell-v,
+  .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v,
+  .ck-vt-cell:has(textarea) .ck-vt-cell-v {
+    display: block;
+    overflow: visible;
+    text-align: left;
+    flex: none;
+    width: 100%;
+  }
+  .ck-vt-cell:has(iframe) .ck-vt-cell-v > *,
+  .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v > *,
+  .ck-vt-cell:has(textarea) .ck-vt-cell-v > * {
+    width: 100%;
+    display: block;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .ck-vt-cell-v iframe { width: 100%; border: 0; background: var(--bg-1); }
+  /* Form/edit cells must let inputs lay out normally; only view-mode truncates. */
+  .ck-vt-cell.is-form .ck-vt-cell-v {
+    display: block;
+    overflow: visible;
+    text-align: left;
+  }
+  .ck-vt-cell.is-form .ck-vt-cell-v > * {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    display: block;
+    text-align: left;
+  }
+  .ck-vt-cell-error { font-size: 11px; color: var(--danger); margin-left: auto; max-width: 60%; }
+  /* Reset framing on inputs dropped into cells so they read as inline edit. */
+  .ck-vt-cell input[type="text"],
+  .ck-vt-cell input[type="email"],
+  .ck-vt-cell input[type="search"],
+  .ck-vt-cell input[type="number"],
+  .ck-vt-cell input[type="date"],
+  .ck-vt-cell input[type="datetime-local"],
+  .ck-vt-cell select,
+  .ck-vt-cell textarea {
+    width: 100%; background: transparent;
+    border: 1px solid transparent; border-radius: var(--r-sm);
+    padding: 4px 6px; margin: -4px -6px;
+    color: var(--fg-1); font-family: var(--font-sans); font-size: 13px;
+    outline: none;
+  }
+  .ck-vt-cell input[type="text"]:hover,
+  .ck-vt-cell input[type="email"]:hover,
+  .ck-vt-cell input[type="search"]:hover,
+  .ck-vt-cell input[type="number"]:hover,
+  .ck-vt-cell select:hover,
+  .ck-vt-cell textarea:hover { border-color: var(--border-1); background: var(--bg-1); }
+  .ck-vt-cell input[type="text"]:focus,
+  .ck-vt-cell input[type="email"]:focus,
+  .ck-vt-cell input[type="search"]:focus,
+  .ck-vt-cell input[type="number"]:focus,
+  .ck-vt-cell select:focus,
+  .ck-vt-cell textarea:focus { border-color: var(--primary-400); background: var(--bg-1); box-shadow: 0 0 0 3px var(--primary-glow); }
+  .ck-vt-cell-error { font-size: 11px; color: var(--danger); margin-top: 2px; }
+
+  .ck-vt-empty {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    padding: 64px 24px;
+    background: var(--bg-2); border: 1px dashed var(--border-2);
+    border-radius: var(--r-lg);
+    color: var(--fg-2); text-align: center;
+  }
+  .ck-vt-empty-title { font-size: 14px; font-weight: 500; color: var(--fg-1); margin-top: 4px; }
+  .ck-vt-empty-sub { font-size: 12px; color: var(--fg-3); }
+
+  /* ===== Compose / post item (feed composer) ===== */
+  .ck-composer {
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+  }
+  .ck-composer:focus-within { border-color: var(--border-2); }
+  .ck-composer-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border-1);
+    padding: 0 4px;
+  }
+  .ck-composer-tab {
+    background: transparent;
+    border: none;
+    color: var(--fg-2);
+    font-size: var(--text-xs);
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    font-family: var(--font-sans);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-composer-tab:hover { color: var(--fg-1); }
+  .ck-composer-tab.is-on { color: var(--fg-1); border-bottom-color: var(--primary-400); }
+  .ck-composer-tab:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .ck-composer-body { padding: 0; }
+  .ck-composer-text {
+    width: 100%;
+    background: transparent;
+    border: none;
+    padding: 12px;
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    font-size: var(--text-md);
+    line-height: var(--leading-body);
+    resize: none;
+    min-height: 72px;
+    outline: none;
+  }
+  .ck-composer-text::placeholder { color: var(--fg-3); }
+
+  .ck-composer-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 8px;
+    border-top: 1px solid var(--border-1);
+    gap: 8px;
+  }
+  .ck-composer-tools {
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ----- Email composer (label/field rows) ----- */
+  .ck-cmp-fields { display: flex; flex-direction: column; }
+  .ck-cmp-row {
+    display: grid;
+    grid-template-columns: 60px 1fr auto;
+    align-items: center;
+    gap: 8px;
+    padding: 0 14px;
+    min-height: 30px;
+    border-bottom: 1px solid var(--border-1);
+  }
+  .ck-cmp-row:hover { background: var(--bg-2); }
+  .ck-cmp-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--fg-2);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .ck-cmp-label .ck-req { color: var(--danger); font-weight: 500; }
+  .ck-cmp-hint { font-size: 10px; font-weight: 400; color: var(--fg-3); text-transform: none; }
+  .ck-cmp-field { min-width: 0; }
+  .ck-cmp-act { display: flex; align-items: center; }
+  .ck-cmp-link {
+    background: transparent;
+    border: none;
+    color: var(--primary-300);
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    padding: 4px 6px;
+    border-radius: var(--r-sm);
+  }
+  .ck-cmp-link:hover { background: var(--primary-glow); }
+  [data-theme="light"] .ck-cmp-link { color: var(--primary-500); }
+
+  /* Strip framing off any field component dropped into a .ck-cmp-field cell so
+     the row reads as a single editable line, not a nested card. */
+  .ck-cmp-field input[type="text"],
+  .ck-cmp-field input[type="email"],
+  .ck-cmp-field input[type="search"],
+  .ck-cmp-field input[type="number"] {
+    width: 100%;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-md);
+    padding: 2px 6px;
+    height: 26px;
+    color: var(--fg-1);
+    font-family: var(--font-sans);
+    font-size: 13px;
+    outline: none;
+  }
+  .ck-cmp-field input[type="text"]:hover,
+  .ck-cmp-field input[type="email"]:hover,
+  .ck-cmp-field input[type="search"]:hover,
+  .ck-cmp-field input[type="number"]:hover {
+    border-color: var(--border-1);
+    background: var(--bg-2);
+  }
+  .ck-cmp-field input[type="text"]:focus,
+  .ck-cmp-field input[type="email"]:focus,
+  .ck-cmp-field input[type="search"]:focus,
+  .ck-cmp-field input[type="number"]:focus {
+    border-color: var(--primary-400);
+    background: var(--bg-1);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+  }
+
+  /* Pill chip used by the From row to signal "shared inbox" etc. */
+  .ck-cmp-pill {
+    font-size: 10px;
+    color: var(--fg-3);
+    background: var(--bg-3);
+    border-radius: var(--r-full);
+    padding: 1px 8px;
+    white-space: nowrap;
+  }
+
+  /* Compact attachment card under the body */
+  .ck-att-row {
+    padding: 0 14px 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .ck-att-card {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-md);
+    padding: 6px 8px 6px 10px;
+    max-width: 100%;
+    min-width: 0;
+  }
+  .ck-att-icon {
+    width: 28px; height: 28px;
+    background: var(--bg-3);
+    border-radius: var(--r-sm);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--info);
+    flex-shrink: 0;
+  }
+  .ck-att-meta { display: flex; flex-direction: column; min-width: 0; }
+  .ck-att-name {
+    font-size: 12px;
+    color: var(--fg-1);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 240px;
+  }
+  .ck-att-size {
+    font-size: 10px;
+    color: var(--fg-3);
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+  .ck-att-add {
+    background: transparent;
+    border: 1px dashed var(--border-2);
+    color: var(--fg-3);
+    font-size: 11px;
+    padding: 6px 10px;
+    border-radius: var(--r-md);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font-sans);
+    white-space: nowrap;
+  }
+  .ck-att-add:hover { color: var(--fg-1); border-color: var(--border-3); }
+  .ck-att-add input { display: none; }
+
+  /* Pill-style chip used in composer footers (Send later, Track opens, …) */
+  .ck-chip-tag {
+    background: transparent;
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-full);
+    padding: 4px 10px;
+    font-size: 11px;
+    color: var(--fg-2);
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    white-space: nowrap;
+  }
+  .ck-chip-tag:hover {
+    background: var(--bg-3);
+    color: var(--fg-1);
+    border-color: var(--border-2);
+  }
+
+  /* Strip the WYSIWYG editor's own surrounding borders / radius when it sits
+     inside the composer panel so the toolbar reads as part of the composer
+     instead of a nested card. */
+  .ck-composer-rich .ck-tiptap-editor {
+    border: none !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    min-height: 96px !important;
+    padding: 12px !important;
+  }
+  .ck-composer-rich .ck-tiptap-editor:focus {
+    box-shadow: none !important;
+  }
+  /* Tiptap toolbar bar (the .flex.flex-wrap.items-center.gap-1.p-2 strip
+     produced by BaseWYSIWYGEditor) — flatten its border so it sits flush
+     above the editor content area. */
+  .ck-composer-rich > div > .flex.flex-wrap.items-center.gap-1 {
+    border: none !important;
+    border-bottom: 1px solid var(--border-1) !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Pull a child out of the BaseLayout main-body's px-6 py-5 padding so a
+     view (swimlane, pipeline, list) can render full-bleed against the
+     sidebar / topbar — matching the design's "list & pipeline views are
+     full-bleed" rule. The horizontal value matches Tailwind's px-6 = 24px
+     and the vertical value matches py-5 = 20px applied at BaseLayout. */
+  .ck-fullbleed {
+    margin-left: -24px;
+    margin-right: -24px;
+    margin-top: -20px;
+    margin-bottom: -20px;
+    width: calc(100% + 48px);
+  }
+
+  /* ===== Swimlane (pivot grid) ===== */
+  .ck-swim { display: flex; flex-direction: column; height: 100%; overflow: auto; }
+  .ck-swim-head, .ck-swim-row { display: grid; gap: 1px; background: var(--border-1); }
+  .ck-swim-head { position: sticky; top: 0; z-index: 2; background: var(--border-1); }
+  .ck-swim-head > div {
+    background: var(--bg-1); padding: 10px 12px;
+    font-size: 11px; font-weight: 600; color: var(--fg-2);
+    text-transform: uppercase; letter-spacing: 0.06em;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ck-swim-corner { color: var(--fg-3); }
+  .ck-swim-row > div {
+    background: var(--bg-1); padding: 10px; min-height: 88px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .ck-swim-row-head {
+    background: var(--bg-2) !important; justify-content: center !important; gap: 4px !important;
+  }
+  .ck-swim-row--alt > div { background: var(--bg-2); }
+  .ck-swim-row--alt .ck-swim-row-head { background: var(--bg-3) !important; }
+  .ck-srh-label { font-size: 12px; font-weight: 600; color: var(--fg-1); }
+  .ck-srh-meta { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); }
+
+  .ck-swim-card {
+    background: var(--bg-2); border: 1px solid var(--border-1); border-radius: 6px;
+    padding: 8px 10px; display: flex; flex-direction: column; gap: 4px; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-swim-card:hover { background: var(--bg-3); border-color: var(--border-2); }
+  .ck-swim-card.is-dragging { opacity: 0.5; }
+  .ck-sc-id { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+  .ck-sc-title { font-size: 12px; font-weight: 500; color: var(--fg-1); line-height: 1.3; }
+  .ck-sc-foot { display: flex; align-items: center; justify-content: space-between; padding-top: 4px; gap: 6px; }
+  .ck-sc-amt { font-family: var(--font-mono); font-size: 11px; color: var(--fg-1); font-weight: 500; }
+  .ck-swim-empty { flex: 1; min-height: 40px; }
+
+  /* ===== Gallery (knowledge-base style cards) ===== */
+  .ck-gal-wrap { display: flex; flex-direction: column; gap: 18px; }
+  .ck-gal-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; }
+  .ck-gal-title-h { font-size: 24px; font-weight: 600; letter-spacing: -0.025em; color: var(--fg-1); margin: 0; }
+  .ck-gal-sub { font-size: 12px; color: var(--fg-3); margin-top: 4px; }
+  .ck-gal-filters { display: flex; gap: 4px; flex-wrap: wrap; }
+  .ck-gf {
+    background: transparent; border: 1px solid var(--border-1);
+    border-radius: 999px; padding: 4px 12px;
+    font-size: 11px; color: var(--fg-2); cursor: pointer; font-family: var(--font-sans);
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .ck-gf:hover { background: var(--bg-2); color: var(--fg-1); }
+  .ck-gf.is-on { background: var(--bg-3); color: var(--fg-1); border-color: var(--border-2); }
+
+  .ck-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 14px;
+  }
+  .ck-gal-card {
+    background: var(--bg-2); border: 1px solid var(--border-1); border-radius: 10px;
+    overflow: hidden; cursor: pointer;
+    transition: border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .ck-gal-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+  .ck-gal-thumb { height: 110px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+  .ck-gal-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .ck-gal-thumb-tint { position: absolute; inset: 0; pointer-events: none; }
+  .ck-gal-glyph { font-size: 48px; opacity: 0.85; font-weight: 700; }
+  .ck-gal-meta { padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+  .ck-gal-cat { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); }
+  .ck-gal-name { font-size: 14px; font-weight: 600; color: var(--fg-1); letter-spacing: -0.01em; line-height: 1.3; }
+  .ck-gal-foot { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-3); margin-top: 4px; }
+  .ck-gal-author { color: var(--fg-2); }
+  .ck-gal-sep { color: var(--fg-4); }
+  .ck-gal-time { font-family: var(--font-mono); white-space: nowrap; }
+  .ck-gal-spacer { flex: 1; }
+  .ck-gal-reads { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); }
+
+  /* ===== Conversation (3-pane) ===== */
+  .ck-conv {
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 240px;
+    grid-template-rows: minmax(0, 1fr);
+    height: calc(100vh - var(--topbar-h));
+    overflow: hidden;
+    background: var(--bg-1);
+  }
+  @media (max-width: 1100px) { .ck-conv { grid-template-columns: 240px minmax(0, 1fr); } .ck-conv-side { display: none; } }
+  @media (max-width: 820px)  { .ck-conv { grid-template-columns: 220px minmax(0, 1fr); } }
+
+  .ck-conv-list { border-right: 1px solid var(--border-1); display: flex; flex-direction: column; background: var(--bg-0); min-width: 0; }
+  .ck-conv-list-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-bottom: 1px solid var(--border-1); gap: 8px;
+  }
+  .ck-clh-tabs { display: flex; gap: 2px; flex: 1; min-width: 0; }
+  .ck-clt {
+    background: transparent; border: none; color: var(--fg-2);
+    font-size: 11px; font-weight: 500; padding: 4px 8px;
+    border-radius: var(--r-sm); cursor: pointer; font-family: var(--font-sans);
+    display: inline-flex; gap: 5px; align-items: center; white-space: nowrap;
+  }
+  .ck-clt:hover { background: var(--bg-2); color: var(--fg-1); }
+  .ck-clt.is-on { background: var(--bg-3); color: var(--fg-1); }
+  .ck-clt-c { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
+  .ck-conv-rows { flex: 1; overflow: auto; }
+  .ck-cr-unread {
+    background: var(--primary-400); color: #0B0C0E;
+    font-size: 10px; font-weight: 600;
+    border-radius: var(--r-full); min-width: 16px; height: 16px;
+    display: inline-flex; align-items: center; justify-content: center;
+    padding: 0 5px; align-self: center;
+  }
+  .ck-conv-row {
+    display: flex; gap: 10px; padding: 12px;
+    border-bottom: 1px solid var(--border-1);
+    cursor: pointer; align-items: flex-start; position: relative;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .ck-conv-row:hover { background: var(--bg-2); }
+  .ck-conv-row.is-on { background: var(--bg-3); }
+  .ck-conv-row.is-on::before {
+    content: ''; position: absolute; left: 0; top: 0; bottom: 0;
+    width: 2px; background: var(--primary-400);
+  }
+  .ck-cr-body { flex: 1; min-width: 0; }
+  .ck-cr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
+  .ck-cr-who { font-size: 12px; font-weight: 600; color: var(--fg-1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-cr-when { font-size: 10px; color: var(--fg-3); font-family: var(--font-mono); flex-shrink: 0; white-space: nowrap; }
+  .ck-cr-company { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-cr-preview { font-size: 12px; color: var(--fg-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+
+  .ck-conv-thread { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .ck-ct-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; border-bottom: 1px solid var(--border-1); gap: 10px; }
+  .ck-cth-who { font-size: 13px; font-weight: 600; color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-cth-co  { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .ck-ct-body { flex: 1; min-height: 0; overflow: auto; padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+  .ck-bubble-row { display: flex; gap: 8px; max-width: 75%; min-width: 0; }
+  .ck-bubble-row.is-out { align-self: flex-end; flex-direction: row-reverse; }
+  .ck-bubble-stack { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+  .ck-bubble {
+    padding: 8px 12px; border-radius: 12px;
+    font-size: 13px; line-height: 1.45;
+    max-width: 100%; word-wrap: break-word; overflow-wrap: break-word;
+  }
+  .ck-bubble-in  { background: var(--bg-3); color: var(--fg-1); border-bottom-left-radius: 4px; }
+  .ck-bubble-out { background: var(--primary-400); color: #0B0C0E; border-bottom-right-radius: 4px; }
+  [data-theme="light"] .ck-bubble-out { color: #fff; }
+  .ck-bubble-system {
+    align-self: center; background: var(--danger-bg); color: var(--danger);
+    border: 1px solid var(--danger); border-radius: var(--r-md);
+    padding: 6px 10px; font-size: 12px;
+  }
+  .ck-bubble-meta { font-size: 10px; color: var(--fg-3); font-family: var(--font-mono); padding: 0 4px; }
+  .ck-bubble-row.is-out .ck-bubble-meta { text-align: right; }
+
+  .ck-ct-composer { border-top: 1px solid var(--border-1); padding: 10px; display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+  .ck-ct-composer textarea {
+    width: 100%; background: var(--bg-2); border: 1px solid var(--border-1);
+    border-radius: 6px; padding: 10px;
+    color: var(--fg-1); font-family: var(--font-sans); font-size: 13px;
+    resize: none; min-height: 60px; outline: none;
+  }
+  .ck-ct-composer textarea:focus { border-color: var(--primary-400); box-shadow: var(--shadow-focus); }
+
+  .ck-conv-side { background: var(--bg-0); border-left: 1px solid var(--border-1); padding: 18px; display: flex; flex-direction: column; gap: 22px; overflow: auto; min-width: 0; }
+  .ck-cs-head { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--fg-3); margin-bottom: 8px; }
+  .ck-cs-row { display: grid; grid-template-columns: 96px 1fr; align-items: center; padding: 4px 0; font-size: 12px; gap: 8px; }
+  .ck-cs-label { color: var(--fg-3); }
+  .ck-cs-value { color: var(--fg-1); min-width: 0; }
+  .ck-cs-value > * { min-width: 0; max-width: 100%; }
+  .ck-cs-customer { display: flex; gap: 10px; align-items: center; min-width: 0; }
+  .ck-cs-customer > div { display: flex; flex-direction: column; min-width: 0; }
+  .ck-cs-who { font-size: 13px; font-weight: 600; color: var(--fg-1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-cs-meta { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-cs-deal {
+    background: var(--bg-2); border: 1px solid var(--border-1);
+    border-radius: var(--r-md); padding: 10px; cursor: pointer;
+    transition: background var(--dur-fast) var(--ease-out);
+    display: block;
+  }
+  .ck-cs-deal:hover { background: var(--bg-3); }
+  .ck-cs-deal-name { font-size: 12px; font-weight: 600; color: var(--fg-1); margin-bottom: 4px; }
+  .ck-cs-deal-meta { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); }
+  .ck-cs-assignee { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg-1); }
+  .ck-cs-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+  .ck-cs-tag {
+    font-size: 11px; color: var(--fg-2);
+    background: var(--bg-3); border-radius: var(--r-full);
+    padding: 2px 8px; border: 1px solid var(--border-1);
+  }
+  .ck-cs-add {
+    background: transparent; border: 1px dashed var(--border-2);
+    border-radius: var(--r-full); padding: 2px 8px;
+    font-size: 10px; color: var(--fg-3); cursor: pointer;
+    display: inline-flex; gap: 4px; align-items: center;
+    font-family: var(--font-sans);
+  }
+  .ck-cs-add:hover { color: var(--fg-1); border-color: var(--border-3); }
+
+  /* ===== Quadrant ===== */
+  .ck-quad-wrap { display: flex; flex-direction: column; gap: 18px; }
+  .ck-quad-head { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 14px; }
+  .ck-quad-h { font-size: 22px; font-weight: 600; letter-spacing: -0.025em; color: var(--fg-1); margin: 0; }
+  .ck-quad-sub { font-size: 12px; color: var(--fg-3); margin-top: 4px; }
+  .ck-quad-legend { display: flex; gap: 12px; flex-wrap: wrap; }
+  .ck-qlg { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-2); }
+  .ck-qlgd { width: 8px; height: 8px; border-radius: 999px; }
+
+  .ck-quad-board { position: relative; background: var(--bg-2); border: 1px solid var(--border-1); border-radius: 12px; padding: 28px; }
+  .ck-quad-grid {
+    position: relative;
+    /* Fit within the available viewport: aspect-driven width but capped so a
+       wide screen doesn't make the board taller than the user can see. */
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    max-height: 52vh;
+    min-height: 240px;
+    margin: 0 auto;
+    background:
+      radial-gradient(circle at 50% 50%, rgba(123,127,255,0.04), transparent 70%),
+      repeating-linear-gradient(0deg, var(--border-1) 0, var(--border-1) 1px, transparent 1px, transparent 40px),
+      repeating-linear-gradient(90deg, var(--border-1) 0, var(--border-1) 1px, transparent 1px, transparent 40px);
+    border: 1px solid var(--border-1); border-radius: 8px; overflow: hidden;
+  }
+  .ck-qline { position: absolute; background: var(--border-2); }
+  .ck-qline-h { left: 0; right: 0; top: 50%; height: 1px; }
+  .ck-qline-v { top: 0; bottom: 0; left: 50%; width: 1px; }
+  .ck-ql {
+    position: absolute; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--fg-4); padding: 8px 12px;
+  }
+  .ck-ql-tl { top: 0; left: 0; }
+  .ck-ql-tr { top: 0; right: 0; }
+  .ck-ql-bl { bottom: 0; left: 0; }
+  .ck-ql-br { bottom: 0; right: 0; }
+
+  .ck-qax-y-top, .ck-qax-y-bot, .ck-qax-x-l, .ck-qax-x-r {
+    position: absolute; font-size: 10px; color: var(--fg-3); font-weight: 500;
+  }
+  .ck-qax-y-top { left: 8px; top: 36px; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .ck-qax-y-bot { left: 8px; bottom: 36px; writing-mode: vertical-rl; transform: rotate(180deg); }
+  .ck-qax-x-l { bottom: 12px; left: 36px; }
+  .ck-qax-x-r { bottom: 12px; right: 36px; }
+
+  .ck-qdot {
+    position: absolute; border-radius: 999px; cursor: pointer;
+    box-shadow: 0 0 0 2px var(--bg-2), 0 4px 12px rgba(0,0,0,0.3);
+    transition: transform 120ms;
+  }
+  .ck-qdot:hover { transform: scale(1.1); }
+  .ck-qdot-label {
+    position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+    margin-top: 6px; font-size: 11px; color: var(--fg-1);
+    white-space: nowrap; font-weight: 500;
+  }
+
+  .ck-quad-table {
+    background: var(--bg-2); border: 1px solid var(--border-1);
+    border-radius: 8px; overflow: hidden;
+  }
+  .ck-qt-head, .ck-qt-row {
+    display: flex; align-items: center; gap: 12px; padding: 8px 14px; font-size: 12px;
+  }
+  .ck-qt-head {
+    color: var(--fg-3); border-bottom: 1px solid var(--border-1);
+    font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .ck-qt-row { border-bottom: 1px solid var(--border-1); }
+  .ck-qt-row:last-child { border-bottom: none; }
+  .ck-qt-row:hover, .ck-qt-row.is-hover { background: var(--bg-3); }
+  .ck-qt-dot { width: 8px; height: 8px; border-radius: 999px; }
+  .ck-qt-name { color: var(--fg-1); font-weight: 500; }
+  .ck-qt-bar { width: 100%; height: 4px; background: var(--bg-4); border-radius: 999px; overflow: hidden; }
+  .ck-qt-bar-fill { height: 100%; border-radius: 999px; }
+
+  /* ---- Inbox row ---- */
+  .ck-inbox-row {
+    display: flex; gap: 12px;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-1);
+    cursor: pointer;
+    align-items: flex-start;
+    transition: background var(--dur-fast) var(--ease-out);
+  }
+  .ck-inbox-row:hover { background: var(--bg-2); }
+  .ck-inbox-row.is-unread { background: rgba(123,127,255,0.04); }
+
+  /* ---- Command palette ---- */
+  .ck-cmd-backdrop {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55);
+    display: flex; align-items: flex-start; justify-content: center;
+    padding-top: 15vh;
+    z-index: 100;
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+  }
+  .ck-cmd {
+    width: 580px; max-width: 90vw;
+    background: var(--bg-4);
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-xl);
+    box-shadow: var(--shadow-modal);
+    overflow: hidden;
+  }
+  .ck-cmd-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 7px 10px;
+    border-radius: var(--r-sm);
+    font-size: var(--text-sm);
+    color: var(--fg-1);
+    cursor: pointer;
+  }
+  .ck-cmd-item.is-on { background: var(--bg-5); }
+
+  /* ---- Markdown composer (textarea + format toolbar) ----
+     Used in the agent chat composer and the customer-facing widget. Output
+     is markdown text; SafeMarkdown renders it on the receiving end. */
+  .ck-md-composer { display: flex; flex-direction: column; min-width: 0; }
+  .ck-md-toolbar {
+    display: flex;
+    gap: 4px;
+    padding: 4px 2px 8px;
+  }
+  .ck-md-tool {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    border-radius: var(--r-md);
+    color: var(--fg-2);
+    background: transparent;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition:
+      background var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+  .ck-md-tool:hover {
+    background: var(--bg-3);
+    color: var(--fg-1);
+    border-color: var(--border-1);
+  }
+  .ck-md-tool:active { background: var(--bg-2); }
+  .ck-md-tool:focus-visible {
+    outline: none;
+    border-color: var(--primary-400);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+  }
+  .ck-md-tool:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Tighter markdown inside chat bubbles — bubble already pads and colors. */
+  .ck-bubble .ck-note-body { color: inherit; }
+  .ck-bubble .ck-note-body :first-child { margin-top: 0; }
+  .ck-bubble .ck-note-body :last-child { margin-bottom: 0; }
+  .ck-bubble-out .ck-note-body a { color: inherit; text-decoration: underline; }
+
+  /* ---- Typing indicator (chat bubble) ---- */
+  .ck-bubble-typing { display: inline-flex; gap: 3px; padding: 10px 12px; }
+  .ck-typing-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--fg-3);
+    animation: ck-typing-bounce 1.2s infinite ease-in-out;
+  }
+  .ck-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+  .ck-typing-dot:nth-child(3) { animation-delay: 0.30s; }
+  @keyframes ck-typing-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-4px); opacity: 1; }
+  }
+}
+
+/* ==========================================================================
+   Dashboard widget grid (kept from prior; tokenized)
+   ========================================================================== */
+
+@layer components {
+  .widget-grid {
+    @apply grid grid-cols-3 gap-6;
+    display: grid !important;
+  }
+
+  .widget-item {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-2);
+    border: 1px solid var(--border-1);
+    border-radius: var(--r-lg);
+    overflow: hidden;
+    transition: border-color var(--dur-med) var(--ease-out), background var(--dur-med) var(--ease-out);
+    min-height: 300px;
+    width: 100%;
+  }
+  .widget-item:hover { border-color: var(--border-2); }
+
+  .widget-width-1 { grid-column: span 1 !important; }
+  .widget-width-2 { grid-column: span 2 !important; }
+  .widget-width-3 { grid-column: span 3 !important; }
+}

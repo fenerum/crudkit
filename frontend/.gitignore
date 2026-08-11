@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+.DS_Store
+.env*.local

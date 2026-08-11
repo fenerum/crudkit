@@ -46,3 +46,10 @@ so the built SPA ships inside the `django-crudkit` wheel and is served by the
 `crudkit_frontend` Django app. The shell is rendered as a Django template; the
 `{{ csrf_token }}` and `{{ crudkit_config_json }}` placeholders survive the
 Vite build untouched (asserted by `scripts/postbuild.mjs`).
+
+Sourcemaps are not emitted by default (the `.js.map` is ~6.6 MB and would
+ship in the wheel). To debug a production bundle, build with:
+
+```bash
+CRUDKIT_SOURCEMAP=1 npm run build
+```

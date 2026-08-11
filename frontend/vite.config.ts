@@ -39,7 +39,9 @@ export default defineConfig(({ command, mode }) => {
         '../backend/src/crudkit_frontend/static/crudkit_frontend'
       ),
       emptyOutDir: true,
-      sourcemap: true,
+      // The ~6.6 MB .js.map would ship in the wheel; set CRUDKIT_SOURCEMAP=1
+      // when you need to debug the production bundle.
+      sourcemap: !!process.env.CRUDKIT_SOURCEMAP,
     },
     test: {
       globals: true,

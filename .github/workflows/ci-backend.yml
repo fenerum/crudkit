@@ -1,0 +1,72 @@
+name: backend
+
+on:
+  push:
+    branches: [main]
+    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
+  pull_request:
+    paths: ["backend/**", ".github/workflows/ci-backend.yml"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+        django-version: ["5.1.*", "5.2.*"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install
+        working-directory: backend
+        run: |
+          uv sync --all-extras
+          uv pip install "Django==${{ matrix.django-version }}"
+      - name: Lint
+        working-directory: backend
+        run: uv run ruff check src tests
+      - name: Migration drift check
+        working-directory: backend
+        run: uv run manage.py makemigrations --check --dry-run
+      - name: Tests (SQLite)
+        working-directory: backend
+        run: uv run manage.py test crudkit crudkit_api crudkit_assistant tests --noinput
+
+  test-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: crudkit
+          POSTGRES_PASSWORD: crudkit
+          POSTGRES_DB: crudkit
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U crudkit"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://crudkit:crudkit@localhost:5432/crudkit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.13"
+      - name: Install
+        working-directory: backend
+        run: uv sync --all-extras
+      - name: Fresh migrate on empty Postgres
+        working-directory: backend
+        run: uv run manage.py migrate
+      - name: Tests (Postgres)
+        working-directory: backend
+        run: uv run manage.py test crudkit crudkit_api crudkit_assistant tests --noinput

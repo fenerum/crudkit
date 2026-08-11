@@ -1,0 +1,8 @@
+[project]
+name = "crudkit-demo"
+version = "0.0.0"
+requires-python = ">=3.12"
+dependencies = ["django-crudkit[api]"]
+
+[tool.uv.sources]
+django-crudkit = { path = "../../backend", editable = true }

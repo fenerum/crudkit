@@ -1,0 +1,64 @@
+[project]
+name = "django-crudkit"
+version = "0.1.0"
+description = "A metadata-driven CRUD framework for Django: typed object IDs, soft delete, merge, change log, activity feed, saved views, AI fields and a generic REST API."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "Fenerum ApS" }]
+keywords = ["django", "crud", "framework", "rest", "api"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Framework :: Django",
+    "Framework :: Django :: 5.1",
+    "Framework :: Django :: 5.2",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "Django>=5.1",
+    "celery>=5.3",
+    "pydantic>=2.11",
+    "pydantic-ai-slim>=1.39",
+    "pyjwt>=2.9",
+    "django-phonenumber-field[phonenumberslite]>=8.0",
+]
+
+[project.optional-dependencies]
+api = [
+    "djangorestframework>=3.15",
+    "djangorestframework-simplejwt>=5.4",
+    "drf-extra-fields>=3.7",
+]
+assistant = [
+    "django-crudkit[api]",
+    "channels>=4.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/fenerum/crudkit"
+Changelog = "https://github.com/fenerum/crudkit/blob/main/backend/CHANGELOG.md"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/crudkit", "src/crudkit_api", "src/crudkit_assistant"]
+exclude = ["**/tests"]
+
+[dependency-groups]
+dev = [
+    "psycopg2-binary>=2.9",
+    "ruff>=0.7.0",
+]
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B"]
+# B904 (raise ... from) is suppressed for now: the extracted code predates the
+# rule and adding `from` clauses changes traceback chaining output.
+ignore = ["B904"]

@@ -1,9 +1,12 @@
 import * as React from "react";
 import {useEffect, useState, useMemo, useCallback, useRef} from "react";
-import CrudKitAPIClient, {fetchObjects} from "@/data/api";
-import {useQuery} from "@tanstack/react-query";
+import {fetchObjects} from "@/data/api";
 import {Link, Outlet, useLocation, useNavigate} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
+import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
+import {useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
+import {resolveWorkspaceViews} from "../utils/workspaces";
+import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
 import defaultLogoUrl from "../images/logo.svg";
 import faviconUrl from "../images/favicon.svg";
 import {appConfig} from "../utils/appConfig";
@@ -120,7 +123,14 @@ function Topbar({ menuActive, setMenuActive, handleNavClick }) {
 }
 
 export default function BaseLayout() {
-  const client = useMemo(() => new CrudKitAPIClient(), []);
+  return (
+    <WorkspaceProvider>
+      <BaseLayoutInner />
+    </WorkspaceProvider>
+  );
+}
+
+function BaseLayoutInner() {
   const navigate = useNavigate();
   const {pathname} = useLocation();
   const {user, logout} = useAuth();
@@ -176,19 +186,56 @@ export default function BaseLayout() {
     link.href = faviconUrl;
   }, []);
 
-  const {isPending, data: viewsData} = useQuery({
-    queryKey: ['list', 'VIW', { show_in_menu: true }],
-    queryFn: () => client.list("VIW", {"show_in_menu": true})
-  });
+  const {isPending, items: allViews} = useMenuViews();
+  const {isPending: workspacesPending, items: allWorkspaces} = useWorkspaces();
+  const {activeWorkspaceId, setActiveWorkspaceId} = useWorkspace();
 
-  const rootViews = viewsData?.isPaginated ? viewsData.results : viewsData;
+  // Group views by ownership: public views show under "Workspace"; private
+  // views the current user created show under "My Views" with colored dots.
+  const userId = user?.id;
+  const isMineAndPrivate = useCallback((v) => {
+    if (v.public) return false;
+    const owner = typeof v.created_by === 'object' ? v.created_by?.id : v.created_by;
+    return owner != null && userId != null && String(owner) === String(userId);
+  }, [userId]);
+
+  const rootViews = useMemo(() => allViews.filter(v => v.show_in_menu), [allViews]);
+  const myViews = useMemo(() => rootViews.filter(isMineAndPrivate), [rootViews, isMineAndPrivate]);
+  const workspaceViews = useMemo(() => rootViews.filter(v => !isMineAndPrivate(v)), [rootViews, isMineAndPrivate]);
+
+  const visibleWorkspaces = useMemo(
+    () => allWorkspaces.filter(w => w.public || isMineAndPrivate(w)),
+    [allWorkspaces, isMineAndPrivate]
+  );
+  const activeWorkspace = useMemo(
+    () => visibleWorkspaces.find(w => String(w.id) === String(activeWorkspaceId)) || null,
+    [visibleWorkspaces, activeWorkspaceId]
+  );
+  // Tabs may pin any view, including ones with show_in_menu=False, so resolve
+  // against the full view list.
+  const workspaceTabs = useMemo(
+    () => resolveWorkspaceViews(activeWorkspace, allViews),
+    [activeWorkspace, allViews]
+  );
+
+  // Clear a stale stored workspace id (deleted, or not visible to this user).
+  useEffect(() => {
+    if (activeWorkspaceId && !workspacesPending && !activeWorkspace) {
+      setActiveWorkspaceId(null);
+    }
+  }, [activeWorkspaceId, workspacesPending, activeWorkspace, setActiveWorkspaceId]);
 
   const [badgeCounts, setBadgeCounts] = useState({});
 
+  // Only poll counts for views currently displayed in the sidebar.
   const viewsWithBadges = useMemo(() => {
-    if (!rootViews) return [];
-    return rootViews.filter(v => v.show_badge_in_menu);
-  }, [rootViews]);
+    const displayed = activeWorkspace ? [...workspaceTabs, ...myViews] : rootViews;
+    const badged = new Map();
+    displayed.forEach((v) => {
+      if (v.show_badge_in_menu && !badged.has(v.id)) badged.set(v.id, v);
+    });
+    return [...badged.values()];
+  }, [activeWorkspace, workspaceTabs, myViews, rootViews]);
 
   useEffect(() => {
     const fetchBadgeCounts = async () => {
@@ -222,17 +269,6 @@ export default function BaseLayout() {
     }
   }, []);
 
-  // Group views by ownership: public views show under "Workspace"; private
-  // views the current user created show under "My Views" with colored dots.
-  const userId = user?.id;
-  const isMineAndPrivate = useCallback((v) => {
-    if (v.public) return false;
-    const owner = typeof v.created_by === 'object' ? v.created_by?.id : v.created_by;
-    return owner != null && userId != null && String(owner) === String(userId);
-  }, [userId]);
-  const myViews = useMemo(() => (rootViews || []).filter(isMineAndPrivate), [rootViews, isMineAndPrivate]);
-  const workspaceViews = useMemo(() => (rootViews || []).filter(v => !isMineAndPrivate(v)), [rootViews, isMineAndPrivate]);
-
   const userName = user?.first_name
     ? `${user.first_name} ${user.last_name || ''}`.trim()
     : (user?.username || 'User');
@@ -253,25 +289,34 @@ export default function BaseLayout() {
           className={sidebarClasses}
           style={{width: 'var(--sidebar-w)', padding: '10px 8px'}}
         >
-          {/* Workspace header */}
-          <Link
-            to="/"
-            onClick={handleNavClick}
-            className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-2"
-          >
-            <span className="flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 6, overflow: 'hidden', flex: '0 0 24px', background: 'var(--primary-400)'}}>
-              <img
-                src={appConfig.logo_url || defaultLogoUrl}
-                alt={appConfig.app_name}
-                style={{width: 18, height: 18, objectFit: 'contain'}}
-              />
-            </span>
-            <span className="flex-1 min-w-0">
-              <span className="block text-sm font-semibold text-fg-1 truncate">{appConfig.org_name}</span>
-              <span className="block text-2xs text-fg-3">{userName}</span>
-            </span>
-            <Icon name="chevrons-up-down" size={14} color="var(--fg-3)" />
-          </Link>
+          {/* Workspace header — a picker when workspaces exist, else a home link */}
+          {visibleWorkspaces.length > 0 ? (
+            <WorkspaceSwitcher
+              workspaces={visibleWorkspaces}
+              activeWorkspace={activeWorkspace}
+              onSelect={setActiveWorkspaceId}
+              userName={userName}
+            />
+          ) : (
+            <Link
+              to="/"
+              onClick={handleNavClick}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-2"
+            >
+              <span className="flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 6, overflow: 'hidden', flex: '0 0 24px', background: 'var(--primary-400)'}}>
+                <img
+                  src={appConfig.logo_url || defaultLogoUrl}
+                  alt={appConfig.app_name}
+                  style={{width: 18, height: 18, objectFit: 'contain'}}
+                />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-semibold text-fg-1 truncate">{appConfig.org_name}</span>
+                <span className="block text-2xs text-fg-3">{userName}</span>
+              </span>
+              <Icon name="chevrons-up-down" size={14} color="var(--fg-3)" />
+            </Link>
+          )}
 
           {/* Search trigger */}
           <button
@@ -302,10 +347,10 @@ export default function BaseLayout() {
             />
           </NavSection>
 
-          {/* Workspace */}
-          {workspaceViews.length > 0 && (
-            <NavSection title="Workspace">
-              {workspaceViews.map((view) => {
+          {/* Workspace — the active workspace's tabs, or all shared views */}
+          {(activeWorkspace || workspaceViews.length > 0) && (
+            <NavSection title={activeWorkspace ? activeWorkspace.name : 'Workspace'}>
+              {(activeWorkspace ? workspaceTabs : workspaceViews).map((view) => {
                 const href = view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
                 const active = pathname === href || pathname.startsWith(`/${view.model}`);
                 return (

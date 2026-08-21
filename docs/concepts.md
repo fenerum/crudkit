@@ -81,6 +81,22 @@ the view and applies its filters and ordering server-side. Views are
 themselves CrudKit models, so they are managed through the same generic API
 (`/api/v1/VIW/`) — the SPA's "save this view" feature is just a POST.
 
+## Workspaces
+
+A `Workspace` (TYPE_ID `WSP`) is a named, switchable bundle of saved views —
+like a Salesforce app with its own tabs. Its `views` field is an ordered JSON
+list of View CK-IDs (`["VIW3", "VIW1"]`); the list order is the tab order, and
+the same view may appear in any number of workspaces. Workspaces can be
+`public` or private to their creator, and are themselves CrudKit models
+managed through the generic API (`/api/v1/WSP/`) and the generic SPA forms.
+
+Workspaces only shape the sidebar: picking one from the sidebar-header
+switcher replaces the shared-views section with that workspace's tabs. Search,
+the command palette, "All objects", and direct links are unaffected. The
+active workspace is client-side state persisted in localStorage — URLs stay
+flat. A deployment with no `Workspace` rows renders the classic sidebar and
+never shows the switcher.
+
 ## The frontend config contract
 
 The built SPA shell (`index.html`) is served as a Django template by

@@ -1,0 +1,41 @@
+"$schema" = "https://conductor.build/schemas/settings.repo.schema.json"
+
+# Copy machine-local files into new worktrees: env files (default pattern),
+# the gitignored uv locks, and the demo SQLite DB if you have one.
+file_include_globs = [
+  ".env*",
+  "backend/uv.lock",
+  "examples/demo/uv.lock",
+  "examples/demo/db.sqlite3",
+]
+
+[scripts]
+setup = """
+set -e
+(cd backend && uv sync --all-extras)
+(cd frontend && npm install)
+(cd frontend && npm run build)
+(cd examples/demo && uv sync && uv run manage.py migrate --noinput && uv run manage.py seed)
+"""
+# Each workspace has its own venvs, node_modules, SQLite DB, and CONDUCTOR_PORT.
+run_mode = "concurrent"
+# Nothing external to clean up — all workspace state lives in the worktree.
+archive = "true"
+
+# Demo app (admin/admin) serving the built SPA (`npm run build` to refresh the UI).
+[scripts.run.demo]
+command = "cd examples/demo && uv run manage.py migrate --noinput && uv run manage.py seed && uv run manage.py runserver 127.0.0.1:$CONDUCTOR_PORT"
+available_in = ["local"]
+default = true
+icon = "play"
+
+# Full-stack dev with Vite HMR: Django on $CONDUCTOR_PORT, Vite on $CONDUCTOR_PORT+1
+# proxying /api, /static, /ws, ... to Django (vite.config.ts reads BACKEND_PORT).
+[scripts.run.dev]
+command = '''cd examples/demo && uv run manage.py migrate --noinput && uv run manage.py seed && cd ../.. && BACKEND_PORT=$CONDUCTOR_PORT npx -y concurrently -k -n django,vite "cd examples/demo && uv run manage.py runserver 127.0.0.1:$CONDUCTOR_PORT" "cd frontend && npm run dev -- --port $((CONDUCTOR_PORT+1))"'''
+available_in = ["local"]
+icon = "flame"
+
+[scripts.run.test-frontend]
+command = "cd frontend && npm run test:watch"
+icon = "test-tube"

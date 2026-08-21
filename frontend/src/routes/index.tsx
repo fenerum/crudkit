@@ -1,16 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import CrudKitAPIClient from '../../data/api';
 import Dashboard from '../../components/Dashboard';
+import { useMenuViews } from '../../hooks/useMenuViews';
 
 export default function Index() {
   const client = new CrudKitAPIClient();
 
-  const { isPending, error, data: viewsData } = useQuery({
-    queryKey: ['rootViews'],
-    queryFn: () => client.list('VIW', { show_in_menu: true }),
-  });
-
-  const rootViews = viewsData?.isPaginated ? viewsData.results : viewsData;
+  const { isPending, error, items: allViews } = useMenuViews();
+  const rootViews = allViews.filter((v) => v.show_in_menu);
 
   const {
     isPending: isPendingWidgets,

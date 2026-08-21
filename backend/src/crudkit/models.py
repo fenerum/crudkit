@@ -585,6 +585,43 @@ class View(BaseCrudKitModel):
         return instance
 
 
+class Workspace(BaseCrudKitModel):
+    TYPE_ID = "WSP"
+
+    name = models.CharField(max_length=128)
+    icon = models.CharField(
+        max_length=64,
+        blank=True,
+        null=True,
+        help_text=_("Icon name shown in the workspace switcher"),
+    )
+    public = models.BooleanField(blank=True, default=True)
+    views = models.JSONField(
+        blank=True,
+        default=list,
+        encoder=PrettyJSONEncoder,
+        help_text='Format: ["VIW1", "VIW2", ...] — tab order follows the list order',
+    )
+
+    class Meta:
+        ordering = ["name"]
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        search_fields = ["name"]
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if not isinstance(self.views, list):
+            raise ValidationError({"views": _('Format: ["VIW1", "VIW2", ...]')})
+        for ck_id in self.views:
+            if not isinstance(ck_id, str) or not ck_id_regex.match(ck_id) or ck_id[:3] != View.TYPE_ID:
+                raise ValidationError({"views": _(f"'{ck_id}' is not a View id.")})
+            if not View.objects.filter(pk=ck_id).exists():
+                raise ValidationError({"views": _(f"View '{ck_id}' does not exist.")})
+
+
 class FeedItem(BaseCrudKitModel):
     TYPE_ID = "FEI"
 

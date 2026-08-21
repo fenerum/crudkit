@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Workspaces: new `Workspace` model (TYPE_ID `WSP`) — switchable sidebar
+  apps that pin an ordered set of saved views as tabs, picked from a switcher
+  in the sidebar header. Purely additive: deployments with no Workspace rows
+  render exactly as before.
+
 ## 0.2.1 (2026-08-11)
 
 - `crudkit_frontend`: asset URLs are no longer hardcoded to `/static/`. The

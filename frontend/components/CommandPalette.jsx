@@ -1,8 +1,8 @@
 import * as React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import CrudKitAPIClient from "../data/api";
+import { useMenuViews } from "../hooks/useMenuViews";
 import { Icon, Kbd } from "./ui";
 import { getIdPrefix, isObjectTypeCode } from "../utils/crudkit";
 import { detail as detailRegex } from "../utils/urls";
@@ -21,12 +21,8 @@ export default function CommandPalette({ open, onClose }) {
   const [directMatch, setDirectMatch] = useState(null);
   const [typeMatch, setTypeMatch] = useState(null);
 
-  const { data: viewsData } = useQuery({
-    queryKey: ["mainMenu"],
-    queryFn: () => client.list("VIW", { show_in_menu: true }),
-    enabled: open,
-  });
-  const rootViews = viewsData?.isPaginated ? viewsData.results : (viewsData || []);
+  const { items: allViews } = useMenuViews({ enabled: open });
+  const rootViews = allViews.filter((v) => v.show_in_menu);
 
   useEffect(() => {
     if (open) {

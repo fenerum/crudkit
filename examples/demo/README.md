@@ -7,9 +7,12 @@ routes.
 ```
 uv sync
 uv run manage.py migrate
-uv run manage.py createsuperuser
+uv run manage.py seed        # superuser admin/admin + sample authors and books
 uv run manage.py runserver
 ```
+
+(`seed` is idempotent; use `createsuperuser` instead if you want your own
+credentials.)
 
 Then explore:
 

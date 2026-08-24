@@ -148,29 +148,40 @@ class GenericViewSet(viewsets.ModelViewSet):
 
     @action(["POST"], detail=True, url_path="merge")
     def merge(self, request, pk=None):
-        post_data = request.data
+        post_data = request.data.copy()
         try:
             with transaction.atomic():
                 to_stay_obj = self.get_object()
-                other_objects = self.get_queryset().filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
+                merge_ids = post_data.pop("merge", None)
+                if not isinstance(merge_ids, list) or not merge_ids:
+                    raise ValidationError({"merge": "Provide at least one object ID."})
+                other_objects = list(self.get_queryset().filter(id__in=merge_ids).exclude(id=to_stay_obj.id))
+                expected_ids = set(merge_ids) - {to_stay_obj.id}
+                if {obj.id for obj in other_objects} != expected_ids:
+                    raise ValidationError({"merge": "One or more objects were not found."})
 
                 if not all([x.TYPE_ID == to_stay_obj.TYPE_ID for x in other_objects]):
-                    raise Exception(
+                    raise ValidationError(
                         "Cannot merge objects of different types %s"
                         % ([x.TYPE_ID for x in other_objects] + [to_stay_obj.TYPE_ID])
                     )
                 if not other_objects:
-                    raise Exception("No objects to merge")
+                    raise ValidationError("No objects to merge")
                 if to_stay_obj in other_objects:
-                    raise Exception("Cannot merge the same object")
+                    raise ValidationError("Cannot merge the same object")
 
                 merge_fields = post_data
                 objects_by_id = {obj.id: obj for obj in [to_stay_obj, *other_objects]}
 
                 for field, value in merge_fields.items():
-                    if field not in ["id"]:
-                        new_value = getattr(objects_by_id[value], field)
-                        setattr(to_stay_obj, field, new_value)
+                    if field == "id":
+                        continue
+                    if field not in {model_field.name for model_field in to_stay_obj._meta.fields}:
+                        raise ValidationError({field: "Unknown merge field."})
+                    if value not in objects_by_id:
+                        raise ValidationError({field: "Unknown source object."})
+                    new_value = getattr(objects_by_id[value], field)
+                    setattr(to_stay_obj, field, new_value)
                 to_stay_obj.save()
 
                 for to_be_deleted_object in other_objects:
@@ -178,7 +189,7 @@ class GenericViewSet(viewsets.ModelViewSet):
 
                 messages = ([mark_safe(f"{to_stay_obj} merged. <a href='{to_stay_obj.id}'>View</a>")],)
                 return Response({"messages": messages, "redirect": to_stay_obj.id})
-        except (ValidationError, ProtectedError) as e:
+        except (ValidationError, ProtectedError, TypeError, ValueError) as e:
             return Response({"errors": [str(e)]}, status=400)
 
     @action(["POST"], detail=True, url_path="action")
@@ -237,7 +248,7 @@ class SearchViewSet(viewsets.ViewSet):
         results = []
 
         if len(query) > 3 and CRM_TYPE_REGEX.match(query) and ":" in query:
-            search_type, query = query.split(":")
+            search_type, query = query.split(":", 1)
             possible_searches = [
                 mdl
                 for mdl in get_model_types().values()

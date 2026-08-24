@@ -1,5 +1,6 @@
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import FieldDoesNotExist
 from django.db.models.functions import Lower
 from rest_framework import filters
 from rest_framework.exceptions import NotFound, ValidationError
@@ -23,11 +24,14 @@ class BasicFilter(filters.BaseFilterBackend):
         pivot_by = None
 
         if "_view" in request.query_params:
-            view_obj = (
-                get_authorized_queryset(request.user, View.objects.all(), "view")
-                .filter(pk=request.query_params["_view"])
-                .first()
-            )
+            try:
+                view_obj = (
+                    get_authorized_queryset(request.user, View.objects.all(), "view")
+                    .filter(pk=request.query_params["_view"])
+                    .first()
+                )
+            except (ValueError, TypeError):
+                raise NotFound("Saved view not found.") from None
             if view_obj is None:
                 raise NotFound("Saved view not found.")
             model_type_id = getattr(queryset.model, "TYPE_ID", None)
@@ -97,6 +101,12 @@ class BasicFilter(filters.BaseFilterBackend):
                 # Handle descending ordering (fields starting with '-')
                 desc = field.startswith("-")
                 field_name = field[1:] if desc else field
+                get_field = getattr(queryset.model._meta, "get_field", None)
+                if get_field:
+                    try:
+                        get_field(field_name)
+                    except FieldDoesNotExist:
+                        raise ValidationError({"_order_by": f"Unknown field {field_name!r}."}) from None
 
                 # Check if field is a string-based field that needs case-insensitive ordering
                 # Common text field names - apply Lower() to these

@@ -10,7 +10,7 @@ import AssistantLauncher from '../../components/Assistant/AssistantLauncher';
 import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
-import { useTopbarSlots, OverflowMenu, Icon } from '../../components/ui';
+import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { isFrontendPath } from './is-frontend-path';
 
 function truncateLabel(s: string, max = 18) {

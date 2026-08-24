@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Bold, Italic, Code, List, ListOrdered, Link as LinkIcon } from "lucide-react";
+import { Bold, Code, Italic, Link as LinkIcon, List, ListOrdered } from "lucide-react";
 
 type Props = {
     value: string;

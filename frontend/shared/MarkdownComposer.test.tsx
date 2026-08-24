@@ -1,6 +1,6 @@
 import * as React from "react";
-import { describe, test, expect, vi } from "vitest";
-import { render, fireEvent, screen, act } from "@testing-library/react";
+import { describe, expect, test, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import MarkdownComposer from "./MarkdownComposer";
 
 function Harness({ initial = "", onSubmit }: { initial?: string; onSubmit?: () => void }) {

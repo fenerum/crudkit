@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { fetchObjects, fetchMetadata } from '@/data/api';
+import { fetchMetadata, fetchObjects } from '@/data/api';
 import ListWidgetRenderer from './ListWidgetRenderer';
 
 export interface ListWidgetProps {

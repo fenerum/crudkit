@@ -1,19 +1,19 @@
 import React from 'react';
 import {
-  Chart as ChartJS,
+  ArcElement,
+  BarElement,
   CategoryScale,
+  ChartData,
+  Chart as ChartJS,
+  ChartOptions,
+  Legend,
+  LineElement,
   LinearScale,
   PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
   Title,
-  Tooltip,
-  Legend,
-  ChartData,
-  ChartOptions
+  Tooltip
 } from 'chart.js';
-import { Bar, Line, Pie, Doughnut, Scatter } from 'react-chartjs-2';
+import { Bar, Doughnut, Line, Pie, Scatter } from 'react-chartjs-2';
 
 // Quadrants plugin for Chart.js, based on the example
 const quadrantsPlugin = {

@@ -15,6 +15,11 @@ export default tseslint.config(
   {
     files: ['**/*.{ts,tsx}'],
     extends: [tseslint.configs.recommended],
+    rules: {
+      // strict is off in tsconfig and `any` is pervasive (~115 sites); keep
+      // visible as a warning rather than rewriting them in a lint PR.
+      '@typescript-eslint/no-explicit-any': 'warn',
+    },
   },
 
   // These flat configs register their own plugins.
@@ -29,9 +34,6 @@ export default tseslint.config(
       'sort-imports': 'warn',
       // Mixed TS + untyped JSX codebase; prop-types would be pure noise.
       'react/prop-types': 'off',
-      // strict is off in tsconfig and `any` is pervasive (~115 sites); keep
-      // visible as a warning rather than rewriting them in a lint PR.
-      '@typescript-eslint/no-explicit-any': 'warn',
     },
   },
 

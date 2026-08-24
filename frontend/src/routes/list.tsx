@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { OverflowMenu, Icon, useTopbarSlots } from '../../components/ui';
+import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';

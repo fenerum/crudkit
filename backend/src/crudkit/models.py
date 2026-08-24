@@ -375,6 +375,9 @@ class BaseCrudKitModel(models.Model):
         def has_action_permission(user, instance, action_name):
             return True
 
+        @staticmethod
+        def get_ai_foreign_key_queryset(instance, field, queryset):
+            return queryset
     class Meta:
         abstract = True
         ordering = ["id"]

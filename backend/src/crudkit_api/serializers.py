@@ -399,13 +399,16 @@ class GenericSerializer(serializers.ModelSerializer):
         if relation_info.to_many:  # Currently not supported
             return super().build_nested_field(field_name, relation_info, nested_depth)
 
+        configured_fields = getattr(self.Meta.model.CrudKitSettings, "nested_fields", {}).get(field_name, [])
+        nested_fields = list(dict.fromkeys(["id", "label", "object_images", *configured_fields]))
+
         class NestedSerializer(GenericSerializer):
             _is_nested = True
 
             class Meta:
                 model = relation_info.related_model
                 depth = nested_depth - 1
-                fields = "__all__"
+                fields = nested_fields
 
         class RelatedField(serializers.Field):
             def to_representation(self, value):
@@ -419,7 +422,7 @@ class GenericSerializer(serializers.ModelSerializer):
                         # relation_info.related_model.objects.get(id=pk)
                         return relation_info.related_model.objects.get(id=data)
                     except relation_info.related_model.DoesNotExist:
-                        pass
+                        raise serializers.ValidationError("Related object does not exist.") from None
 
         model_fields = {field.name: field for field in self.Meta.model._meta.fields}
         field = model_fields[field_name]

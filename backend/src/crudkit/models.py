@@ -366,6 +366,7 @@ class BaseCrudKitModel(models.Model):
         # this model. Lets the CRM (or any consumer) plug in model-specific
         # capabilities without touching the framework app.
         assistant_tools = []
+        nested_fields = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

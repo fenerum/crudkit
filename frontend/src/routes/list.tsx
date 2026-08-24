@@ -295,11 +295,19 @@ export default function List() {
             <div className="text-fg-3 text-sm">No data found</div>
           </div>
         ) : view?.layout === 'gallery' ? (
-          <Gallery objectList={displayData} view={view} model={type} metadata={metadata} q={qStr} />
+          <Gallery
+            objectList={displayData}
+            view={view}
+            fields={view?.fields}
+            model={type}
+            metadata={metadata}
+            q={qStr}
+          />
         ) : view?.layout === 'kanban' ? (
           <KanbanBoard
             objectList={displayData}
             view={view}
+            fields={view?.fields}
             model={type}
             metadata={metadata}
             key={view?.id || 'default-kanban'}
@@ -310,6 +318,7 @@ export default function List() {
           <Swimlane
             objectList={displayData}
             view={view}
+            fields={view?.fields}
             model={type}
             metadata={metadata}
             refetch={refetch}
@@ -321,12 +330,12 @@ export default function List() {
             view={view}
             model={type}
             metadata={metadata}
-            refetch={refetch}
           />
         ) : view?.layout === 'conversation' ? (
           <ConversationList
             objectList={displayData}
             view={view}
+            fields={view?.fields}
             model={type}
             metadata={metadata}
             refetch={refetch}
@@ -335,6 +344,7 @@ export default function List() {
           <ObjectList
             objectList={displayData}
             view={view}
+            fields={view?.fields}
             model={type}
             metadata={metadata}
             pagination={objectList.isPaginated ? objectList : null}

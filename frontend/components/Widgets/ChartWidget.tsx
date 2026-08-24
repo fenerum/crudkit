@@ -11,7 +11,8 @@ import {
   Tooltip,
   Legend,
   ChartData,
-  ChartOptions
+  ChartOptions,
+  ChartType,
 } from 'chart.js';
 import { Bar, Line, Pie, Doughnut, Scatter } from 'react-chartjs-2';
 
@@ -146,6 +147,21 @@ export interface ChartWidgetProps {
   containerClassName?: string;
 }
 
+type SupportedChartType = Extract<ChartType, 'bar' | 'line' | 'pie' | 'doughnut' | 'scatter'>;
+type QuadrantOptions = {
+  topLeft?: string;
+  topRight?: string;
+  bottomLeft?: string;
+  bottomRight?: string;
+  midX?: number;
+  midY?: number;
+};
+type SupportedChartOptions = ChartOptions<SupportedChartType> & {
+  plugins?: NonNullable<ChartOptions<SupportedChartType>['plugins']> & {
+    quadrants?: QuadrantOptions;
+  };
+};
+
 const ChartWidget = ({ title, data, width, containerClassName }: ChartWidgetProps) => {
   // Log props for debugging
   console.log('ChartWidget.web props:', { title, data, width, containerClassName });
@@ -182,7 +198,7 @@ const ChartWidget = ({ title, data, width, containerClassName }: ChartWidgetProp
   };
 
   // Combine default options with provided options
-  const chartOptions = {
+  const chartOptions: SupportedChartOptions = {
     ...defaultOptions,
     ...data.options,
   };
@@ -220,15 +236,21 @@ const ChartWidget = ({ title, data, width, containerClassName }: ChartWidgetProp
       </div>
       <div className="flex-1 p-4">
         {data.type === 'bar' ? (
-          <Bar data={data.chartData} options={chartOptions} />
+          <Bar data={data.chartData as ChartData<'bar'>} options={chartOptions as ChartOptions<'bar'>} />
         ) : data.type === 'line' ? (
-          <Line data={data.chartData} options={chartOptions} />
+          <Line data={data.chartData as ChartData<'line'>} options={chartOptions as ChartOptions<'line'>} />
         ) : data.type === 'pie' ? (
-          <Pie data={data.chartData} options={chartOptions} />
+          <Pie data={data.chartData as ChartData<'pie'>} options={chartOptions as ChartOptions<'pie'>} />
         ) : data.type === 'doughnut' ? (
-          <Doughnut data={data.chartData} options={chartOptions} />
+          <Doughnut
+            data={data.chartData as ChartData<'doughnut'>}
+            options={chartOptions as ChartOptions<'doughnut'>}
+          />
         ) : data.type === 'scatter' ? (
-          <Scatter data={data.chartData} options={chartOptions} />
+          <Scatter
+            data={data.chartData as ChartData<'scatter'>}
+            options={chartOptions as ChartOptions<'scatter'>}
+          />
         ) : (
           <div className="flex items-center justify-center h-full text-danger text-sm">
             Unsupported chart type: {data.type}

@@ -2,7 +2,9 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.functions import Lower
 from rest_framework import filters
+from rest_framework.exceptions import NotFound, ValidationError
 
+from crudkit.authorization import get_authorized_queryset
 from crudkit.models import View, parse_ck_id
 from crudkit.utils import get_model_types, resolve_variable_value
 
@@ -21,7 +23,16 @@ class BasicFilter(filters.BaseFilterBackend):
         pivot_by = None
 
         if "_view" in request.query_params:
-            view_obj = View.objects.get(pk=request.query_params["_view"])
+            view_obj = (
+                get_authorized_queryset(request.user, View.objects.all(), "view")
+                .filter(pk=request.query_params["_view"])
+                .first()
+            )
+            if view_obj is None:
+                raise NotFound("Saved view not found.")
+            model_type_id = getattr(queryset.model, "TYPE_ID", None)
+            if model_type_id and view_obj.model != model_type_id:
+                raise ValidationError("Saved view does not match this model.")
             if view_obj.filters:
                 queryset = view_obj.filter(queryset, request=request)
 

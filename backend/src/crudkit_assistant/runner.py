@@ -16,11 +16,12 @@ import re
 from typing import Any, Optional
 
 from asgiref.sync import sync_to_async
+from django.contrib.auth import get_user_model
 
 from crudkit import llm
 from crudkit_assistant.agent import assistant_agent
 from crudkit_assistant.deps import AssistantDeps
-from crudkit_assistant.utils import get_assistant_tools, get_instance
+from crudkit_assistant.utils import get_assistant_tools, get_authorized_instance
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +125,8 @@ async def run_turn(
 
 
 def _load_extra_tools(deps: AssistantDeps) -> list:
-    instance = get_instance(deps.object_type_id, deps.object_pk)
+    user = get_user_model().objects.get(pk=deps.user_id)
+    instance = get_authorized_instance(user, deps.object_type_id, deps.object_pk)
     if instance is None:
         return []
     return list(get_assistant_tools(instance))

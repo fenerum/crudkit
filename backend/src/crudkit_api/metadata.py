@@ -14,6 +14,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db.models import Model
 
+from crudkit.authorization import get_authorized_queryset
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem
 from crudkit.utils import get_model_types
@@ -145,13 +146,15 @@ def _fk_display_field(related_model) -> Optional[str]:
     return None
 
 
-def _fk_choices(field) -> dict[str, Any]:
+def _fk_choices(field, user=None) -> dict[str, Any]:
     """List the rows the LLM can refer to for a ForeignKey. Returns
     `{"options": [...], "truncated": bool}` or `{"options": None, "reason": str}`
     when the table is too wide to enumerate."""
     related_model = field.related_model
     display = _fk_display_field(related_model)
     qs = related_model._default_manager.all()
+    if user is not None:
+        qs = get_authorized_queryset(user, qs, "view")
     if "deleted" in {f.name for f in related_model._meta.fields}:
         qs = qs.filter(deleted=False)
     total = qs.count()
@@ -205,7 +208,7 @@ def _coerce_current_value(value: Any) -> Any:
     return str(value)
 
 
-def build_instance_metadata(instance: Model) -> dict[str, Any]:
+def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
     """Return a slim, LLM-friendly projection of the writable fields on an
     instance: name, type, current value, valid choices, FK options, plus
     the available @crm_action names. Skips audit/housekeeping fields."""
@@ -230,7 +233,7 @@ def build_instance_metadata(instance: Model) -> dict[str, Any]:
         if choices:
             entry["choices"] = [c[0] for c in choices]
         if field.related_model is not None and field.many_to_one:
-            entry["fk_choices"] = _fk_choices(field)
+            entry["fk_choices"] = _fk_choices(field, user=user)
         fields_out[name] = entry
     return {
         "type": base["type"],

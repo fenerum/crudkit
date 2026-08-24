@@ -46,6 +46,9 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
+    "DEFAULT_PERMISSION_CLASSES": [
+        "crudkit_api.permissions.CrudKitModelPermissions",
+    ],
     "DEFAULT_PAGINATION_CLASS": "crudkit_api.pagination.CrudKitPagination",
     "DEFAULT_FILTER_BACKENDS": ["crudkit_api.filters.BasicFilter"],
     "PAGE_SIZE": 50,
@@ -54,6 +57,13 @@ REST_FRAMEWORK = {
 # urls.py — one include registers a full CRUD API for every TYPE_ID model
 urlpatterns = [path("api/v1/", include("crudkit_api.urls"))]
 ```
+
+CrudKit requires the standard Django model permissions for every API and
+assistant operation. Projects that need row-level rules can override
+`CrudKitSettings.get_authorized_queryset(user, queryset, action)`; `action`
+is one of `view`, `add`, `change`, or `delete`. Model actions require `change`
+permission and can be narrowed further with
+`CrudKitSettings.has_action_permission(user, instance, action_name)`.
 
 ## Settings
 

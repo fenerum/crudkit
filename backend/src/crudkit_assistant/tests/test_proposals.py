@@ -8,6 +8,7 @@ import asyncio
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Permission
 from django.test import TestCase
 
 from crudkit_assistant import tools
@@ -18,11 +19,20 @@ from tests.testapp.models import Customer
 User = get_user_model()
 
 
+def grant_customer_permissions(user):
+    permissions = Permission.objects.filter(
+        content_type__app_label=Customer._meta.app_label,
+        codename__in=["view_customer", "change_customer"],
+    )
+    user.user_permissions.add(*permissions)
+
+
 class ProposalSafetyTests(TestCase):
     """Verify proposal tools persist a PENDING row and do NOT mutate."""
 
     def setUp(self):
         self.user = User.objects.create_user(username="staff", password="x")
+        grant_customer_permissions(self.user)
         self.customer = Customer.objects.create(
             name="Original",
             created_by=self.user,
@@ -85,6 +95,7 @@ class ProposalApplyTests(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user(username="staff", password="x")
+        grant_customer_permissions(self.user)
         self.customer = Customer.objects.create(
             name="Original",
             created_by=self.user,
@@ -271,6 +282,19 @@ class ProposalApplyTests(TestCase):
         self.assertEqual(self.customer.name, "Original")
         self.assertEqual(proposal.status, AssistantProposal.Status.SKIPPED)
         self.assertIsNotNone(proposal.confirmed_at)
+
+    def test_apply_requires_change_permission(self):
+        self.user.user_permissions.clear()
+        proposal = self._make_proposal(
+            AssistantProposal.Kind.PATCH,
+            {"fields": {"name": "Renamed"}},
+        )
+
+        proposal.apply(self.user)
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Original")
+        self.assertEqual(proposal.status, AssistantProposal.Status.FAILED)
 
 
 class FallbackPromptTests(TestCase):

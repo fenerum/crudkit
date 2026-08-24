@@ -28,10 +28,11 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import AccessToken
 
+from crudkit.authorization import has_object_permission
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
 from crudkit_assistant.runner import run_turn
-from crudkit_assistant.utils import get_instance
+from crudkit_assistant.utils import get_authorized_instance
 
 logger = logging.getLogger(__name__)
 
@@ -92,9 +93,13 @@ class AssistantConsumer(AsyncWebsocketConsumer):
             await self.close(code=4001)
 
     async def _finish_auth(self, user_id: int):
-        instance = await sync_to_async(get_instance)(self.type_id, self.object_pk)
+        user = await self._get_user_by_id(user_id)
+        if user is None or not user.is_active:
+            await self.close(code=4001)
+            return
+        instance = await sync_to_async(get_authorized_instance)(user, self.type_id, self.object_pk)
         if instance is None:
-            await self.close(code=4404)
+            await self.close(code=4403)
             return
         self.user_id = user_id
         if self._auth_timeout_task is not None:
@@ -214,6 +219,9 @@ class AssistantConsumer(AsyncWebsocketConsumer):
             return
 
         user = await self._get_user()
+        if not await self._can_change_proposal_target(proposal, user):
+            await self._send_json({"type": "error", "message": "Proposal not found."})
+            return
         if ok:
             outcome = await sync_to_async(proposal.apply)(user)
             applied = proposal.status == AssistantProposal.Status.CONFIRMED
@@ -260,6 +268,11 @@ class AssistantConsumer(AsyncWebsocketConsumer):
     @database_sync_to_async
     def _get_user(self):
         return get_user_model().objects.get(pk=self.user_id)
+
+    @database_sync_to_async
+    def _can_change_proposal_target(self, proposal, user):
+        target = proposal.target
+        return target is not None and has_object_permission(user, target, "change")
 
     async def _send_json(self, payload: dict):
         await self.send(text_data=json.dumps(payload, default=str))

@@ -13,6 +13,7 @@ from django.db import models, transaction
 from django.http import HttpResponseRedirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from crudkit.authorization import require_action_permission, require_object_permission
 from crudkit.models import ChangeLog
 from crudkit_api.serializers import get_serializer
 
@@ -25,6 +26,7 @@ def execute_proposal(proposal, user, request=None) -> dict[str, Any]:
     instance = proposal.target
     if instance is None:
         raise ValueError("Target object no longer exists")
+    require_object_permission(user, instance, "change")
 
     logger.info(
         "execute_proposal id=%s kind=%s target=%s.%s",
@@ -56,6 +58,7 @@ def _run_action(instance, payload: dict, user, request) -> dict[str, Any]:
             available,
         )
         raise ValueError(f"Action {action_name!r} not available on {instance}")
+    require_action_permission(user, instance, action_name)
     if request is None:
         request = _RequestShim(user)
     logger.info("Running action %s on %s.%s", action_name, instance.__class__.__name__, instance.pk)

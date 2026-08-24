@@ -18,14 +18,16 @@ import logging
 from typing import Any
 
 from asgiref.sync import sync_to_async
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from pydantic_ai import RunContext
 
+from crudkit.authorization import get_authorized_queryset, has_action_permission
 from crudkit.models import ChangeLog, FeedItem
 from crudkit_api.metadata import build_instance_metadata
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
-from crudkit_assistant.utils import get_instance
+from crudkit_assistant.utils import get_authorized_instance
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +36,12 @@ logger = logging.getLogger(__name__)
 # Read tools
 
 
-def _load_instance(deps: AssistantDeps):
-    return get_instance(deps.object_type_id, deps.object_pk)
+def _load_user(deps: AssistantDeps):
+    return get_user_model().objects.get(pk=deps.user_id)
+
+
+def _load_instance(deps: AssistantDeps, action: str = "view"):
+    return get_authorized_instance(_load_user(deps), deps.object_type_id, deps.object_pk, action)
 
 
 async def get_object(ctx: RunContext[AssistantDeps]) -> str:
@@ -64,7 +70,7 @@ async def describe_object(ctx: RunContext[AssistantDeps]) -> dict[str, Any]:
         instance = _load_instance(ctx.deps)
         if instance is None:
             return {"error": "Object not found."}
-        return build_instance_metadata(instance)
+        return build_instance_metadata(instance, user=_load_user(ctx.deps))
 
     return await sync_to_async(_run)()
 
@@ -135,7 +141,8 @@ async def get_related(ctx: RunContext[AssistantDeps], relation_name: str, limit:
         if manager is None or not hasattr(manager, "all"):
             return [{"error": f"Unknown relation {relation_name!r}"}]
         out = []
-        for obj in manager.all()[:limit]:
+        queryset = get_authorized_queryset(_load_user(ctx.deps), manager.all(), "view")
+        for obj in queryset[:limit]:
             ctx_text = obj.get_ai_context() if hasattr(obj, "get_ai_context") else str(obj)
             out.append({"id": str(getattr(obj, "id", obj.pk)), "context": ctx_text})
         return out
@@ -154,12 +161,10 @@ def _make_proposal(
     payload: dict,
     reasoning: str,
 ) -> AssistantProposal:
-    instance = get_instance(deps.object_type_id, deps.object_pk)
+    instance = _load_instance(deps, "change")
     if instance is None:
-        raise ValueError(f"Object {deps.object_type_id}{deps.object_pk} not found")
-    from django.contrib.auth import get_user_model
-
-    user = get_user_model().objects.get(pk=deps.user_id)
+        raise PermissionError("Object is not available for changes")
+    user = _load_user(deps)
     return AssistantProposal.objects.create(
         target_content_type=ContentType.objects.get_for_model(instance.__class__),
         target_object_id=instance.pk,
@@ -217,6 +222,7 @@ async def propose_action(
         if instance is None:
             return ["object not found"], []
         valid = list(getattr(instance, "_actions", {}).keys())
+        valid = [name for name in valid if has_action_permission(_load_user(ctx.deps), instance, name)]
         return ([] if action_name in valid else [action_name]), valid
 
     invalid, valid_actions = await sync_to_async(_validate)()

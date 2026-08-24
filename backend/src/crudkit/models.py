@@ -21,6 +21,8 @@ def get_ck_id(type_id, pk):
 
 
 def parse_ck_id(ck_id: str) -> tuple[str, int]:
+    if not isinstance(ck_id, str) or not ck_id_regex.fullmatch(ck_id):
+        raise ValueError(f"Invalid CrudKit ID: {ck_id!r}")
     return ck_id[0:3], int(ck_id[3:])
 
 
@@ -58,7 +60,11 @@ class CrudKitIDField(models.BigAutoField):
         if value == "":
             return None
         if type(value) is str and value is not None:
-            type_id, pk = parse_ck_id(value)
+            if value.isdigit():
+                pk = int(value)
+            else:
+                type_id, pk = parse_ck_id(value)
+                self._validate_type_id(type_id)
         else:
             pk = value
         return super().get_prep_value(pk)
@@ -71,9 +77,18 @@ class CrudKitIDField(models.BigAutoField):
         if value == "":
             return super().get_db_prep_value(None, connection, prepared)
         if value is not None:
-            type_id, pk = parse_ck_id(value)
+            if isinstance(value, str) and value.isdigit():
+                pk = int(value)
+            else:
+                type_id, pk = parse_ck_id(value)
+                self._validate_type_id(type_id)
             return super().get_db_prep_value(pk, connection, prepared)
         return super().get_db_prep_value(value, connection, prepared)
+
+    def _validate_type_id(self, type_id):
+        expected = getattr(self.model, "TYPE_ID", None)
+        if expected is not None and type_id != expected:
+            raise ValueError(f"Expected a {expected} ID, got {type_id}")
 
 
 class CrudKitPositiveIntegerField(models.PositiveIntegerField):
@@ -352,6 +367,14 @@ class BaseCrudKitModel(models.Model):
         # capabilities without touching the framework app.
         assistant_tools = []
 
+        @staticmethod
+        def get_authorized_queryset(user, queryset, action):
+            return queryset
+
+        @staticmethod
+        def has_action_permission(user, instance, action_name):
+            return True
+
     class Meta:
         abstract = True
         ordering = ["id"]
@@ -577,6 +600,12 @@ class View(BaseCrudKitModel):
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         allowed_prefills = ["model", "fields"]
 
+        @staticmethod
+        def get_authorized_queryset(user, queryset, action):
+            if action == "view":
+                return queryset.filter(models.Q(public=True) | models.Q(created_by=user))
+            return queryset.filter(created_by=user)
+
     @classmethod
     def from_query_params(cls, params, kwargs=None):
         instance = super().from_query_params(params, kwargs)
@@ -608,6 +637,12 @@ class Workspace(BaseCrudKitModel):
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name"]
+
+        @staticmethod
+        def get_authorized_queryset(user, queryset, action):
+            if action == "view":
+                return queryset.filter(models.Q(public=True) | models.Q(created_by=user))
+            return queryset.filter(created_by=user)
 
     def __str__(self):
         return self.name
@@ -804,7 +839,13 @@ class WorkLog(BaseCrudKitModel):
             models.Index(fields=["created_by", "end_at"]),
             models.Index(fields=["related_content_type", "related_object_id"]),
         ]
-        unique_together = [("created_by", "end_at")]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["created_by"],
+                condition=models.Q(end_at__isnull=True),
+                name="crudkit_one_active_worklog_per_user",
+            )
+        ]
 
     def __str__(self):
         return f"Work log on {self.related_object} from {self.created_at}"
@@ -850,6 +891,12 @@ class ExchangeRate(BaseCrudKitModel):
         indexes = [
             models.Index(fields=["currency", "from_date", "to_date"]),
         ]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(to_date__isnull=True) | models.Q(to_date__gte=models.F("from_date")),
+                name="crudkit_exchange_rate_dates_ordered",
+            )
+        ]
 
     def __str__(self):
         to_date_str = f" - {self.to_date}" if self.to_date else " - ongoing"
@@ -859,29 +906,13 @@ class ExchangeRate(BaseCrudKitModel):
         """
         Validate that there are no overlaps for a currency in terms of from_date and to_date.
         """
-        # Set a far future date for "no end date" comparisons
-        far_future = timezone.now().date() + timezone.timedelta(days=36500)
-        effective_to_date = self.to_date or far_future
-
         # Check for start date after end date
         if self.to_date and self.from_date > self.to_date:
             raise ValidationError({"to_date": _("End date must be after start date")})
 
         # Check for overlapping date ranges for the same currency
-        overlapping_query = models.Q(
-            # Overlapping cases:
-            # 1. starts during our range
-            models.Q(from_date__gte=self.from_date, from_date__lte=effective_to_date)
-            |
-            # 2. ends during our range
-            models.Q(to_date__gte=self.from_date, to_date__lte=effective_to_date)
-            |
-            # 3. spans our entire range
-            models.Q(from_date__lte=self.from_date, to_date__gte=effective_to_date)
-            |
-            # 4. our range spans their entire range
-            models.Q(from_date__gte=self.from_date, to_date__lte=effective_to_date)
-        )
+        overlapping_query = models.Q(from_date__lte=self.to_date) if self.to_date else models.Q()
+        overlapping_query &= models.Q(to_date__isnull=True) | models.Q(to_date__gte=self.from_date)
 
         overlapping_filter = ExchangeRate.objects.filter(currency=self.currency).filter(overlapping_query)
 

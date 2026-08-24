@@ -1,5 +1,5 @@
+from django.conf import settings as dj_settings
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -9,10 +9,24 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from crudkit.profile import get_user_profile_adapter
 
 
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ["id", "username", "email", "first_name", "last_name"]
+class UserSerializer(serializers.Serializer):
+    id = serializers.ReadOnlyField(source="pk")
+    username = serializers.SerializerMethodField()
+    email = serializers.SerializerMethodField()
+    first_name = serializers.SerializerMethodField()
+    last_name = serializers.SerializerMethodField()
+
+    def get_username(self, user):
+        return user.get_username()
+
+    def get_email(self, user):
+        return getattr(user, "email", "")
+
+    def get_first_name(self, user):
+        return getattr(user, "first_name", "")
+
+    def get_last_name(self, user):
+        return getattr(user, "last_name", "")
 
 
 def _is_safe_image_path(img):
@@ -43,13 +57,7 @@ class LoginView(APIView):
                 {
                     "refresh": str(refresh),
                     "access": str(refresh.access_token),
-                    "user": {
-                        "id": user.id,
-                        "username": user.username,
-                        "email": user.email,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                    },
+                    "user": UserSerializer(user).data,
                 }
             )
 
@@ -60,8 +68,6 @@ class UserProfileView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from django.conf import settings as dj_settings
-
         data = UserSerializer(request.user).data
         profile_data = get_user_profile_adapter().get(request.user)
         data["preferred_language"] = profile_data.get("preferred_language") or "en"

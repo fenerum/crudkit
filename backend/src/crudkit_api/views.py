@@ -1,6 +1,6 @@
 import re
 
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import ValidationError
 from django.db import connection, models, reset_queries, transaction
@@ -105,7 +105,7 @@ class GenericViewSet(viewsets.ModelViewSet):
                     "updated_by__user_permissions",
                     "updated_by__groups",
                 )
-                if queryset.model is not User
+                if queryset.model is not get_user_model()
                 else []
             ),
             *prefetchable_fields,

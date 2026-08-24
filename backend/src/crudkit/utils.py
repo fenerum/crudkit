@@ -1,7 +1,8 @@
 import uuid
 
 from django.apps import apps
-from django.contrib.auth.models import User
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.utils.deconstruct import deconstructible
 
@@ -12,7 +13,7 @@ def get_model_types():
 
 
 def get_system_user():
-    return User.objects.get_or_create(username="system")[0]
+    return _get_service_user("CRUDKIT_SYSTEM_USER_IDENTIFIER", "system")
 
 
 def get_ai_bot_user():
@@ -21,10 +22,20 @@ def get_ai_bot_user():
     Kept distinct from `get_system_user()` so we can reliably tell bot-authored
     messages apart from visitor messages (which currently fall back to "system").
     """
-    return User.objects.get_or_create(
-        username="ai_bot",
+    return _get_service_user(
+        "CRUDKIT_AI_BOT_USER_IDENTIFIER",
+        "ai_bot",
         defaults={"first_name": "AI", "last_name": "Assistant"},
-    )[0]
+    )
+
+
+def _get_service_user(setting_name, default_identifier, defaults=None):
+    user_model = get_user_model()
+    identifier = getattr(settings, setting_name, default_identifier)
+    lookup = {user_model.USERNAME_FIELD: identifier}
+    field_names = {field.name for field in user_model._meta.fields}
+    safe_defaults = {key: value for key, value in (defaults or {}).items() if key in field_names}
+    return user_model._default_manager.get_or_create(**lookup, defaults=safe_defaults)[0]
 
 
 def resolve_variable_value(request, value):

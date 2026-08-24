@@ -65,6 +65,10 @@ is one of `view`, `add`, `change`, or `delete`. Model actions require `change`
 permission and can be narrowed further with
 `CrudKitSettings.has_action_permission(user, instance, action_name)`.
 
+The logout endpoint always ends the Django session. Add
+`rest_framework_simplejwt.token_blacklist` to `INSTALLED_APPS` if refresh
+tokens must also be revoked immediately.
+
 ## Settings
 
 | Setting | Purpose |

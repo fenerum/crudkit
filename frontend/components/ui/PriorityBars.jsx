@@ -1,4 +1,3 @@
-import * as React from 'react';
 
 export default function PriorityBars({ level = 0, max = 4 }) {
   const bars = [];

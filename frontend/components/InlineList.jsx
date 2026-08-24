@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import ReadOnlyField from './ReadOnlyField';
@@ -11,7 +11,7 @@ const DEFAULT_INLINE_PAGE_SIZE = 10;
 /**
  * Component for displaying related inline objects in a detail view.
  */
-export default function InlineList({ fields, model, metadata, createParams, parent_object_id, related_field_name }) {
+export default function InlineList({ fields, model, metadata, parent_object_id, related_field_name }) {
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_INLINE_PAGE_SIZE);
@@ -108,7 +108,7 @@ export default function InlineList({ fields, model, metadata, createParams, pare
             </div>
           ) : hasError ? (
             <div className="px-3.5 py-6 text-center text-danger text-sm">
-              Couldn't load data — try refreshing.
+              Couldn&apos;t load data — try refreshing.
             </div>
           ) : objectList?.length > 0 ? (
             objectList.map((object) => {

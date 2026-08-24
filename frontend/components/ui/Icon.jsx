@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { mapIcon } from './iconMap';
 
 export default function Icon({ name, size = 14, color = 'currentColor', style = undefined, ...rest }) {

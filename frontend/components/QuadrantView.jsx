@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { hashName } from "./ui/avatarPalette";
@@ -35,7 +34,7 @@ function humanize(field) {
   return String(field || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-export default function QuadrantView({ objectList, view, model, metadata }) {
+export default function QuadrantView({ objectList, view, metadata }) {
   const navigate = useNavigate();
   const xField = view?.fields?.[0];
   const yField = view?.fields?.[1];
@@ -53,7 +52,7 @@ export default function QuadrantView({ objectList, view, model, metadata }) {
   }, [objectList, xField, yField]);
 
   // Normalize x/y into 0..1 against the data extent so dots fill the board.
-  const { norm, xMin, xMax, yMin, yMax } = useMemo(() => {
+  const { norm } = useMemo(() => {
     if (points.length === 0) return { norm: [], xMin: 0, xMax: 1, yMin: 0, yMax: 1 };
     const xs = points.map(p => p.x);
     const ys = points.map(p => p.y);

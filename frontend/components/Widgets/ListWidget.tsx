@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { fetchMetadata, fetchObjects } from '@/data/api';
 import ListWidgetRenderer from './ListWidgetRenderer';
 
@@ -14,7 +14,7 @@ export interface ListWidgetProps {
   containerClassName?: string;
 }
 
-const ListWidget = ({ title, data, width, containerClassName }: ListWidgetProps) => {
+const ListWidget = ({ title, data, containerClassName }: ListWidgetProps) => {
   const [objects, setObjects] = useState<any[]>([]);
   const [metadata, setMetadata] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(true);

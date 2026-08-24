@@ -128,7 +128,7 @@ export default function SearchPage() {
         searchQuery.length >= 2 &&
         !searchResults.isFetching &&
         (searchResults.data || []).length === 0 && (
-          <div className="text-sm text-fg-3">No results for "{searchQuery}"</div>
+          <div className="text-sm text-fg-3">No results for &quot;{searchQuery}&quot;</div>
         )}
 
       {!directMatch && !objectTypeMatch && (searchResults.data || []).length > 0 && (

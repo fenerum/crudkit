@@ -1,4 +1,3 @@
-import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FormProvider } from "react-hook-form";
 import DetailPane from "./DetailPane";
@@ -17,7 +16,6 @@ export default function FormContainer({
   submitButtonText = "Save",
   cancelHref,
   deleteHref = null,
-  submitButtonRef = null,
   formMethods,
   modelType,
 }) {

@@ -1,7 +1,6 @@
-import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 
-interface CheckboxProps extends BaseFieldProps {}
+type CheckboxProps = BaseFieldProps;
 
 export default function Checkbox({
   fieldName,

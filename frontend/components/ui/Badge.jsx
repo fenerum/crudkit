@@ -1,4 +1,3 @@
-import * as React from 'react';
 import Dot from './Dot';
 
 export default function Badge({ children, dot, style }) {

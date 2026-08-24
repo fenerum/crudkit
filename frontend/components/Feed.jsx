@@ -13,11 +13,11 @@ import {toast} from "react-toastify";
 import {getIdPrefix} from "../utils/crudkit";
 import ActionButton from "./ActionButton.jsx";
 import {useAuth} from "../context/AuthContext";
-import { Icon, Avatar } from "./ui";
+import { Avatar, Icon } from "./ui";
 import GenericDetailField from "./GenericDetailField.jsx";
 import WYSIWYGEditorField from "./Fields/WYSIWYGEditorField";
 
-function FeedItem({object, fields, model, sendEmailAction, onReply, isReplyTarget}) {
+function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
     let internalFeedItem = object.related_object === null;
     const client = new CrudKitAPIClient();
     const [relatedObject, setRelatedObject] = useState(null);
@@ -161,7 +161,7 @@ function FeedItem({object, fields, model, sendEmailAction, onReply, isReplyTarge
             
             // Refresh feed to show updated status
             queryClient.invalidateQueries(['inline-feed', model, object.parent_object]);
-        } catch (error) {
+        } catch {
             // Error already handled in sendEmailAction
         }
     };
@@ -447,13 +447,10 @@ function AddToFeed({ parent_object_id, feedMetadata, model, sendEmailAction, par
         ? { from_object: parent_object_id, reply_to_message: replyToMessageId }
         : { from_object: parent_object_id };
     const {
-        handleSubmit: handleEmailSubmit,
         errors: emailErrors,
         isLoading: emailIsLoading,
-        errorMessage: emailErrorMessage,
         initialQuery: emailInitialQuery,
         metadataQuery: emailMetadataQuery,
-        getFieldPairs: getEmailFieldPairs,
         formMethods: emailFormMethods
     } = useCreateForm({ 
         type: "EML", 
@@ -462,13 +459,8 @@ function AddToFeed({ parent_object_id, feedMetadata, model, sendEmailAction, par
 
     // Setup for feed item form
     const {
-        handleSubmit: handleFeedSubmit,
         errors: feedErrors,
         isLoading: feedIsLoading,
-        errorMessage: feedErrorMessage,
-        initialQuery: feedInitialQuery,
-        metadataQuery: feedMetadataQuery,
-        getFieldPairs: getFeedFieldPairs,
         formMethods: feedFormMethods
     } = useCreateForm({ 
         type: "FEI", 
@@ -536,12 +528,7 @@ function AddToFeed({ parent_object_id, feedMetadata, model, sendEmailAction, par
             })
             .then(async (createdEmail) => {
                 // Step 3: Use the send_email action to trigger sending
-                try {
-                    await sendEmailAction(createdEmail.id);
-                } catch (error) {
-                    // Error already handled in sendEmailAction
-                    throw error; // Re-throw to prevent form reset on error
-                }
+                await sendEmailAction(createdEmail.id);
                 return createdEmail;
             })
             .then(() => {
@@ -593,8 +580,6 @@ function AddToFeed({ parent_object_id, feedMetadata, model, sendEmailAction, par
     const emailMetadata = !emailMetadataQuery.isPending ? emailMetadataQuery.data?.fields : null;
     const emailInitial = !emailInitialQuery.isPending ? emailInitialQuery.data : {};
 
-    // Setup feed item form fields
-    const feedFieldPairs = [["body"], []];
 
     return (
         <div id="feed-form" className="mb-5 flex flex-col gap-2">
@@ -772,9 +757,8 @@ function AddToFeed({ parent_object_id, feedMetadata, model, sendEmailAction, par
 }
 
 
-export default function Feed({view, fields, model, parent_object_id, metadata, related_field_name, parentType}) {
+export default function Feed({fields, model, parent_object_id, metadata, related_field_name, parentType}) {
     const client = new CrudKitAPIClient();
-    const queryClient = useQueryClient();
 
     // Composer state is lifted here so that a Reply button on any timeline
     // row can drive the composer (switch to email tab + target a specific

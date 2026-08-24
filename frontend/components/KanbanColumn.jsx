@@ -1,14 +1,13 @@
 import {useDroppable} from "@dnd-kit/core";
 import {SortableContext, verticalListSortingStrategy} from "@dnd-kit/sortable";
 import KanbanItem from "./KanbanItem";
-import React, { useState } from "react";
+import { useState } from "react";
 import { Dot, Icon } from "./ui";
 import { colorForStage } from "./ui/StageBadge";
 
 export default function KanbanColumn({
   id,
   label,
-  index = 0,
   items,
   objectList,
   objectMap,

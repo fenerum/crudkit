@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Document from '@tiptap/extension-document'

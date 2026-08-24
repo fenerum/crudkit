@@ -45,7 +45,7 @@ export const valid_url = (obj: string, action: string = null): boolean => {
     try {
         url(obj, action);
         return true;
-    } catch (e) {
+    } catch {
         return false;
     }
 }

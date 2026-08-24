@@ -62,7 +62,6 @@ function InlineTab({ inline, parent_object_id }: any) {
         fields={fields}
         model={model}
         metadata={inlineMetadata}
-        createParams={createParams}
         parent_object_id={parent_object_id}
         related_field_name={related_field_name}
       />
@@ -71,7 +70,6 @@ function InlineTab({ inline, parent_object_id }: any) {
 }
 
 function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useMemo(() => new CrudKitAPIClient(), []);
 

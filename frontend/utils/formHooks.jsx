@@ -24,7 +24,7 @@ const showSuccessToastWithLink = (action, data, navigate) => {
   );
 };
 
-export function useCrudForm({ type, id = null, params = {}, defaultValues = {} }) {
+export function useCrudForm({ type, defaultValues = {} }) {
   const [errors, setErrors] = useState(null);
   const navigate = useNavigate();
 

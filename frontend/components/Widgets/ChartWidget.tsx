@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   ArcElement,
   BarElement,
@@ -161,7 +160,7 @@ const ChartWidget = ({ title, data, width, containerClassName }: ChartWidgetProp
         display: false,
       },
     },
-    onClick: (event, elements, chart) => {
+    onClick: (event, elements) => {
       if (elements.length === 0 || !data.urls) return;
       
       const clickedElement = elements[0];

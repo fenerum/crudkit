@@ -1,7 +1,6 @@
-import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 
-interface DateTimeFieldProps extends BaseFieldProps {}
+type DateTimeFieldProps = BaseFieldProps;
 
 export default function DateTimeField({
   fieldName,

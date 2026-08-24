@@ -1,7 +1,6 @@
-import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 
-interface JSONFieldProps extends BaseFieldProps {}
+type JSONFieldProps = BaseFieldProps;
 
 export default function JSONField({
   fieldName,

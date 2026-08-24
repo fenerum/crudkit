@@ -1,4 +1,3 @@
-import React from 'react';
 import { WidgetRenderer } from '@/components/Widgets';
 
 export default function WebDashboard({ widgets, isLoadingWidgets, widgetsError }) {
@@ -7,7 +6,7 @@ export default function WebDashboard({ widgets, isLoadingWidgets, widgetsError }
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-fg-1 tracking-tight">Dashboard</h1>
-          <p className="mt-1 text-sm text-fg-3">Today's snapshot across the workspace.</p>
+          <p className="mt-1 text-sm text-fg-3">Today&apos;s snapshot across the workspace.</p>
         </div>
       </div>
 

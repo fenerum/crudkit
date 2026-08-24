@@ -1,5 +1,4 @@
 import GenericDetailField from "./GenericDetailField.jsx";
-import * as React from "react";
 import { Icon } from "./ui";
 
 function Cell({ fieldName, form, value, metadata, errors, modelType }) {

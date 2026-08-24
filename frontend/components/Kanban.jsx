@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useState} from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -19,7 +19,7 @@ import { toast } from "react-toastify";
 import ErrorMessage from "./ErrorMessage.jsx";
 import { Icon } from "./ui";
 
-export default function KanbanBoard({objectList, view, fields, model, metadata, refetch, q = ''}) {
+export default function KanbanBoard({objectList, view, model, metadata, q = ''}) {
     const client = useMemo(() => new CrudKitAPIClient(), []);
 
     const groupByField = view?.group_by ? metadata.fields[view.group_by] : null;

@@ -5,6 +5,7 @@ in apply(), which the WebSocket consumer calls when the user clicks Confirm.
 """
 
 import asyncio
+from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
@@ -296,6 +297,33 @@ class ProposalApplyTests(TestCase):
         self.assertEqual(self.customer.name, "Original")
         self.assertEqual(proposal.status, AssistantProposal.Status.FAILED)
 
+    def test_apply_only_executes_once(self):
+        proposal = self._make_proposal(
+            AssistantProposal.Kind.PATCH,
+            {"fields": {"name": "Renamed"}},
+        )
+        outcome = {"kind": "patch", "applied": ["name"]}
+
+        with patch("crudkit_assistant.models.execute_proposal", return_value=outcome) as execute:
+            first = proposal.apply(self.user)
+            second = proposal.apply(self.user)
+
+        self.assertEqual(first, outcome)
+        self.assertEqual(second, outcome)
+        execute.assert_called_once()
+
+    def test_apply_does_not_execute_skipped_proposal(self):
+        proposal = self._make_proposal(
+            AssistantProposal.Kind.PATCH,
+            {"fields": {"name": "Renamed"}},
+        )
+        proposal.skip(self.user)
+
+        with patch("crudkit_assistant.models.execute_proposal") as execute:
+            proposal.apply(self.user)
+
+        execute.assert_not_called()
+        self.assertEqual(proposal.status, AssistantProposal.Status.SKIPPED)
 
 class FallbackPromptTests(TestCase):
     """A CrudKit model that hasn't set assistant_prompt must still get a

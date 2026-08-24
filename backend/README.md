@@ -80,6 +80,7 @@ permission and can be narrowed further with
 | `CRUDKIT_FRONTEND_CONFIG` | dict injected into the bundled SPA at runtime (`app_name`, `logo_url`, ...) |
 | `CRUDKIT_FRONTEND_LOGIN_REQUIRED` | redirect anonymous users of the SPA view to `LOGIN_URL` |
 | `CRUDKIT_SYSTEM_USER_IDENTIFIER`, `CRUDKIT_AI_BOT_USER_IDENTIFIER` | identifiers for service accounts when using a custom user model |
+| `CRUDKIT_MAX_BASE64_FILE_SIZE` | maximum decoded size for generic base64 file uploads (default 10 MiB) |
 
 ## Bundled frontend
 

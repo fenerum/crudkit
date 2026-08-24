@@ -1,5 +1,7 @@
-import mimetypes
+import io
+import zipfile
 
+from django.conf import settings
 from django.core.exceptions import FieldDoesNotExist
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
@@ -41,35 +43,73 @@ class CustomBase64FileField(Base64FieldMixin, FileField):
         "txt",
         "csv",
     ]
+    INVALID_FILE_MESSAGE = "Please upload a valid base64-encoded file."
+    INVALID_TYPE_MESSAGE = "The file type is not supported or could not be determined."
+
+    MIME_TYPE_EXTENSIONS = {
+        "application/pdf": "pdf",
+        "application/msword": "doc",
+        "application/vnd.ms-excel": "xls",
+        "application/vnd.ms-powerpoint": "ppt",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
+        "image/jpeg": "jpg",
+        "image/png": "png",
+        "image/gif": "gif",
+        "image/bmp": "bmp",
+        "image/webp": "webp",
+        "text/csv": "csv",
+        "text/plain": "txt",
+    }
 
     def get_file_extension(self, filename, decoded_file):
-        # Try to get extension from filename first
-        if filename and "." in filename:
-            return filename.split(".")[-1].lower()
+        if not decoded_file:
+            return "bin"
+        if len(decoded_file) > self._max_file_size():
+            raise serializers.ValidationError("The uploaded file is too large.")
+        signatures = (
+            (b"%PDF", "pdf"),
+            (b"\xff\xd8\xff", "jpg"),
+            (b"\x89PNG\r\n\x1a\n", "png"),
+            (b"GIF8", "gif"),
+            (b"BM", "bmp"),
+        )
+        for signature, extension in signatures:
+            if decoded_file.startswith(signature):
+                return self._validate_mime_type(extension)
+        if decoded_file.startswith(b"RIFF") and decoded_file[8:12] == b"WEBP":
+            return self._validate_mime_type("webp")
+        if decoded_file.startswith(b"PK\x03\x04"):
+            return self._validate_mime_type(self._office_zip_extension(decoded_file))
+        if decoded_file.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            return self.MIME_TYPE_EXTENSIONS.get(getattr(self, "_mime_type", ""), "bin")
+        try:
+            decoded_file.decode("utf-8")
+        except UnicodeDecodeError:
+            return "bin"
+        mime_type = getattr(self, "_mime_type", "")
+        if mime_type in {"text/plain", "text/csv"}:
+            return self.MIME_TYPE_EXTENSIONS[mime_type]
+        return "txt" if mime_type in {"", "application/octet-stream"} else "bin"
 
-        # For base64 data URLs, try to extract mime type
-        if hasattr(self, "_mime_type") and self._mime_type:
-            extension = mimetypes.guess_extension(self._mime_type)
-            if extension:
-                return extension[1:] if extension.startswith(".") else extension
+    def _validate_mime_type(self, extension):
+        expected = self.MIME_TYPE_EXTENSIONS.get(getattr(self, "_mime_type", ""))
+        return extension if expected is None or extension == expected else "bin"
 
-        # Try to detect from file content
-        if decoded_file:
-            # Check magic bytes for common formats
-            if decoded_file.startswith(b"%PDF"):
-                return "pdf"
-            elif decoded_file.startswith(b"\xff\xd8\xff"):
-                return "jpg"
-            elif decoded_file.startswith(b"\x89PNG\r\n\x1a\n"):
-                return "png"
-            elif decoded_file.startswith(b"GIF8"):
-                return "gif"
-            elif decoded_file.startswith(b"PK\x03\x04"):
-                # Could be zip, docx, xlsx, etc.
-                return "zip"
-
-        # Default fallback
+    def _office_zip_extension(self, decoded_file):
+        try:
+            with zipfile.ZipFile(io.BytesIO(decoded_file)) as archive:
+                names = archive.namelist()
+        except (OSError, zipfile.BadZipFile):
+            return "bin"
+        for prefix, extension in (("word/", "docx"), ("xl/", "xlsx"), ("ppt/", "pptx")):
+            if any(name.startswith(prefix) for name in names):
+                return extension
         return "bin"
+
+    def _max_file_size(self):
+        return int(getattr(settings, "CRUDKIT_MAX_BASE64_FILE_SIZE", 10 * 1024 * 1024))
 
     def to_internal_value(self, data):
         # Extract MIME type from data URL if present
@@ -81,7 +121,15 @@ class CustomBase64FileField(Base64FieldMixin, FileField):
             except (ValueError, IndexError):
                 self._mime_type = None
 
-        return super().to_internal_value(data)
+            encoded = data.split(",", 1)[-1]
+            max_encoded_size = ((self._max_file_size() + 2) // 3) * 4
+            if len(encoded) > max_encoded_size:
+                raise serializers.ValidationError("The uploaded file is too large.")
+
+        try:
+            return super().to_internal_value(data)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.messages) from exc
 
 
 class CrudKitIDFieldSerializer(CharField):

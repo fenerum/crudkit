@@ -1,7 +1,7 @@
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from crudkit.fields import AIBooleanField, AICategoryField, AISummaryField, AITagsField
 from crudkit.tasks import _build_field_specs, process_ai_fields
@@ -59,6 +59,16 @@ class BuildFieldSpecsTests(TestCase):
         self.assertIn(str(t2.pk), spec["enum"])
         self.assertTrue(len(spec["options"]) >= 2)
 
+    @override_settings(CRUDKIT_AI_FOREIGN_KEY_CHOICES_LIMIT=1)
+    def test_fk_field_limits_related_objects(self):
+        user = User.objects.create_user(username="limited", password="pw")
+        Topic.objects.create(name="Billing", created_by=user, updated_by=user)
+        Topic.objects.create(name="Technical", created_by=user, updated_by=user)
+
+        specs = _build_field_specs([Ticket._meta.get_field("topic")])
+
+        self.assertEqual(len(specs["topic"]["options"]), 1)
+
 
 @patch("crudkit.tasks.close_old_connections")
 class ProcessAIFieldsTaskTests(TestCase):
@@ -100,6 +110,23 @@ class ProcessAIFieldsTaskTests(TestCase):
         mock_process.return_value = {"topic": "999999"}
         with self.assertLogs("crudkit.tasks", level="WARNING"):
             process_ai_fields("testapp", "Ticket", ticket.pk)
+        ticket.refresh_from_db()
+        self.assertIsNone(ticket.topic)
+
+    @patch("crudkit.tasks.process")
+    def test_fk_field_rejects_candidate_outside_scoped_queryset(self, mock_process, _mock_close):
+        allowed = Topic.objects.create(name="Allowed", created_by=self.user, updated_by=self.user)
+        denied = Topic.objects.create(name="Denied", created_by=self.user, updated_by=self.user)
+        ticket = self._create_ticket()
+        mock_process.return_value = {"topic": str(denied.pk)}
+
+        with patch.object(
+            Ticket.CrudKitSettings,
+            "get_ai_foreign_key_queryset",
+            side_effect=lambda instance, field, queryset: queryset.filter(pk=allowed.pk),
+        ):
+            process_ai_fields("testapp", "Ticket", ticket.pk)
+
         ticket.refresh_from_db()
         self.assertIsNone(ticket.topic)
 

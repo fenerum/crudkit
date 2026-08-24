@@ -5,6 +5,7 @@ from typing import Any
 
 from celery import shared_task
 from django.apps import apps
+from django.conf import settings
 from django.db import close_old_connections
 
 from crudkit.ai_backend import process
@@ -13,7 +14,7 @@ from crudkit.fields import AIBooleanField, AICategoryField, AIForeignKeyField, A
 logger = logging.getLogger(__name__)
 
 
-def _build_field_specs(ai_fields: list) -> dict[str, dict[str, Any]]:
+def _build_field_specs(ai_fields: list, instance=None) -> dict[str, dict[str, Any]]:
     """Build a dict of {field_name: JSON-Schema-like spec} for the backend."""
     specs: dict[str, dict[str, Any]] = {}
     for field in ai_fields:
@@ -28,8 +29,19 @@ def _build_field_specs(ai_fields: list) -> dict[str, dict[str, Any]]:
         elif isinstance(field, AIForeignKeyField):
             related_model = field.related_model
             qs = related_model.objects.filter(deleted=False)
+            authorize = getattr(getattr(related_model, "CrudKitSettings", None), "get_authorized_queryset", None)
+            if instance is not None and authorize:
+                qs = authorize(instance.updated_by, qs, "view")
+            scope_candidates = getattr(
+                getattr(instance.__class__, "CrudKitSettings", None),
+                "get_ai_foreign_key_queryset",
+                None,
+            )
+            if scope_candidates:
+                qs = scope_candidates(instance, field, qs)
+            limit = max(1, int(getattr(settings, "CRUDKIT_AI_FOREIGN_KEY_CHOICES_LIMIT", 50)))
             options = []
-            for obj in qs:
+            for obj in qs[:limit]:
                 option = {"pk": str(obj.pk), "name": str(obj)}
                 if hasattr(obj, "get_ai_context"):
                     option["context"] = obj.get_ai_context()
@@ -74,7 +86,7 @@ def process_ai_fields(app_label: str, model_name: str, pk: int) -> None:
         logger.info(f"Empty AI context for {instance}, skipping")
         return
 
-    field_specs = _build_field_specs(ai_fields)
+    field_specs = _build_field_specs(ai_fields, instance=instance)
 
     try:
         result = process(context, field_specs)
@@ -99,6 +111,10 @@ def process_ai_fields(app_label: str, model_name: str, pk: int) -> None:
                 logger.warning(f"Invalid choice '{value}' for {name}, skipping")
                 continue
         if isinstance(field, AIForeignKeyField):
+            allowed = {str(pk) for pk in field_specs.get(name, {}).get("enum", [])}
+            if str(value) not in allowed:
+                logger.warning(f"Related object pk={value} is not an allowed candidate for {name}, skipping")
+                continue
             try:
                 related_obj = field.related_model.objects.get(pk=value)
             except field.related_model.DoesNotExist:

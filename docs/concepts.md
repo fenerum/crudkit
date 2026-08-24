@@ -45,6 +45,8 @@ class Book(BaseCrudKitModel):
 - `allowed_prefills` — query params accepted by the `/initial/` action to
   prefill create forms (e.g. "new book for author AUT7").
 - `ai_trigger_children` — related objects whose changes re-trigger AI fields.
+- `get_ai_foreign_key_queryset(instance, field, queryset)` — limits the
+  candidate rows available to an AI foreign-key field.
 - `assistant_prompt` / `assistant_tools` — configure the per-object AI
   assistant (`crudkit_assistant`).
 

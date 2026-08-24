@@ -1,9 +1,10 @@
 from django.conf import settings as dj_settings
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, logout
 from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from crudkit.profile import get_user_profile_adapter
@@ -62,6 +63,23 @@ class LoginView(APIView):
             )
 
         return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+
+
+class LogoutView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        refresh_value = request.data.get("refresh")
+        if refresh_value:
+            try:
+                refresh = RefreshToken(refresh_value)
+                blacklist = getattr(refresh, "blacklist", None)
+                if blacklist:
+                    blacklist()
+            except TokenError:
+                pass
+        logout(request)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class UserProfileView(APIView):

@@ -101,7 +101,26 @@ export default class CrudKitAPIClient {
   }
 
   async logout() {
-    this.clearTokens();
+    const accessToken = this.getAccessToken();
+    const refreshToken = this.getRefreshToken();
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    try {
+      await fetch(`${this.baseUrl}/api/v1/logout/`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Client-Id': this.clientId,
+          ...(csrfToken ? { 'X-CSRFToken': csrfToken } : {}),
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
+        body: JSON.stringify({ refresh: refreshToken }),
+      });
+    } catch (error) {
+      if (isDevelopment()) console.warn('Server logout failed; local credentials were cleared', error);
+    } finally {
+      this.clearTokens();
+    }
   }
 
   storeTokens(accessToken: string, refreshToken: string) {

@@ -3,7 +3,7 @@ from rest_framework import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 
 from crudkit.utils import get_model_types
-from crudkit_api.authentication import LoginView, UserProfileView
+from crudkit_api.authentication import LoginView, LogoutView, UserProfileView
 from crudkit_api.serializers import get_serializer
 from crudkit_api.views import GenericViewSet, SearchViewSet, WidgetsViewSet
 
@@ -34,6 +34,7 @@ urlpatterns = [
     # JWT Authentication endpoints
     path("token/", LoginView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+    path("logout/", LogoutView.as_view(), name="logout"),
     # User profile endpoint
     path("user/me/", UserProfileView.as_view(), name="user_profile"),
 ]

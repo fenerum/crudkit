@@ -27,6 +27,15 @@ class DefaultAdapterUserProfileViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["preferred_language"], "en")
 
+    def test_logout_ends_django_session(self):
+        session_client = APIClient()
+        self.assertTrue(session_client.login(username="agent", password="pw"))
+
+        response = session_client.post("/api/v1/logout/", {}, format="json")
+
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(session_client.get("/api/v1/user/me/").status_code, 401)
+
         response = self.client.get("/api/v1/user/me/")
         self.assertEqual(response.data["preferred_language"], "en")
 

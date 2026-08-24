@@ -1,9 +1,8 @@
-import * as React from "react";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
-import { Avatar, Icon, colorForStage } from "./ui";
+import { Avatar } from "./ui";
 import { hashName } from "./ui/avatarPalette";
 
 // Returns the per-card thumb hue & glyph deterministically from the object's
@@ -94,7 +93,7 @@ function Card({ object, view, fields, metadata }) {
   );
 }
 
-export default function Gallery({ objectList, view, fields, model, metadata, q = '' }) {
+export default function Gallery({ objectList, view, fields, metadata, q = '' }) {
   // Build category filter buttons from the choices of the second field if
   // available — keeps the design's "All / Onboarding / Security" bar useful
   // without bespoke metadata.

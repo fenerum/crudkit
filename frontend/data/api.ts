@@ -79,7 +79,7 @@ export default class CrudKitAPIClient {
         },
         body: JSON.stringify({ refresh: refreshToken }),
       });
-    } catch (networkError) {
+    } catch {
       throw new TokenRefreshError('Token refresh request failed: network error', 'transient');
     }
 

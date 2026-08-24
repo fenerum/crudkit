@@ -1,18 +1,17 @@
 import moment from "moment-timezone";
-import * as React from "react";
 import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { url, valid_url } from "../utils/urls";
 import { Icon } from "./ui";
 
-export default function ReadOnlyField({ field, value, metadata, link = true }) {
-    if (metadata === undefined) {
-        return <>[undefined]</>;
-    }
-
+export default function ReadOnlyField({ value, metadata, link = true }) {
     const iframeRef = useRef();
     const iframeDefaultHeight = "140px";
     const [iframeHeight, setIframeHeight] = useState(iframeDefaultHeight);
+
+    if (metadata === undefined) {
+        return <>[undefined]</>;
+    }
 
     const toggleSize = () => {
         if (iframeRef.current) {

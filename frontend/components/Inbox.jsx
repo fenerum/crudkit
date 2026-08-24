@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useCallback, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
@@ -118,7 +117,7 @@ export default function Inbox() {
         <div className="px-6 py-12 text-center text-fg-3 text-sm">Loading…</div>
       ) : isError ? (
         <div className="px-6 py-12 text-center text-danger text-sm">
-          Couldn't load inbox — try refreshing the page.
+          Couldn&apos;t load inbox — try refreshing the page.
         </div>
       ) : items.length === 0 ? (
         <div className="px-6 py-12 text-center">

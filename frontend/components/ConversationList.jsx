@@ -8,11 +8,10 @@ import useWebSocket, {ReadyState} from "react-use-websocket";
 import moment from "moment-timezone";
 import {Link, useNavigate} from "react-router-dom";
 import {useHotkeys} from "react-hotkeys-hook";
-import ActionButton from "./ActionButton.jsx";
 import {toast} from "react-toastify";
 import {useMutation} from "@tanstack/react-query";
 import {useAuth} from "../context/AuthContext";
-import {Avatar, Icon, IconButton, Button} from "./ui";
+import {Avatar, Icon, IconButton} from "./ui";
 import SafeMarkdown from "../shared/SafeMarkdown";
 import MarkdownComposer from "../shared/MarkdownComposer";
 
@@ -26,15 +25,14 @@ function MessageTranslation({message, preferredLanguage}) {
   );
 }
 
-function Messages({parentId, messageMetadata}) {
+function Messages({parentId}) {
   const {user} = useAuth();
-  const preferredLanguage = user?.preferred_language || "en";
   const client = new CrudKitAPIClient();
+  const preferredLanguage = user?.preferred_language || "en";
 
   const socketURL = client.baseUrl + "/ws/agent/" + parentId + "/";
-  const [messageHistory, setMessageHistory] = useState([]);
   const {sendMessage, lastJsonMessage, readyState} = useWebSocket(socketURL, {
-    shouldReconnect: (closeEvent) => true,
+    shouldReconnect: () => true,
   });
   const bodyRef = React.useRef(null);
   const prevScrollHeightRef = React.useRef(null);
@@ -233,7 +231,7 @@ function Messages({parentId, messageMetadata}) {
             })}
             {surveyResponses.find((r) => r.comments) && (
               <div className="mt-1 italic text-fg-3">
-                "{surveyResponses.find((r) => r.comments).comments}"
+                &quot;{surveyResponses.find((r) => r.comments).comments}&quot;
               </div>
             )}
           </div>
@@ -388,13 +386,12 @@ function tabFilter(tab, items, userId) {
   }
 }
 
-export default function ConversationList({objectList, view, fields, model, metadata, refetch}) {
+export default function ConversationList({objectList, view, model, metadata, refetch}) {
   const {user} = useAuth();
   const navigate = useNavigate();
   const [tab, setTab] = useState("open");
   // Only set selectedRows if objectList has items
   const [selectedRows, setSelectedRows] = useState(objectList && objectList.length > 0 ? [objectList[0].id]:[]);
-  const [messageMetadata, setMessageMetadata] = useState(null);
   // Force Messages component refresh when this changes
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -408,7 +405,6 @@ export default function ConversationList({objectList, view, fields, model, metad
     closed: tabFilter("closed", objectList || [], user?.id).length,
   }), [objectList, user?.id]);
   
-  const client = new CrudKitAPIClient();
   
   // Update selectedRows when objectList changes
   useEffect(() => {
@@ -637,7 +633,6 @@ export default function ConversationList({objectList, view, fields, model, metad
           <Messages
             key={`${selectedRows[0] || ''}-${refreshKey}`}
             parentId={selectedRows[0] || null}
-            messageMetadata={messageMetadata}
           />
         ) : (
           <div className="flex items-center justify-center flex-1 h-full">

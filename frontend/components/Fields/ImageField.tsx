@@ -1,7 +1,7 @@
 import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 
-interface ImageFieldProps extends BaseFieldProps {}
+type ImageFieldProps = BaseFieldProps;
 
 function convertBase64(file: File): Promise<string> {
   return new Promise((resolve, reject) => {

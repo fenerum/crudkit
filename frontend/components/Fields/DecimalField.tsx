@@ -1,4 +1,3 @@
-import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 
 interface DecimalFieldProps extends BaseFieldProps {

@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { render } from "@testing-library/react";
 import SafeMarkdown from "./SafeMarkdown";
 

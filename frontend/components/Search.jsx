@@ -65,7 +65,7 @@ export default function Search() {
     }
   }, [results]);
 
-  const [isTypeCode, setIsTypeCode] = useState(false);
+  const [, setIsTypeCode] = useState(false);
   const [objectTypeMatch, setObjectTypeMatch] = useState(null);
   const [directMatch, setDirectMatch] = useState(null);
 
@@ -281,7 +281,7 @@ export default function Search() {
             <div className="px-6 py-8 text-center">
               <p className="font-semibold text-fg-1">No results found</p>
               <p className="mt-2 text-sm text-fg-3">
-                We couldn't find anything with that term. Please try again.
+                We couldn&apos;t find anything with that term. Please try again.
               </p>
             </div>
           )}

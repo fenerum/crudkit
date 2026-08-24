@@ -1,4 +1,3 @@
-import * as React from 'react';
 import Icon from './Icon';
 
 export default function IconButton({ icon, size = 'md', className = '', ...rest }) {

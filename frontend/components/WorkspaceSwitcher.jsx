@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { appConfig } from "../utils/appConfig";

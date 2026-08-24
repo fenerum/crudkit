@@ -1,4 +1,3 @@
-import React from 'react';
 
 /**
  * Web-specific widget component for displaying embedded Metabase questions
@@ -30,7 +29,6 @@ const MetabaseEmbeddedQuestionWidget = ({ data, title }) => {
           src={data.url}
           title={title || "Metabase Question"}
           frameBorder="0"
-          allowTransparency={true}
           className="w-full h-full"
         />
       </div>

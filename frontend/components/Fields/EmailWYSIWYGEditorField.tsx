@@ -1,4 +1,3 @@
-import * as React from "react";
 import BaseField, { BaseFieldProps } from "./BaseField";
 import BaseWYSIWYGEditor from "./BaseWYSIWYGEditor";
 
@@ -20,7 +19,7 @@ export default function EmailWYSIWYGEditorField({
       metadata={metadata}
       {...rest}
     >
-      {({ value, onChange, onBlur, hasError, ref }) => (
+      {({ value, onChange, onBlur, hasError }) => (
         <BaseWYSIWYGEditor
           value={value}
           onChange={onChange}

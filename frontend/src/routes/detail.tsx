@@ -10,7 +10,7 @@ import AssistantLauncher from '../../components/Assistant/AssistantLauncher';
 import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
-import { useTopbarSlots, OverflowMenu, Icon } from '../../components/ui';
+import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { isFrontendPath } from './is-frontend-path';
 
 function truncateLabel(s: string, max = 18) {
@@ -62,7 +62,6 @@ function InlineTab({ inline, parent_object_id }: any) {
         fields={fields}
         model={model}
         metadata={inlineMetadata}
-        createParams={createParams}
         parent_object_id={parent_object_id}
         related_field_name={related_field_name}
       />
@@ -71,7 +70,6 @@ function InlineTab({ inline, parent_object_id }: any) {
 }
 
 function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useMemo(() => new CrudKitAPIClient(), []);
 

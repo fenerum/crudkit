@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import CrudKitAPIClient from '../../data/api';
 import ObjectList from '../../components/ObjectList';
@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { OverflowMenu, Icon, useTopbarSlots } from '../../components/ui';
+import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -18,7 +18,6 @@ export default function List() {
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const client = useMemo(() => new CrudKitAPIClient(), []);
-  const queryClient = useQueryClient();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pageParam = searchParams.get('page');
@@ -295,7 +294,7 @@ export default function List() {
             <div className="text-fg-3 text-sm">No data found</div>
           </div>
         ) : view?.layout === 'gallery' ? (
-          <Gallery objectList={displayData} view={view} model={type} metadata={metadata} q={qStr} />
+          <Gallery objectList={displayData} view={view} metadata={metadata} q={qStr} />
         ) : view?.layout === 'kanban' ? (
           <KanbanBoard
             objectList={displayData}
@@ -303,7 +302,6 @@ export default function List() {
             model={type}
             metadata={metadata}
             key={view?.id || 'default-kanban'}
-            refetch={refetch}
             q={qStr}
           />
         ) : view?.layout === 'swimlane' ? (
@@ -319,9 +317,7 @@ export default function List() {
           <QuadrantView
             objectList={displayData}
             view={view}
-            model={type}
             metadata={metadata}
-            refetch={refetch}
           />
         ) : view?.layout === 'conversation' ? (
           <ConversationList

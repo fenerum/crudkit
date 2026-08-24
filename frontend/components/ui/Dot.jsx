@@ -1,4 +1,3 @@
-import * as React from 'react';
 
 export default function Dot({ color = 'var(--fg-3)', size = 8, style }) {
   return (

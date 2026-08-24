@@ -3,20 +3,20 @@
 // `home-outline`) and we resolve to the right lucide icon.
 
 import {
-  PanelLeft, ChevronRight, ChevronDown, ChevronUp, ChevronsUpDown,
-  ChevronLeft, MoreHorizontal, MoreVertical, X, Check, Plus, Minus,
-  ArrowRight, ArrowLeft, ArrowUp, ArrowDown, ArrowDownUp, ArrowRightCircle,
-  PlusCircle, ExternalLink, Edit, Edit3, Trash, Trash2, Copy, Link as LinkIcon,
-  Star, Settings, LogOut, LogIn, Eye, EyeOff, Lock, Unlock,
-  Inbox, Mail, MessageSquare, MessagesSquare, MessageCircle, Phone, PhoneIncoming,
-  PhoneOutgoing, Calendar, Clock, Users, User, UserPlus, Building, Building2,
-  Home, File, FileText, StickyNote, Paperclip, Tag, Tags, Filter, Search,
-  Bell, Zap, Activity, List, LayoutGrid, Columns, BarChart, BarChart2,
-  PieChart, HelpCircle, Info, AlertCircle, AlertTriangle, CheckCircle,
-  XCircle, Sun, Moon, Globe, Send, Download, Upload, RefreshCw, RefreshCcw,
-  Play, Pause, Square, Circle, AtSign, Hash, Bold, Italic, Menu,
-  DollarSign, CreditCard, Briefcase, Sparkles, Kanban, Layers,
-  GripVertical, CornerUpLeft,
+  Activity, AlertCircle, AlertTriangle, ArrowDown, ArrowDownUp,
+  ArrowLeft, ArrowRight, ArrowRightCircle, ArrowUp, AtSign, BarChart, BarChart2,
+  Bell, Bold, Briefcase, Building, Building2, Calendar,
+  Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Circle,
+  Clock, Columns, Copy, CornerUpLeft, CreditCard, DollarSign, Download, Edit,
+  Edit3, ExternalLink, Eye, EyeOff, File, FileText, Filter,
+  Globe, GripVertical, Hash, HelpCircle, Home, Inbox, Info, Italic,
+  Kanban, Layers, LayoutGrid, Link as LinkIcon, List, Lock, LogIn, LogOut, Mail,
+  Menu, MessageCircle, MessageSquare, MessagesSquare, Minus, Moon, MoreHorizontal, MoreVertical,
+  PanelLeft, Paperclip, Pause, Phone, PhoneIncoming, PhoneOutgoing,
+  PieChart, Play, Plus, PlusCircle, RefreshCcw, RefreshCw, Search, Send, Settings,
+  Sparkles, Square, Star, StickyNote, Sun, Tag, Tags, Trash, Trash2,
+  Unlock, Upload, User, UserPlus, Users, X,
+  XCircle, Zap,
 } from 'lucide-react';
 
 // First, normalise legacy Ionicons-style names to a canonical lucide kebab name.

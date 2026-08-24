@@ -1,5 +1,4 @@
-import * as React from "react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 // Slot shape:
 //   title?:        { eyebrow?: string, label: string, subtitle?: string }

@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { colorForName, initialsFromName } from './avatarPalette';
 
 export default function Avatar({ name, size = 24, status, src }) {

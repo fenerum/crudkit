@@ -1,4 +1,4 @@
-import { describe, beforeEach, test, expect } from 'vitest';
+import { beforeEach, describe, expect, test } from 'vitest';
 import CrudKitAPIClient, { ValidationError } from '../../data/api';
 
 describe('CrudKitAPIClient.cleanObject', () => {

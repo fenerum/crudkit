@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useCreateForm } from '../../utils/formHooks';
 import FormContainer from '../../components/FormContainer';
@@ -10,7 +9,6 @@ export default function Create() {
   searchParams.forEach((value, key) => { params[key] = value; });
 
   const type = (segment || '').substring(0, 3);
-  const createRef = useRef(null);
   const nextUrl = params.next;
 
   const {
@@ -41,7 +39,6 @@ export default function Create() {
       onSubmit={handleSubmit}
       submitButtonText="Create"
       cancelHref={nextUrl || `/${type}/`}
-      submitButtonRef={createRef}
       formMethods={formMethods}
       modelType={type}
     />

@@ -82,7 +82,7 @@ export default function ForeignKeyField({
       metadata={metadata}
       {...rest}
     >
-      {({ value, onChange, onBlur, hasError }) => (
+      {({ onChange, onBlur, hasError }) => (
         <AsyncSelect
           name={fieldName}
           defaultValue={defaultValueOption}

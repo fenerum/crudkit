@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link } from 'react-router-dom';
 import { url } from '@/utils/urls';
 import ReadOnlyField from '@/components/ReadOnlyField';
@@ -117,7 +116,6 @@ const ListWidgetRenderer = ({
                     <div className="truncate">
                       {metadata?.fields[field] ? (
                         <ReadOnlyField
-                          field={field}
                           value={object[field]}
                           metadata={metadata.fields[field]}
                           link={false}

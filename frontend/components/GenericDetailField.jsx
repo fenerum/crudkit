@@ -1,4 +1,3 @@
-import * as React from "react";
 import ReadOnlyField from "./ReadOnlyField";
 
 // Import specific field components

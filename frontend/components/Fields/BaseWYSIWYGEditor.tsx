@@ -1,4 +1,3 @@
-import * as React from "react";
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import Document from '@tiptap/extension-document'
@@ -57,20 +56,20 @@ const StyledImage = Image.extend({
 });
 
 function mergeStyles(...styleStrings) {
-  let styleObject = {};
-  for (let styleString of styleStrings) {
-    let styleArray = styleString
+  const styleObject = {};
+  for (const styleString of styleStrings) {
+    const styleArray = styleString
       .split(";")
       .map((s) => s.trim())
       .filter(Boolean);
 
-    for (let style of styleArray) {
-      let [property, value] = style.split(":");
+    for (const style of styleArray) {
+      const [property, value] = style.split(":");
       styleObject[property.trim()] = value.trim();
     }
   }
 
-  let finalStyleString = Object.entries(styleObject)
+  const finalStyleString = Object.entries(styleObject)
     .map(([property, value]) => `${property}: ${value}`)
     .join("; ");
 

@@ -1,4 +1,3 @@
-import * as React from "react";
 import moment from "moment-timezone";
 import BaseField, { BaseFieldProps } from "./BaseField";
 

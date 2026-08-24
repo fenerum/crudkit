@@ -18,8 +18,8 @@ import {
 import {
     SortableContext,
     sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
     useSortable,
+    verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { url } from "../utils/urls";
@@ -114,7 +114,7 @@ function DroppableCell({ id, items, children }) {
     );
 }
 
-export default function Swimlane({ objectList, view, fields, model, metadata, refetch, q = '' }) {
+export default function Swimlane({ objectList, view, model, metadata, refetch, q = '' }) {
     const client = new CrudKitAPIClient();
 
     // Check if we hit the limit
@@ -122,8 +122,8 @@ export default function Swimlane({ objectList, view, fields, model, metadata, re
 
     const filterText = q;
     const [expandedRows, setExpandedRows] = useState({});
-    const [sortOrder, setSortOrder] = useState('asc');
-    const [sortBy, setSortBy] = useState('');
+    const [sortOrder] = useState('asc');
+    const [sortBy] = useState('');
 
     // Drag and drop state
     const [activeId, setActiveId] = useState(null);

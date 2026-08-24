@@ -1,4 +1,3 @@
-import { useRef } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useEditForm } from '../../utils/formHooks';
 import FormContainer from '../../components/FormContainer';
@@ -11,7 +10,6 @@ export default function Edit() {
 
   const id = segment || '';
   const type = id.substring(0, 3);
-  const editRef = useRef(null);
 
   const {
     handleSubmit,
@@ -42,7 +40,6 @@ export default function Edit() {
       submitButtonText="Save"
       cancelHref={nextUrl || url(id)}
       deleteHref={url(id, 'delete', nextUrl ? { next: nextUrl } : {})}
-      submitButtonRef={editRef}
       formMethods={formMethods}
       modelType={type}
     />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, useCallback, KeyboardEvent } from 'react';
+import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import SafeMarkdown from '../../shared/SafeMarkdown';
 import { Icon } from '../ui';

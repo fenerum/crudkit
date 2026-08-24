@@ -1,7 +1,7 @@
 import * as React from "react";
-import {useEffect, useState, useMemo, useCallback, useRef} from "react";
+import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {fetchObjects} from "@/data/api";
-import {Link, Outlet, useLocation, useNavigate} from "react-router-dom";
+import {Link, Outlet, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
 import {useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
@@ -15,7 +15,7 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import CommandPalette from "../components/CommandPalette";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {useHotkeys} from "react-hotkeys-hook";
-import {Avatar, Icon, Kbd, Dot, TopbarSlotsProvider, useTopbarSlotsValue, ThemeProvider, ThemeToggle} from "../components/ui";
+import {Avatar, Dot, Icon, Kbd, ThemeProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
 
@@ -131,9 +131,8 @@ export default function BaseLayout() {
 }
 
 function BaseLayoutInner() {
-  const navigate = useNavigate();
   const {pathname} = useLocation();
-  const {user, logout} = useAuth();
+  const {user} = useAuth();
   useDocumentTitle();
 
   const [paletteOpen, setPaletteOpen] = useState(false);

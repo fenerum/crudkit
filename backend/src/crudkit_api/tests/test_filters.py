@@ -24,7 +24,7 @@ class TestBasicFilter(TestCase):
         self.view = MockView()
 
         # Create test user
-        self.user = User.objects.create_user(username="testuser", password="password")
+        self.user = User.objects.create_superuser(username="testuser", password="password")
 
         # Create test views with different ordering configurations
         self.view_with_order_by = View.objects.create(
@@ -70,6 +70,7 @@ class TestBasicFilter(TestCase):
         # Create a mock request with _order_by parameter
         django_request = self.factory.get("/", {"_order_by": "name"})
         request = Request(django_request)
+        request.user = self.user
         self.view.request = request
 
         # Mock queryset with order_by method
@@ -101,6 +102,7 @@ class TestBasicFilter(TestCase):
         # Create a mock request with _view parameter
         django_request = self.factory.get("/", {"_view": self.view_with_order_by.id})
         request = Request(django_request)
+        request.user = self.user
         self.view.request = request
 
         # Mock queryset with order_by method
@@ -131,6 +133,7 @@ class TestBasicFilter(TestCase):
         # Create a mock request with _view parameter
         django_request = self.factory.get("/", {"_view": self.view_with_all.id})
         request = Request(django_request)
+        request.user = self.user
         self.view.request = request
 
         # Mock queryset with order_by method
@@ -167,6 +170,7 @@ class TestBasicFilter(TestCase):
         # Create a mock request with both _view and _order_by parameters
         django_request = self.factory.get("/", {"_view": self.view_with_all.id, "_order_by": "updated_at"})
         request = Request(django_request)
+        request.user = self.user
         self.view.request = request
 
         # Mock queryset with order_by method
@@ -202,6 +206,7 @@ class TestBasicFilter(TestCase):
         # Create a mock request with _order_by parameter containing multiple fields
         django_request = self.factory.get("/", {"_order_by": "name,created_at,-updated_at"})
         request = Request(django_request)
+        request.user = self.user
         self.view.request = request
 
         # Mock queryset with order_by method

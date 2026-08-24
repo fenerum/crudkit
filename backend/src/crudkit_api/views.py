@@ -9,16 +9,31 @@ from django.http import HttpResponseRedirect
 from django.utils.safestring import mark_safe
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from crudkit.authorization import (
+    get_authorized_queryset,
+    get_permission_action,
+    has_action_permission,
+    has_model_permission,
+)
 from crudkit.models import BaseCrudKitModel, ChangeLog
 from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_model_metadata
+from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
 
 
 class GenericViewSet(viewsets.ModelViewSet):
+    permission_classes = [CrudKitModelPermissions]
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        action = get_permission_action(self.request.method, getattr(self, "action", None))
+        return get_authorized_queryset(self.request.user, queryset, action)
+
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
         if hasattr(self.queryset.model, "deleted") and not self.request.GET.get("deleted", False):
@@ -31,16 +46,19 @@ class GenericViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(search_filters)
         return queryset
 
+    @transaction.atomic
     def perform_create(self, serializer: GenericSerializer):
-        serializer.instance = self.initial_instance
-        new_object = serializer.save()
-        ChangeLog.objects.create_from_objects(None, new_object)
+        serializer.initial_instance = self.initial_instance
+        instance = serializer.save()
+        ChangeLog.objects.create_from_objects(None, instance)
 
+    @transaction.atomic
     def perform_update(self, serializer: GenericSerializer):
         old_object = self.get_object()
         serializer.save()
         ChangeLog.objects.create_from_objects(old_object, serializer.instance)
 
+    @transaction.atomic
     def perform_destroy(self, instance: BaseCrudKitModel):
         ChangeLog.objects.create_from_objects(instance, None)
         instance.soft_delete()
@@ -134,7 +152,7 @@ class GenericViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 to_stay_obj = self.get_object()
-                other_objects = self.queryset.filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
+                other_objects = self.get_queryset().filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
 
                 if not all([x.TYPE_ID == to_stay_obj.TYPE_ID for x in other_objects]):
                     raise Exception(
@@ -168,15 +186,16 @@ class GenericViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         action_name = request.data.get("action")
 
-        if action_name in instance._actions:
-            response = instance._actions[action_name](self.request)
-            if action_name not in instance._actions:
-                return Response({"error": f"Action {action_name} not found"}, status=400)
-            if isinstance(response, HttpResponseRedirect):
-                return Response({"redirect": response.url})
-            elif isinstance(response, models.Model):
-                return Response({"redirect": response.id})
-            return response
+        if action_name not in instance._actions:
+            return Response({"error": f"Action {action_name} not found"}, status=400)
+        if not has_action_permission(request.user, instance, action_name):
+            raise PermissionDenied
+        response = instance._actions[action_name](self.request)
+        if isinstance(response, HttpResponseRedirect):
+            return Response({"redirect": response.url})
+        if isinstance(response, models.Model):
+            return Response({"redirect": response.id})
+        return response
 
     @action(detail=False, url_path="initial")
     def initial_data(self, request):
@@ -207,8 +226,7 @@ CRM_TYPE_REGEX = re.compile(r"[A-Z]{3}")
 
 
 class SearchViewSet(viewsets.ViewSet):
-    permission_classes = [IsAuthenticated]  # TODO add permissions
-    # TODO: Consider simpler serializer
+    permission_classes = [IsAuthenticated]
 
     def list(self, request):
         query = request.GET.get("q")
@@ -233,10 +251,13 @@ class SearchViewSet(viewsets.ViewSet):
             ]
 
         for mdl in possible_searches:
+            if not has_model_permission(request.user, mdl, "view"):
+                continue
             serializer_cls = get_serializer(mdl, depth=0, fields=["id", "label", "object_images"])
+            allowed = get_authorized_queryset(request.user, mdl.objects.all(), "view")
             qs = mdl.objects.none()
             for field in mdl.CrudKitSettings.search_fields:
-                qs = qs | mdl.objects.filter(**{f"{field}__icontains": query.strip()})
+                qs = qs | allowed.filter(**{f"{field}__icontains": query.strip()})
             if "deleted" in [field.name for field in mdl._meta.fields]:
                 qs = qs.filter(deleted=False)
             results += [serializer_cls(obj).data for obj in qs[0 : (20 if len(possible_searches) == 1 else 5)]]

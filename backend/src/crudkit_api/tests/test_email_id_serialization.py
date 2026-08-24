@@ -12,7 +12,7 @@ class SubclassIDSerializationTest(TestCase):
     serialized with the URG prefix, not the parent's COM prefix."""
 
     def setUp(self):
-        self.user = User.objects.create_user(username="testuser", password="testpass")
+        self.user = User.objects.create_superuser(username="testuser", password="testpass")
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
 

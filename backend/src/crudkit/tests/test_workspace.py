@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -86,3 +88,40 @@ class WorkspaceAPITests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["type"], "WSP")
         self.assertEqual(response.data["fields"]["views"]["type"], "JSONField")
+
+    def test_invalid_create_does_not_persist(self):
+        response = self.client.post(
+            "/api/v1/WSP/",
+            {"name": "Invalid", "views": "not-a-list"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Workspace.objects.filter(name="Invalid").exists())
+
+    def test_invalid_update_does_not_persist(self):
+        workspace = Workspace.objects.create(
+            name="Sales",
+            views=[self.view.pk],
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        response = self.client.patch(
+            f"/api/v1/WSP/{workspace.pk}/",
+            {"views": "not-a-list"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        workspace.refresh_from_db()
+        self.assertEqual(workspace.views, [self.view.pk])
+
+    def test_create_rolls_back_when_change_log_fails(self):
+        with (
+            patch("crudkit_api.views.ChangeLog.objects.create_from_objects", side_effect=RuntimeError("failed")),
+            self.assertRaises(RuntimeError),
+        ):
+            self.client.post(
+                "/api/v1/WSP/",
+                {"name": "Rolled back", "views": [self.view.pk]},
+                format="json",
+            )
+        self.assertFalse(Workspace.objects.filter(name="Rolled back").exists())

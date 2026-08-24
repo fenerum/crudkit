@@ -340,30 +340,30 @@ class GenericSerializer(serializers.ModelSerializer):
         for field_name in set(to_be_removed):
             del self.fields[field_name]
 
+    def _validate_model(self, instance):
+        try:
+            instance.clean()
+        except DjangoValidationError as exc:
+            detail = getattr(exc, "message_dict", {"non_field_errors": exc.messages})
+            raise serializers.ValidationError(detail) from exc
+
     def create(self, validated_data):
         validated_data["created_by"] = self.context["request"].user
         validated_data["updated_by"] = self.context["request"].user
-        instance = super().create(validated_data)
-
-        try:
-            # Only run the clean method, not full_clean to avoid field validator issues
-            instance.clean()
-        except DjangoValidationError as e:
-            # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(e.message_dict) from e
+        instance = getattr(self, "initial_instance", None) or self.Meta.model()
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        self._validate_model(instance)
+        instance.save()
 
         return instance
 
     def update(self, instance, validated_data):
         instance.updated_by = self.context["request"].user
-        instance = super().update(instance, validated_data)
-
-        try:
-            # Only run the clean method, not full_clean to avoid field validator issues
-            instance.clean()
-        except DjangoValidationError as e:
-            # Convert Django ValidationError to DRF ValidationError
-            raise serializers.ValidationError(e.message_dict) from e
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        self._validate_model(instance)
+        instance.save()
 
         return instance
 

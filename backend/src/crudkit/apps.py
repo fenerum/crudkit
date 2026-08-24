@@ -6,4 +6,5 @@ class CrudKitConfig(AppConfig):
     name = "crudkit"
 
     def ready(self):
+        import crudkit.checks  # noqa: F401  # App registry must load model classes first.
         import crudkit.signals  # noqa

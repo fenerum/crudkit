@@ -47,6 +47,9 @@ class Book(BaseCrudKitModel):
 - `ai_trigger_children` — related objects whose changes re-trigger AI fields.
 - `assistant_prompt` / `assistant_tools` — configure the per-object AI
   assistant (`crudkit_assistant`).
+- `nested_fields` — additional explicitly public fields to include when a
+  relation is serialized. Relations otherwise contain only `id`, `label`, and
+  `object_images`.
 
 Project-wide configuration lives in ordinary Django settings with the
 `CRUDKIT_` prefix (`CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_AI_MODEL`,

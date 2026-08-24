@@ -254,10 +254,7 @@ class ProposalApplyTests(TestCase):
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.owner_id, other.pk)
 
-    def test_apply_patch_invalid_fk_pk_does_not_set_to_bad_value(self):
-        """The DRF serializer silently coerces a missing FK PK to None. That
-        matches REST behaviour and means apply doesn't crash — but the field
-        must not end up holding the invented PK."""
+    def test_apply_patch_rejects_invalid_fk_pk(self):
         proposal = self._make_proposal(
             AssistantProposal.Kind.PATCH,
             {"fields": {"owner": 999999}},
@@ -267,7 +264,9 @@ class ProposalApplyTests(TestCase):
         proposal.apply(self.user)
 
         self.customer.refresh_from_db()
-        self.assertNotEqual(self.customer.owner_id, 999999)
+        self.assertIsNone(self.customer.owner_id)
+        self.assertEqual(proposal.status, AssistantProposal.Status.FAILED)
+        self.assertIn("does not exist", proposal.outcome["error"])
 
     def test_skip_does_not_mutate(self):
         proposal = self._make_proposal(

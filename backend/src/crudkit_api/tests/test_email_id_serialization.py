@@ -3,7 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from crudkit_api.serializers import get_serializer
-from tests.testapp.models import Ticket, UrgentComment
+from tests.testapp.models import Customer, Ticket, UrgentComment
 
 
 class SubclassIDSerializationTest(TestCase):
@@ -93,3 +93,15 @@ class SubclassIDSerializationTest(TestCase):
                 comment_id.startswith("URG"),
                 f"Comment ID should start with URG, but got {comment_id}",
             )
+
+    def test_nested_user_only_exposes_reference_fields(self):
+        customer = Customer.objects.create(
+            name="Customer",
+            owner=self.user,
+            created_by=self.user,
+            updated_by=self.user,
+        )
+
+        serializer = get_serializer(Customer)(customer)
+
+        self.assertEqual(set(serializer.data["owner"]), {"id", "label", "object_images"})

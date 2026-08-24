@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
+from crudkit_api.authentication import UserSerializer
 from tests.testapp.adapters import InMemoryUserProfileAdapter
 
 
@@ -28,6 +29,28 @@ class DefaultAdapterUserProfileViewTests(TestCase):
 
         response = self.client.get("/api/v1/user/me/")
         self.assertEqual(response.data["preferred_language"], "en")
+
+
+class MinimalUserSerializerTests(TestCase):
+    def test_missing_optional_name_fields_use_empty_strings(self):
+        class MinimalUser:
+            pk = 7
+
+            def get_username(self):
+                return "person@example.test"
+
+        data = UserSerializer(MinimalUser()).data
+
+        self.assertEqual(
+            data,
+            {
+                "id": 7,
+                "username": "person@example.test",
+                "email": "",
+                "first_name": "",
+                "last_name": "",
+            },
+        )
 
 
 @override_settings(CRUDKIT_USER_PROFILE_ADAPTER="tests.testapp.adapters.InMemoryUserProfileAdapter")

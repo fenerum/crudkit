@@ -12,7 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from crudkit.decorators import crm_action
-from crudkit.fields import AIBooleanField, AIForeignKeyField, AISummaryField, AITagsField, MoneyField
+from crudkit.fields import AIBooleanField, AIForeignKeyField, AISummaryField, AITagsField, CurrencyField, MoneyField
 from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField, WYSIWYGEditorField
 
 
@@ -43,6 +43,7 @@ class Customer(BaseCrudKitModel):
         related_name="+",
     )
     balance = MoneyField(null=True, blank=True)
+    currency = CurrencyField()
 
     def __str__(self):
         return self.name

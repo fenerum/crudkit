@@ -80,6 +80,17 @@ class GenericViewSet(viewsets.ModelViewSet):
     def get_fields(self, request):
         return request.GET.get("_fields").split(",") if request.GET.get("_fields") else []
 
+    def _serialize_rows(self, rows):
+        # One serializer for all rows: building fields per row allocates ~400 KB per object.
+        serializer = self.get_serializer_class()(context={"request": self.request})
+        data = []
+        for obj in rows:
+            # MoneyFieldSerializer reads the current object to find the right currency
+            self.request._current_object_for_serialization = obj
+            serializer.instance = obj
+            data.append(serializer.to_representation(obj))
+        return data
+
     def list(self, request, *args, **kwargs):
         # Reset query stats
         reset_queries()
@@ -115,32 +126,13 @@ class GenericViewSet(viewsets.ModelViewSet):
         # Always use pagination when it's enabled in settings
         page = self.paginate_queryset(queryset)
         if page is not None:
-            # Process each paginated object individually to ensure proper currency serialization
-            data = []
-            serializer_class = self.get_serializer_class()
-
-            for obj in page:
-                # Store the current object being processed in the request for the serializer to access
-                # This is needed for MoneyField serialization to get the correct currency
-                self.request._current_object_for_serialization = obj
-                serializer = serializer_class(obj, context={"request": self.request})
-                data.append(serializer.data)
-
+            data = self._serialize_rows(page)
             response = self.get_paginated_response(data)
             response.headers["X-Query-Count"] = str(len(connection.queries))
             return response
 
         # Fallback for when pagination is disabled
-        # Serialize with special handling for currency fields in list views
-        data = []
-        serializer_class = self.get_serializer_class()
-
-        # Process each object individually to ensure proper currency serialization
-        for obj in queryset:
-            # Store the current object being processed in the request for the serializer to access
-            self.request._current_object_for_serialization = obj
-            serializer = serializer_class(obj, context={"request": self.request})
-            data.append(serializer.data)
+        data = self._serialize_rows(queryset)
 
         return Response(data, headers={"X-Query-Count": len(connection.queries)})
 

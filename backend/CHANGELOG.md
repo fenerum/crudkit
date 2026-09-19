@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 (2026-09-19)
+
+- `crudkit_api`: list endpoints no longer build a serializer per row. `GenericViewSet.list`
+  reuses one serializer for the whole page, `GenericSerializer.build_nested_field` caches the
+  generated nested field classes per (related model, depth), and the nested serializer behind a
+  forward FK is built once per field instead of once per value. A 500-row page of a model with
+  11 FKs went from a 216 MB to a 15 MB peak downstream (72 MB to 8.5 MB in the test suite's
+  smaller fixtures) and serializes ~2.6x faster; the JSON is unchanged. Worker RSS on gunicorn
+  no longer climbs from refetching kanban/swimlane views, which request `page_size=500`.
 
 - Workspaces: new `Workspace` model (TYPE_ID `WSP`) — switchable sidebar
   apps that pin an ordered set of saved views as tabs, picked from a switcher

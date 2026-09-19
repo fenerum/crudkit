@@ -5,6 +5,7 @@ import ReadOnlyField from './ReadOnlyField';
 import { PageSizeSelect } from './ui';
 import { url } from '@/utils/urls';
 import CrudKitAPIClient from '@/data/api';
+import { getStoredPageSize, storePageSize } from '@/utils/pageSize';
 
 const DEFAULT_INLINE_PAGE_SIZE = 10;
 
@@ -14,7 +15,7 @@ const DEFAULT_INLINE_PAGE_SIZE = 10;
 export default function InlineList({ fields, model, metadata, parent_object_id, related_field_name }) {
   const [selectedRows, setSelectedRows] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_INLINE_PAGE_SIZE);
+  const [pageSize, setPageSize] = useState(() => getStoredPageSize('inline') ?? DEFAULT_INLINE_PAGE_SIZE);
   const client = new CrudKitAPIClient();
 
   const listQuery = useQuery({
@@ -33,6 +34,7 @@ export default function InlineList({ fields, model, metadata, parent_object_id, 
   });
 
   const handlePageSizeChange = useCallback((newSize) => {
+    storePageSize('inline', newSize);
     setPageSize(newSize);
     setCurrentPage(1);
   }, []);

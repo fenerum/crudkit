@@ -10,6 +10,7 @@ from django.utils.safestring import mark_safe
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import get_object_or_404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
@@ -151,7 +152,8 @@ class GenericViewSet(viewsets.ModelViewSet):
         post_data = request.data
         try:
             with transaction.atomic():
-                to_stay_obj = self.get_object()
+                to_stay_obj = get_object_or_404(self.filter_queryset(self.get_queryset()), pk=post_data.pop("id", pk))
+                self.check_object_permissions(request, to_stay_obj)
                 other_objects = self.get_queryset().filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
 
                 if not all([x.TYPE_ID == to_stay_obj.TYPE_ID for x in other_objects]):
@@ -161,16 +163,12 @@ class GenericViewSet(viewsets.ModelViewSet):
                     )
                 if not other_objects:
                     raise Exception("No objects to merge")
-                if to_stay_obj in other_objects:
-                    raise Exception("Cannot merge the same object")
 
                 merge_fields = post_data
                 objects_by_id = {obj.id: obj for obj in [to_stay_obj, *other_objects]}
 
                 for field, value in merge_fields.items():
-                    if field not in ["id"]:
-                        new_value = getattr(objects_by_id[value], field)
-                        setattr(to_stay_obj, field, new_value)
+                    setattr(to_stay_obj, field, getattr(objects_by_id[value], field))
                 to_stay_obj.save()
 
                 for to_be_deleted_object in other_objects:

@@ -23,7 +23,7 @@ export default function Merge() {
 
   const mergeMutation = useMutation({
     mutationFn: (mergeData: any) => {
-      const id = mergeData.merge[0];
+      const id = mergeData.id ?? mergeData.merge[0];
       return client.merge(segment, id, mergeData);
     },
     onSuccess: (response: any) => {

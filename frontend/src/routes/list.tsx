@@ -12,6 +12,7 @@ import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
+import { getStoredPageSize, storePageSize } from '../../utils/pageSize';
 
 export default function List() {
   const { segment: type, view: viewId } = useParams() as { segment: string; view?: string };
@@ -24,7 +25,7 @@ export default function List() {
   const [currentPage, setCurrentPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
   const qStr = searchParams.get('q') || '';
   const pageSizeParam = searchParams.get('page_size');
-  const pageSize = pageSizeParam ? parseInt(pageSizeParam, 10) : null;
+  const pageSize = pageSizeParam ? parseInt(pageSizeParam, 10) : getStoredPageSize('list');
 
   // Build extra query filters from URL params, excluding the reserved keys.
   const extraQuery = useMemo(() => {
@@ -150,6 +151,7 @@ export default function List() {
   }, [setSearchParams]);
 
   const handlePageSizeChange = useCallback((newSize: number) => {
+    storePageSize('list', newSize);
     setSearchParams(
       (prev) => {
         const next = new URLSearchParams(prev);

@@ -1,3 +1,4 @@
+import functools
 import mimetypes
 
 from django.core.exceptions import FieldDoesNotExist
@@ -399,28 +400,6 @@ class GenericSerializer(serializers.ModelSerializer):
         if relation_info.to_many:  # Currently not supported
             return super().build_nested_field(field_name, relation_info, nested_depth)
 
-        class NestedSerializer(GenericSerializer):
-            _is_nested = True
-
-            class Meta:
-                model = relation_info.related_model
-                depth = nested_depth - 1
-                fields = "__all__"
-
-        class RelatedField(serializers.Field):
-            def to_representation(self, value):
-                return NestedSerializer(value, context=self.context).data
-
-            def to_internal_value(self, data):
-                if data is not None:
-                    try:
-                        # if issubclass(relation_info.related_model, BaseCrudKitModel):
-                        # mdl, pk = parse_ck_id(data)
-                        # relation_info.related_model.objects.get(id=pk)
-                        return relation_info.related_model.objects.get(id=data)
-                    except relation_info.related_model.DoesNotExist:
-                        pass
-
         model_fields = {field.name: field for field in self.Meta.model._meta.fields}
         field = model_fields[field_name]
         kwargs = {"required": not field.blank, "allow_null": field.null}
@@ -428,7 +407,44 @@ class GenericSerializer(serializers.ModelSerializer):
             if "required" in kwargs:
                 del kwargs["required"]
             kwargs["read_only"] = True
-        return RelatedField, kwargs
+        return _nested_relation_field(relation_info.related_model, nested_depth), kwargs
+
+
+@functools.cache
+def _nested_relation_field(related_model, nested_depth):
+    """
+    Field class rendering a forward FK as a nested object. Cached so building a
+    serializer does not create new classes for every relation.
+    """
+
+    class NestedSerializer(GenericSerializer):
+        _is_nested = True
+
+        class Meta:
+            model = related_model
+            depth = nested_depth - 1
+            fields = "__all__"
+
+    class RelatedField(serializers.Field):
+        def to_representation(self, value):
+            # Reuse one nested serializer per field; building its fields per value is expensive.
+            # .instance must be set since MoneyField/CrudKitIDField serializers read parent.instance.
+            if not hasattr(self, "_nested"):
+                self._nested = NestedSerializer(context=self.context)
+            self._nested.instance = value
+            return self._nested.to_representation(value)
+
+        def to_internal_value(self, data):
+            if data is not None:
+                try:
+                    # if issubclass(related_model, BaseCrudKitModel):
+                    # mdl, pk = parse_ck_id(data)
+                    # related_model.objects.get(id=pk)
+                    return related_model.objects.get(id=data)
+                except related_model.DoesNotExist:
+                    pass
+
+    return RelatedField
 
 
 def get_serializer(mdl, depth=1, fields="__all__"):

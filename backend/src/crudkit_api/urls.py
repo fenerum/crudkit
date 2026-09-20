@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework import routers
 from rest_framework_simplejwt.views import TokenRefreshView
 
+from crudkit.authorization import has_model_permission
 from crudkit.utils import get_model_types
 from crudkit_api.authentication import LoginView, UserProfileView
 from crudkit_api.serializers import get_serializer
@@ -10,8 +11,26 @@ from crudkit_api.views import GenericViewSet, SearchViewSet, WidgetsViewSet
 # ViewSets define the view behavior.
 
 
+class CrudKitAPIRootView(routers.APIRootView):
+    """Router root that only advertises the models the user is allowed to view."""
+
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+        models = get_model_types()
+        response.data = {
+            type_id: url
+            for type_id, url in response.data.items()
+            if type_id not in models or has_model_permission(request.user, models[type_id], "view")
+        }
+        return response
+
+
+class CrudKitRouter(routers.DefaultRouter):
+    APIRootView = CrudKitAPIRootView
+
+
 # Routers provide an easy way of automatically determining the URL conf.
-router = routers.DefaultRouter()
+router = CrudKitRouter()
 # router.register(r"users", UserViewSet)
 
 for type_id, mdl in get_model_types().items():

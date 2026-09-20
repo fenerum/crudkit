@@ -3,6 +3,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from crudkit.models import View, Workspace
+from crudkit.utils import get_model_types
 from tests.testapp.models import Customer, Ticket
 
 
@@ -108,3 +109,39 @@ class GenericAPIAuthorizationTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual([row["id"] for row in response.data["results"]], [self.customer.pk])
+
+
+class APIRootAuthorizationTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+
+    def test_anonymous_requests_are_rejected(self):
+        response = self.client.get("/api/v1/")
+        self.assertEqual(response.status_code, 401)
+
+    def test_superuser_sees_every_model(self):
+        self.client.force_authenticate(User.objects.create_superuser(username="root", password="pw"))
+
+        response = self.client.get("/api/v1/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertLessEqual({"CUS", "TIC"}, set(response.data))
+
+    def test_root_only_lists_models_the_user_can_view(self):
+        user = User.objects.create_user(username="other", password="pw")
+        grant(user, Customer, "view")
+        self.client.force_authenticate(user)
+
+        response = self.client.get("/api/v1/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("CUS", response.data)
+        self.assertNotIn("TIC", response.data)
+
+    def test_user_without_model_permissions_gets_an_empty_listing(self):
+        self.client.force_authenticate(User.objects.create_user(username="nobody", password="pw"))
+
+        response = self.client.get("/api/v1/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(set(response.data) & set(get_model_types()), set())

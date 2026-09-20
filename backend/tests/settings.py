@@ -84,7 +84,7 @@ REST_FRAMEWORK = {
         "rest_framework_simplejwt.authentication.JWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
-    "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.DjangoModelPermissions"],
+    "DEFAULT_PERMISSION_CLASSES": ["crudkit_api.permissions.CrudKitModelPermissions"],
     "DEFAULT_PAGINATION_CLASS": "crudkit_api.pagination.CrudKitPagination",
     "DEFAULT_FILTER_BACKENDS": ["crudkit_api.filters.BasicFilter"],
     "PAGE_SIZE": 50,

@@ -5,6 +5,13 @@ from crudkit.authorization import get_permission_action, has_model_permission, h
 
 class CrudKitModelPermissions(BasePermission):
     def has_permission(self, request, view):
+        if not getattr(request.user, "is_authenticated", False):
+            return False
+        # Set by DRF on rest_framework.routers.APIRootView (inherited by
+        # CrudKitAPIRootView) and on SchemaView: views with no model opting out
+        # of model permissions. DjangoModelPermissions honours it the same way.
+        if getattr(view, "_ignore_model_permissions", False):
+            return True
         queryset = getattr(view, "queryset", None)
         if queryset is None:
             return False

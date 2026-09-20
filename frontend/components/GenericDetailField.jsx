@@ -32,6 +32,7 @@ export default function GenericDetailField({ fieldName, value, form, metadata, m
       <ReadOnlyField
         value={value}
         metadata={metadata}
+        expandable
       />
     );
   }

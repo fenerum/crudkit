@@ -890,7 +890,8 @@ div[dir="auto"] > * {
      short scalar values. */
   .ck-vt-cell:has(iframe),
   .ck-vt-cell:has(.ck-tiptap-editor),
-  .ck-vt-cell:has(textarea) {
+  .ck-vt-cell:has(textarea),
+  .ck-vt-cell:has(.ck-ro-text) {
     flex-direction: column;
     align-items: stretch;
     gap: 6px;
@@ -899,12 +900,14 @@ div[dir="auto"] > * {
   }
   .ck-vt-cell:has(iframe) .ck-vt-cell-l,
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-l,
-  .ck-vt-cell:has(textarea) .ck-vt-cell-l {
+  .ck-vt-cell:has(textarea) .ck-vt-cell-l,
+  .ck-vt-cell:has(.ck-ro-text) .ck-vt-cell-l {
     min-width: 0;
   }
   .ck-vt-cell:has(iframe) .ck-vt-cell-v,
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v,
-  .ck-vt-cell:has(textarea) .ck-vt-cell-v {
+  .ck-vt-cell:has(textarea) .ck-vt-cell-v,
+  .ck-vt-cell:has(.ck-ro-text) .ck-vt-cell-v {
     display: block;
     overflow: visible;
     text-align: left;
@@ -913,7 +916,8 @@ div[dir="auto"] > * {
   }
   .ck-vt-cell:has(iframe) .ck-vt-cell-v > *,
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v > *,
-  .ck-vt-cell:has(textarea) .ck-vt-cell-v > * {
+  .ck-vt-cell:has(textarea) .ck-vt-cell-v > *,
+  .ck-vt-cell:has(.ck-ro-text) .ck-vt-cell-v > * {
     width: 100%;
     display: block;
     white-space: normal;
@@ -921,6 +925,16 @@ div[dir="auto"] > * {
     text-overflow: clip;
   }
   .ck-vt-cell-v iframe { width: 100%; border: 0; background: var(--bg-1); }
+  /* Long or multi-line read-only values: wrap, clamp to ~3 lines, and let the
+     component offer a Show more/less toggle instead of ellipsising. */
+  .ck-ro-text { display: block; }
+  .ck-ro-text-body {
+    display: block;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    line-height: 1.5;
+  }
+  .ck-ro-text-body.is-clamped { max-height: 4.5em; overflow: hidden; }
   /* Form/edit cells must let inputs lay out normally; only view-mode truncates. */
   .ck-vt-cell.is-form .ck-vt-cell-v {
     display: block;

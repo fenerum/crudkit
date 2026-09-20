@@ -1,13 +1,37 @@
 import moment from "moment-timezone";
-import { useRef, useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { url, valid_url } from "../utils/urls";
 import { Icon } from "./ui";
 
-export default function ReadOnlyField({ value, metadata, link = true }) {
+// Values longer than this can't fit on one line in a detail cell, so they get
+// the wrap + expand treatment instead of being ellipsised.
+const WRAP_THRESHOLD = 60;
+
+function ShowMoreToggle({ expanded, onToggle }) {
+    return (
+        <button type="button" className="text-xs text-fg-3 hover:cursor-pointer" onClick={onToggle}>
+            Show {expanded ? "less" : "more"}
+        </button>
+    );
+}
+
+export default function ReadOnlyField({ value, metadata, link = true, expandable = false }) {
     const iframeRef = useRef();
     const iframeDefaultHeight = "140px";
     const [iframeHeight, setIframeHeight] = useState(iframeDefaultHeight);
+    const textRef = useRef(null);
+    const [textExpanded, setTextExpanded] = useState(false);
+    const [textOverflows, setTextOverflows] = useState(false);
+
+    // Only measure while clamped — an expanded element never overflows, and
+    // clearing the flag there would hide the "Show less" toggle.
+    useLayoutEffect(() => {
+        const el = textRef.current;
+        if (el && !textExpanded) {
+            setTextOverflows(el.scrollHeight > el.clientHeight + 1);
+        }
+    }, [value, textExpanded]);
 
     if (metadata === undefined) {
         return <>[undefined]</>;
@@ -33,6 +57,13 @@ export default function ReadOnlyField({ value, metadata, link = true }) {
     };
 
     const isAIField = metadata.type?.startsWith("AI");
+
+    // Choices render as short labels through the same fallback, so they never
+    // need wrapping.
+    const isLongText = expandable
+        && typeof value === "string"
+        && !metadata.choices
+        && (value.includes("\n") || value.length > WRAP_THRESHOLD);
 
     const content = <>
         {metadata.type === "JSONField" || metadata.type === "AITagsField" ? (
@@ -63,9 +94,7 @@ export default function ReadOnlyField({ value, metadata, link = true }) {
                     sandbox="allow-same-origin"
                     title="content"
                 />
-                <button type="button" className="text-xs text-fg-3 hover:cursor-pointer" onClick={toggleSize}>
-                    Show {iframeHeight === iframeDefaultHeight ? "more" : "less"}
-                </button>
+                <ShowMoreToggle expanded={iframeHeight !== iframeDefaultHeight} onToggle={toggleSize} />
             </div>
         ) : value && (metadata.type === "BooleanField" || metadata.type === "AIBooleanField") ? (
             <span>{value ? "Yes" : "No"}</span>
@@ -83,6 +112,13 @@ export default function ReadOnlyField({ value, metadata, link = true }) {
             <a href={value} target="_blank" rel="noopener noreferrer" className="ck-fk-link font-medium">{value}</a>
         ) : value && metadata.type === "CrudKitPositiveIntegerField" && typeof value === 'string' && link && valid_url(value) ? (
             <Link to={url(value)} className="ck-fk-link font-medium">{value}</Link>
+        ) : isLongText ? (
+            <span className="ck-ro-text">
+                <span ref={textRef} className={`ck-ro-text-body${textExpanded ? "" : " is-clamped"}`}>{value}</span>
+                {textOverflows && (
+                    <ShowMoreToggle expanded={textExpanded} onToggle={() => setTextExpanded(!textExpanded)} />
+                )}
+            </span>
         ) : (
             <span>{value}</span>
         )}

@@ -121,6 +121,18 @@ class BuildModelMetadataTests(TestCase):
         self.assertEqual(by_name["worklog"]["related_model_type"], "WLG")
         self.assertEqual(by_name["worklog"]["field_name"], "related_object")
 
+    def test_can_create_reflects_add_permission(self):
+        superuser = User.objects.create_superuser("root", password="x")
+        plain = User.objects.create_user("plain", password="x")
+        self.assertTrue(build_model_metadata(Customer, superuser)["can_create"])
+        self.assertFalse(build_model_metadata(Customer, plain)["can_create"])
+        self.assertFalse(build_model_metadata(Customer)["can_create"])
+
+    def test_search_fields_and_inline_create_exposed(self):
+        md = build_model_metadata(Customer)
+        self.assertEqual(md["search_fields"], list(Customer.CrudKitSettings.search_fields))
+        self.assertTrue(md["inline_create"])
+
     def test_extra_generic_relations_absent_by_default(self):
         md = build_model_metadata(Ticket)
         self.assertNotIn("worklog", {rel["name"] for rel in md["relations"]})

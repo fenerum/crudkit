@@ -109,7 +109,7 @@ export function useCrudForm({ type, defaultValues = {} }) {
   };
 }
 
-export function useCreateForm({ type, params = {} }) {
+export function useCreateForm({ type, params = {}, onCreated = null, initialValues = null }) {
   const [searchParams] = useSearchParams();
   const nextUrl = searchParams.get('next');
 
@@ -144,12 +144,13 @@ export function useCreateForm({ type, params = {} }) {
 
   // Apply prefills onto the form whenever the initial query resolves.
   // (react-query v5 dropped `onSuccess`, so we wire this through useEffect.)
+  // `initialValues` win over server prefills, which may send blanks for them.
   useEffect(() => {
     if (!initialQuery.data) return;
-    for (const [key, value] of Object.entries(initialQuery.data)) {
+    for (const [key, value] of Object.entries({ ...initialQuery.data, ...initialValues })) {
       formMethods.setValue(key, value, { shouldValidate: true });
     }
-  }, [initialQuery.data, formMethods]);
+  }, [initialQuery.data, initialValues, formMethods]);
 
   const createMutation = useMutation({
     mutationFn: (data) => {
@@ -164,7 +165,8 @@ export function useCreateForm({ type, params = {} }) {
     onSuccess: (data) => {
       invalidateModel(queryClient, type, { viewModel: data?.model });
       showSuccessToastWithLink('created', data, router.push);
-      router.push(nextUrl || url(data.id));
+      if (onCreated) onCreated(data);
+      else router.push(nextUrl || url(data.id));
     },
     onError: (error) => {
       const detail = error.message ? `: ${error.message}` : '';

@@ -215,7 +215,7 @@ class GenericViewSet(viewsets.ModelViewSet):
 
     @action(detail=False)
     def metadata(self, request):
-        return Response(build_model_metadata(self.queryset.model))
+        return Response(build_model_metadata(self.queryset.model, request.user))
 
 
 CRM_TYPE_REGEX = re.compile(r"[A-Z]{3}")

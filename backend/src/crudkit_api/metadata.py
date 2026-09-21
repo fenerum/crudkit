@@ -14,7 +14,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db.models import Model
 
-from crudkit.authorization import get_authorized_queryset
+from crudkit.authorization import get_authorized_queryset, has_model_permission
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem
 from crudkit.utils import get_model_types
@@ -108,7 +108,7 @@ def _generic_relations() -> list[dict[str, Any]]:
     return relations
 
 
-def build_model_metadata(model) -> dict[str, Any]:
+def build_model_metadata(model, user=None) -> dict[str, Any]:
     """Return the model-level metadata payload served at /api/v1/<type>/metadata/."""
     mfc = _model_field_choices()
     fields = OrderedDict((field.name, _field_metadata(field, mfc)) for field in model._meta.fields)
@@ -132,6 +132,9 @@ def build_model_metadata(model) -> dict[str, Any]:
         "allowed_prefills": list(
             getattr(model.CrudKitSettings, "allowed_prefills", []),
         ),
+        "search_fields": list(getattr(model.CrudKitSettings, "search_fields", [])),
+        "can_create": has_model_permission(user, model, "add"),
+        "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
         "fields": fields,
         "relations": relations,
         "actions": [{"verbose_name": func.verbose_name, "action": action} for action, func in model()._actions.items()],

@@ -1,13 +1,22 @@
 import * as React from "react";
-import AsyncSelect from "react-select/async";
+import AsyncCreatableSelect from "react-select/async-creatable";
 import BaseField, { BaseFieldProps } from "./BaseField";
 import CrudKitAPIClient from "../../data/api";
+import InlineCreateModal from "../InlineCreateModal";
+import { useMetadata } from "../../utils/formHooks";
 
 export interface ForeignKeyFieldProps extends BaseFieldProps {
   metadata: BaseFieldProps["metadata"] & {
     related_model_type?: string;
     blank?: boolean;
   };
+}
+
+function toOption(value: any) {
+  if (value && typeof value === 'object' && value.id) {
+    return { value: value.id, label: value.label || String(value.id) };
+  }
+  return null;
 }
 
 export default function ForeignKeyField({
@@ -19,17 +28,13 @@ export default function ForeignKeyField({
   const client = React.useMemo(() => new CrudKitAPIClient(), []);
   const [debounceTimeout, setDebounceTimeout] = React.useState<ReturnType<typeof setTimeout> | null>(null);
 
-  const defaultValueOption = React.useMemo(() => {
-    if (defaultValue && typeof defaultValue === 'object' && defaultValue.id) {
-      return {
-        value: defaultValue.id,
-        label: defaultValue.label || String(defaultValue.id)
-      };
-    }
-    return null;
-  }, [defaultValue]);
+  // Text typed when "Create new…" was chosen; non-null while the modal is open.
+  const [creating, setCreating] = React.useState<string | null>(null);
 
   const relatedModelType = metadata.related_model_type;
+  const { metadata: relatedMetadata } = useMetadata(relatedModelType);
+  const canCreate = !!(relatedMetadata?.can_create && relatedMetadata?.inline_create);
+  const relatedName = relatedMetadata?.verbose_name || relatedModelType;
 
   const loadOptions = React.useCallback(async (inputValue: string) => {
     if (!relatedModelType) {
@@ -82,10 +87,11 @@ export default function ForeignKeyField({
       metadata={metadata}
       {...rest}
     >
-      {({ onChange, onBlur, hasError }) => (
-        <AsyncSelect
+      {({ value, onChange, onBlur, hasError }) => (
+        <>
+        <AsyncCreatableSelect
           name={fieldName}
-          defaultValue={defaultValueOption}
+          value={toOption(value)}
           styles={{
             control: (base: any, state: any) => ({
               ...base,
@@ -137,7 +143,11 @@ export default function ForeignKeyField({
           onBlur={onBlur}
           loadOptions={debouncedLoadOptions}
           defaultOptions={true}
-          noOptionsMessage={() => "Type to search..."}
+          noOptionsMessage={() => "No matches"}
+          isValidNewOption={() => canCreate}
+          formatCreateLabel={(input: string) => input ? `+ Create ${relatedName} "${input}"` : `+ Create new ${relatedName}`}
+          createOptionPosition="last"
+          onCreateOption={(input: string) => setCreating(input)}
           isClearable={metadata.blank}
           placeholder={metadata.blank ? "Select..." : "Required - select an option"}
           loadingMessage={() => "Loading..."}
@@ -145,6 +155,18 @@ export default function ForeignKeyField({
           menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
           menuPosition="fixed"
         />
+        {creating !== null && relatedModelType && (
+          <InlineCreateModal
+            type={relatedModelType}
+            initialText={creating}
+            onCreated={(data: { id: string; label?: string }) => {
+              onChange({ id: data.id, label: data.label || String(data.id) });
+              setCreating(null);
+            }}
+            onClose={() => setCreating(null)}
+          />
+        )}
+        </>
       )}
     </BaseField>
   );

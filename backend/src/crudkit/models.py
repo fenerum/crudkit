@@ -367,6 +367,8 @@ class BaseCrudKitModel(models.Model):
     class CrudKitSettings:
         allowed_prefills = []
         search_fields = []
+        # Offer "Create new…" in related-object pickers targeting this model.
+        inline_create = True
         ai_trigger_children = []
         # Playbook prompt for the per-object AI assistant. Empty → generic
         # fallback prompt is used. Subclasses override to teach the assistant

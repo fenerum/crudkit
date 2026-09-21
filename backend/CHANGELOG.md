@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- `crudkit_frontend`: related-record pickers offer `+ Create <model> "<typed text>"`, which
+  opens the target's create form in a modal (prefilled from the first `search_fields` entry)
+  and selects the new record without leaving the form. Modals nest; Esc/Enter only affect the
+  topmost one.
+- `crudkit_api`: the metadata endpoint also returns `search_fields`, `can_create` (add
+  permission for the requesting user) and `inline_create`. `build_model_metadata` takes an
+  optional `user`.
+- `crudkit`: new `CrudKitSettings.inline_create` (default `True`); set `False` to hide the
+  inline create option for a model.
+
 ## 0.2.3 (2026-09-21)
 
 - `crudkit_api`: `GET /api/v1/` no longer returns 403 under `CrudKitModelPermissions`.

@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -18,6 +18,7 @@ import CrudKitAPIClient from "../data/api";
 import { toast } from "react-toastify";
 import ErrorMessage from "./ErrorMessage.jsx";
 import { Icon } from "./ui";
+import { formatApiError } from "../utils/apiErrors";
 
 export default function KanbanBoard({objectList, view, model, metadata, q = ''}) {
     const client = useMemo(() => new CrudKitAPIClient(), []);
@@ -29,6 +30,9 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
     const filterText = q;
     const [draggedItemData, setDraggedItemData] = useState(null);
     const [activeId, setActiveId] = useState();
+    // handleDragOver moves the card between columns while dragging, so the
+    // column it started in has to be remembered to revert a rejected drop.
+    const dragSourceRef = useRef(null);
     const isTouchDevice = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: isTouchDevice ? Infinity : 5 } }),
@@ -186,6 +190,7 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
         const { active } = event;
         const { id } = active;
         if (!objectMap[id]) return;
+        dragSourceRef.current = findContainer(id);
         setActiveId(id);
         setDraggedItemData(objectMap[id]);
     }
@@ -226,63 +231,50 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
 
     function handleDragEnd(event) {
         const { active, over } = event;
-        if (!over) {
-            setActiveId(null);
-            setDraggedItemData(null);
-            return;
-        }
+        const sourceContainer = dragSourceRef.current;
+        dragSourceRef.current = null;
+        setActiveId(null);
+        setDraggedItemData(null);
+        if (!over) return;
         const { id } = active;
         const { id: overId } = over;
-        if (!objectMap[id]) {
-            setActiveId(null);
-            setDraggedItemData(null);
-            return;
-        }
+        if (!objectMap[id]) return;
         const activeContainer = findContainer(id);
         const overContainer = findContainer(overId);
-        if (!activeContainer || !overContainer) {
-            setActiveId(null);
-            setDraggedItemData(null);
-            return;
+        if (!activeContainer || !overContainer || !sourceContainer) return;
+        const activeIndex = items[activeContainer].indexOf(id);
+        const overIndex = items[overContainer].indexOf(overId);
+
+        if (activeContainer === overContainer && activeIndex !== overIndex) {
+            setItems((prev) => ({
+                ...prev,
+                [overContainer]: arrayMove(prev[overContainer], activeIndex, overIndex)
+            }));
         }
-        const activeItems = items[activeContainer];
-        const activeIndex = activeItems.indexOf(id);
-        const overItems = items[overContainer];
-        const overIndex = overItems.indexOf(overId);
+        if (sourceContainer === overContainer) return;
 
         client.partialUpdate(model, id, {
             [view.group_by]: overContainer,
         })
         .then(() => {
             toast.success('Status updated');
-            if (objectMap[id]) {
-                const updatedObj = {...objectMap[id]};
-                if (groupByField.type === "ForeignKey") {
-                    const columnLabel = columns.find(col => col[0] === overContainer)?.[1];
-                    updatedObj[view.group_by] = { id: overContainer, label: columnLabel || overContainer };
-                } else {
-                    updatedObj[view.group_by] = overContainer;
-                }
-                setObjectMap(prev => ({ ...prev, [id]: updatedObj }));
+            const updatedObj = {...objectMap[id]};
+            if (groupByField.type === "ForeignKey") {
+                const columnLabel = columns.find(col => col[0] === overContainer)?.[1];
+                updatedObj[view.group_by] = { id: overContainer, label: columnLabel || overContainer };
+            } else {
+                updatedObj[view.group_by] = overContainer;
             }
-            if (activeContainer === overContainer && activeIndex !== overIndex) {
-                setItems((prev) => ({
-                    ...prev,
-                    [overContainer]: arrayMove(prev[overContainer], activeIndex, overIndex)
-                }));
-            }
+            setObjectMap(prev => ({ ...prev, [id]: updatedObj }));
         })
         .catch(error => {
-            toast.error('Failed to update status');
+            toast.error(formatApiError(error, metadata.fields) || 'Failed to update status');
             console.error('Error updating item status:', error);
             setItems(prev => ({
                 ...prev,
-                [activeContainer]: [...prev[activeContainer], id],
-                [overContainer]: prev[overContainer].filter(item => item !== id)
+                [overContainer]: prev[overContainer].filter(item => item !== id),
+                [sourceContainer]: [...prev[sourceContainer], id],
             }));
         });
-
-        setActiveId(null);
-        setDraggedItemData(null);
     }
 }

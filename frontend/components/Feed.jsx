@@ -17,12 +17,55 @@ import { Avatar, Icon } from "./ui";
 import GenericDetailField from "./GenericDetailField.jsx";
 import WYSIWYGEditorField from "./Fields/WYSIWYGEditorField";
 
+const IMAGE_FILENAME = /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/i;
+const PREVIEW_MAX_HEIGHT = 250;
+
+function AttachmentRow({attachment}) {
+    const [previewStyle, setPreviewStyle] = useState(null);
+    const isImage = IMAGE_FILENAME.test(attachment.filename || "");
+
+    // Fixed positioning so the preview isn't clipped by scrolling feed/tab containers.
+    const showPreview = (event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setPreviewStyle(rect.top > PREVIEW_MAX_HEIGHT
+            ? {left: rect.left, bottom: window.innerHeight - rect.top + 4}
+            : {left: rect.left, top: rect.bottom + 4});
+    };
+
+    return (
+        <li
+            className="flex items-center justify-between py-1.5 pl-3 pr-4 text-xs leading-6"
+            onMouseEnter={isImage ? showPreview : undefined}
+            onMouseLeave={isImage ? () => setPreviewStyle(null) : undefined}
+        >
+            <div className="flex w-0 flex-1 items-center min-w-0 gap-2">
+                {isImage ? (
+                    <img className="ck-att-thumb" src={attachment.attachment} alt="" />
+                ) : (
+                    <span className="text-fg-3 flex-shrink-0">
+                        <Icon name="paperclip" size={13} color="currentColor" />
+                    </span>
+                )}
+                <span className="truncate text-fg-1">{attachment.filename}</span>
+            </div>
+            <a href={attachment.attachment} target="_blank" rel="noreferrer"
+               className="ml-3 flex-shrink-0 text-primary-300 hover:text-primary-200">Download</a>
+            {previewStyle && (
+                <div className="ck-att-preview" style={previewStyle}>
+                    <img src={attachment.attachment} alt={attachment.filename} />
+                </div>
+            )}
+        </li>
+    );
+}
+
 function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
     let internalFeedItem = object.related_object === null;
     const client = new CrudKitAPIClient();
     const [relatedObject, setRelatedObject] = useState(null);
     const [attachments, setAttachments] = useState(null);
     const [showOriginal, setShowOriginal] = useState(false);
+    const [showInline, setShowInline] = useState(false);
     const queryClient = useQueryClient();
     const {user} = useAuth();
     const preferredLanguage = user?.preferred_language || "en";
@@ -100,9 +143,14 @@ function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
 
     const hasTranslation = isEmail && relatedObject && relatedObject.translation
         && relatedObject.detected_language && relatedObject.detected_language !== preferredLanguage;
-    const emailContent = isEmail && relatedObject
-        ? contributeAttachments(relatedObject?.text_html ? relatedObject?.text_html : relatedObject?.text)
-        : "";
+    const emailHtml = isEmail && relatedObject ? (relatedObject.text_html || relatedObject.text || "") : "";
+    const emailContent = emailHtml ? contributeAttachments(emailHtml) : "";
+    // Attachments referenced from the body via cid: are already rendered in
+    // the iframe, so keep them out of the list unless asked for.
+    const isInline = (attachment) => !!attachment.content_id && emailHtml.includes(`cid:${attachment.content_id}`);
+    const inlineAttachments = (attachments || []).filter(isInline);
+    const regularAttachments = (attachments || []).filter((attachment) => !isInline(attachment));
+    const visibleAttachments = showInline ? [...regularAttachments, ...inlineAttachments] : regularAttachments;
     const translatedContent = hasTranslation ? `<p>${(relatedObject.translation || "").replace(/\n/g, "<br/>")}</p>` : "";
     // Trusted in-app content (internal notes, AI suggestions) renders inline
     // on the dark surface. External email HTML stays sandboxed in an iframe.
@@ -367,21 +415,19 @@ function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
                         </button>
                     </div>
                 )}
-                {attachments && (
+                {visibleAttachments.length > 0 && (
                         <ul role="list" className="divide-y divide-border-1 rounded-md border border-border-1 mt-2">
-                            {attachments.map((attachment) => (
-                                    <li className="flex items-center justify-between py-1.5 pl-3 pr-4 text-xs leading-6" key={attachment.filename}>
-                                        <div className="flex w-0 flex-1 items-center min-w-0 gap-2">
-                                            <span className="text-fg-3 flex-shrink-0">
-                                                <Icon name="paperclip" size={13} color="currentColor" />
-                                            </span>
-                                            <span className="truncate text-fg-1">{attachment.filename}</span>
-                                        </div>
-                                        <a href={attachment.attachment} target="_blank" rel="noreferrer"
-                                           className="ml-3 flex-shrink-0 text-primary-300 hover:text-primary-200">Download</a>
-                                    </li>
-                                ))}
+                            {visibleAttachments.map((attachment) => (
+                                <AttachmentRow attachment={attachment} key={attachment.filename} />
+                            ))}
                         </ul>
+                )}
+                {inlineAttachments.length > 0 && (
+                    <a className="text-2xs text-fg-3 hover:text-fg-1 hover:cursor-pointer mt-1 inline-block" onClick={() => setShowInline(!showInline)}>
+                        {showInline
+                            ? "Hide inline images"
+                            : `Show ${inlineAttachments.length} inline image${inlineAttachments.length === 1 ? "" : "s"}`}
+                    </a>
                 )}
             </div>
         </div>

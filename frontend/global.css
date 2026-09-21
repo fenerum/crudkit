@@ -1194,6 +1194,29 @@ div[dir="auto"] > * {
   }
   .ck-att-add:hover { color: var(--fg-1); border-color: var(--border-3); }
   .ck-att-add input { display: none; }
+  .ck-att-thumb {
+    width: 20px; height: 20px;
+    object-fit: cover;
+    border-radius: var(--r-sm);
+    border: 1px solid var(--border-1);
+    flex-shrink: 0;
+  }
+  .ck-att-preview {
+    position: fixed;
+    z-index: 1000;
+    pointer-events: none;
+    padding: 4px;
+    background: var(--bg-2);
+    border: 1px solid var(--border-2);
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-menu);
+  }
+  .ck-att-preview img {
+    display: block;
+    max-width: 320px;
+    max-height: 240px;
+    object-fit: contain;
+  }
 
   /* Pill-style chip used in composer footers (Send later, Track opens, …) */
   .ck-chip-tag {
@@ -1654,3 +1677,6 @@ div[dir="auto"] > * {
   .widget-width-2 { grid-column: span 2 !important; }
   .widget-width-3 { grid-column: span 3 !important; }
 }
+
+/* Multi-line error toasts (one line per field error). */
+.Toastify__toast-body { white-space: pre-line; }

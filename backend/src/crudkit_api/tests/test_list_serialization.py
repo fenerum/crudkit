@@ -8,7 +8,7 @@ from rest_framework.request import Request
 from rest_framework.test import APIClient, APIRequestFactory
 
 from crudkit.fields import DEFAULT_CURRENCY
-from crudkit.models import ExchangeRate
+from crudkit.models import ExchangeRate, ExternalObject, FeedItem
 from crudkit_api.serializers import GenericSerializer, _nested_relation_field, get_serializer
 from crudkit_api.views import GenericViewSet
 from tests.testapp.models import Customer, Ticket, Topic
@@ -96,3 +96,33 @@ class ListSerializationTest(TestCase):
 
     def test_nested_field_classes_are_cached(self):
         self.assertIs(_nested_relation_field(Customer, 1), _nested_relation_field(Customer, 1))
+
+
+class GenericRelationListTest(TestCase):
+    """FeedItem and ExternalObject are the targets of the generic relations
+    every model inherits, so on those two the relation names resolve to the
+    reverse descriptor. Listing them must not try to prefetch that."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.user = User.objects.create_superuser(username="genericrelation", password="testpass")
+        audit = {"created_by": cls.user, "updated_by": cls.user}
+        cls.customer = Customer.objects.create(name="Acme", **audit)
+        cls.feed_item = FeedItem.objects.create(parent_object=cls.customer, body="Called them", **audit)
+        ExternalObject.objects.create(system_name="hubspot", system_id="123", related_object=cls.customer, **audit)
+
+    def setUp(self):
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    def test_feed_item_list_filtered_by_parent(self):
+        response = self.client.get(f"/api/v1/FEI/?parent_object={self.customer.pk}")
+        self.assertEqual(response.status_code, 200)
+        results = response.json()["results"]
+        self.assertEqual([row["id"] for row in results], [self.feed_item.pk])
+        self.assertEqual(results[0]["parent_object"], self.customer.pk)
+
+    def test_external_object_list(self):
+        response = self.client.get("/api/v1/EXT/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.json()["results"]), 1)

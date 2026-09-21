@@ -1,7 +1,7 @@
 import re
 
 from django.contrib.auth.models import User
-from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import connection, models, reset_queries, transaction
 from django.db.models import ProtectedError, Q
@@ -106,6 +106,12 @@ class GenericViewSet(viewsets.ModelViewSet):
             if f.is_relation
             and not hasattr(f, "related_name")
             and type(f) is not GenericForeignKey
+            # A GenericRelation also installs a reverse descriptor of the same
+            # name on its target, so on FeedItem and ExternalObject the base
+            # class' feeditem_set/externalobject_set are shadowed and
+            # prefetching them by name walks the relation backwards. Nothing in
+            # GenericSerializer renders a generic relation anyway.
+            and not isinstance(f, GenericRelation)
             and (not fields or f.name in fields)
         ]
 

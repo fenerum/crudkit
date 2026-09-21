@@ -5,10 +5,7 @@ import ReadOnlyField from "./ReadOnlyField.jsx";
 import moment from "moment-timezone";
 import { Link } from "react-router-dom";
 import { Icon, PriorityBars } from "./ui";
-import {
-  AMOUNT_FIELDS, PRIORITY_FIELDS,
-  findFieldByNames, priorityLevel,
-} from "../utils/cardFields";
+import { AMOUNT_FIELDS, findFieldByNames, priorityBadge } from "../utils/cardFields";
 
 export default function KanbanItem({ id, object, fieldList, metadata }) {
   const {
@@ -28,8 +25,7 @@ export default function KanbanItem({ id, object, fieldList, metadata }) {
     opacity: isDragging ? 0.5 : 1,
   };
 
-  const priorityField = findFieldByNames(object, PRIORITY_FIELDS);
-  const prioLevel = priorityLevel(priorityField ? object[priorityField] : null);
+  const priority = priorityBadge(object, metadata);
 
   const amountField = findFieldByNames(object, AMOUNT_FIELDS);
   const amountValue = amountField ? object[amountField] : null;
@@ -39,7 +35,7 @@ export default function KanbanItem({ id, object, fieldList, metadata }) {
   const isStale = updatedAt && moment().diff(updatedAt, 'days') > 7;
 
   const titleField = fieldList[0];
-  const skipFields = new Set([priorityField, amountField].filter(Boolean));
+  const skipFields = new Set([priority?.field, amountField].filter(Boolean));
   const subFields = fieldList.slice(1).filter(f => !skipFields.has(f));
 
   return (
@@ -53,7 +49,7 @@ export default function KanbanItem({ id, object, fieldList, metadata }) {
       <Link to={url(object.id)} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div className="ck-dc-head">
           <span className="ck-dc-id">{object.id}</span>
-          {prioLevel != null && <PriorityBars level={prioLevel} />}
+          {priority && <PriorityBars level={priority.level} label={priority.label} />}
         </div>
 
         {titleField && (

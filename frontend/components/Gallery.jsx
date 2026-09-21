@@ -29,9 +29,10 @@ function Card({ object, view, fields, metadata }) {
   const subField = fieldList[1];
   const thumbHue = thumbStyle(object.label || object.id);
 
-  // The "category" eyebrow tries the second field, falling back to model name.
+  // The "category" eyebrow shows the second field's value, falling back to
+  // the model name.
   const category = subField && metadata.fields[subField]
-    ? metadata.fields[subField].verbose_name
+    ? <ReadOnlyField value={object[subField]} metadata={metadata.fields[subField]} link={false} />
     : metadata.verbose_name;
 
   return (

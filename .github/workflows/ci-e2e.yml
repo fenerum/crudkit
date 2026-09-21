@@ -11,9 +11,9 @@ concurrency:
 
 # Proves a fresh project can build on the published artifact: build the SPA,
 # build the wheel, install it (not editable) into a clean venv, and serve the
-# demo project from it.
+# demo project from it, then drive the UI in a real browser with Playwright.
 jobs:
-  demo:
+  e2e:
     runs-on: ubuntu-latest
     env:
       # Deliberately not "static/": proves the SPA has no hardcoded prefix.
@@ -40,12 +40,13 @@ jobs:
         run: |
           uv venv /tmp/e2e
           uv pip install --python /tmp/e2e "crudkit[api] @ file://$PWD/$(ls backend/dist/*.whl)"
-      - name: Migrate and create a user
+      - name: Migrate, create a user and seed
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput
           /tmp/e2e/bin/python examples/demo/manage.py shell -c "
           from django.contrib.auth.models import User
           User.objects.create_superuser('e2e', password='e2e-password')"
+          /tmp/e2e/bin/python examples/demo/manage.py seed
       - name: Boot the demo server and probe it
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py runserver 127.0.0.1:8000 --noreload > /tmp/server.log 2>&1 &
@@ -75,3 +76,20 @@ jobs:
           code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8000$asset")
           echo "GET $asset -> $code"
           test "$code" = "200"
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Playwright UI tests
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8000
+        run: npm run e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            /tmp/server.log
+          retention-days: 7

@@ -8,6 +8,7 @@ export { default as Kbd } from './Kbd';
 export { default as PriorityBars } from './PriorityBars';
 export { default as StageBadge, colorForStage } from './StageBadge';
 export { default as OverflowMenu } from './OverflowMenu';
+export { default as PageRange } from './PageRange';
 export { default as PageSizeSelect } from './PageSizeSelect';
 export { default as ThemeToggle } from './ThemeToggle';
 export { ThemeProvider, useTheme } from './ThemeContext';

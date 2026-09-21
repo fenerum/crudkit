@@ -11,6 +11,7 @@ export interface AppConfig {
   auth_mode: 'password' | 'saml';
   storage_prefix: string;
   conversation_link_pattern: string;
+  default_currency: string;
 }
 
 const defaults: AppConfig = {
@@ -20,6 +21,8 @@ const defaults: AppConfig = {
   auth_mode: 'password',
   storage_prefix: 'crudkit',
   conversation_link_pattern: 'deal|opportunity|case',
+  // Matches the backend's CRUDKIT_DEFAULT_CURRENCY fallback.
+  default_currency: 'EUR',
 };
 
 function load(): AppConfig {

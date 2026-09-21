@@ -1,10 +1,13 @@
-
-export default function PriorityBars({ level = 0, max = 4 }) {
+export default function PriorityBars({ level = 0, max = 4, label }) {
   const bars = [];
   for (let i = 1; i <= max; i++) {
     bars.push(
       <span key={i} className={`ck-prio-bar ${i <= level ? 'is-on' : ''}`} />
     );
   }
-  return <span className="ck-prio">{bars}</span>;
+  return (
+    <span className="ck-prio" role={label ? 'img' : undefined} aria-label={label} title={label}>
+      {bars}
+    </span>
+  );
 }

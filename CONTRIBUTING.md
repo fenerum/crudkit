@@ -36,10 +36,21 @@ npm run lint
 npm run build  # builds into backend/src/crudkit_frontend/
 ```
 
+End-to-end UI tests (Playwright) drive the built SPA served by the demo
+project, so run `npm run build` first. The demo server is started
+automatically on port 8765 (`E2E_PORT`) against a throwaway SQLite DB; your
+`examples/demo/db.sqlite3` is never touched.
+
+```bash
+cd frontend
+npx playwright install chromium   # once
+npm run e2e                       # headless; `npm run e2e:ui` for the UI runner
+```
+
 ## Workflow
 
 `main` is protected: every change goes through a pull request, and the
-`backend`, `frontend`, and `demo` checks must pass before merging. There are
+`backend`, `frontend`, and `e2e` checks must pass before merging. There are
 no direct pushes.
 
 CI runs the backend suite on a Python × Django matrix (plus a fresh-migrate

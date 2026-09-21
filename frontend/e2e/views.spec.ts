@@ -113,3 +113,28 @@ test.describe('layouts', () => {
     await expect(page.getByRole('main')).not.toContainText('DKK');
   });
 });
+
+test('private views only show to their owner, outside the shared menu', async ({ page, request }) => {
+  const name = unique('My private');
+  await createObject(request, 'VIW', { model: 'RDG', name, public: false, fields: ['name'] });
+  await page.goto('/RDG');
+
+  const sidebar = page.getByRole('navigation', { name: 'Sidebar' });
+  const banner = page.getByRole('banner');
+  await expect(banner.getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
+
+  // Seeded view owned by another user; the admin is a superuser so the API returns it.
+  const othersView = "Reader's private picks";
+  await expect(banner.getByRole('button', { name: othersView })).toBeHidden();
+  await expect(sidebar.getByRole('link', { name: othersView })).toBeHidden();
+});
+
+test('views without show_in_menu stay out of the sidebar', async ({ page, request }) => {
+  const name = unique('Not in menu');
+  await createObject(request, 'VIW', { model: 'RDG', name, fields: ['name'], show_in_menu: false });
+  await page.goto('/RDG');
+
+  await expect(page.getByRole('banner').getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Sidebar' }).getByRole('link', { name })).toBeHidden();
+});

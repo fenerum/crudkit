@@ -97,6 +97,14 @@ class Command(BaseCommand):
                 model="RDG", name=name, defaults={"public": True, **config, **audit}
             )
 
+        # Another user's private view: must stay hidden from admin's menus and view tabs.
+        reader, _ = User.objects.get_or_create(username="reader")
+        View.objects.get_or_create(
+            model="RDG",
+            name="Reader's private picks",
+            defaults={"public": False, "fields": ["name"], "created_by": reader, "updated_by": reader},
+        )
+
         Layout.objects.get_or_create(
             model="AUT",
             defaults={"inlines": [["BOK", ["title", "published_date"]], ["FEI", []]], **audit},

@@ -13,12 +13,15 @@ import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
 import { getStoredPageSize, storePageSize } from '../../utils/pageSize';
+import { isVisibleToUser } from '../../hooks/useMenuViews';
+import { useAuth } from '../../context/AuthContext';
 
 export default function List() {
   const { segment: type, view: viewId } = useParams() as { segment: string; view?: string };
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   const client = useMemo(() => new CrudKitAPIClient(), []);
+  const { user } = useAuth();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pageParam = searchParams.get('page');
@@ -56,11 +59,12 @@ export default function List() {
   });
 
   const { data: currentView, isPending: isViewLoading } = useQuery({
-    queryKey: ['view', type, viewId],
+    queryKey: ['view', type, viewId, user?.id],
     queryFn: async () => {
       if (viewId) return await client.retrieve('VIW', viewId);
       const viewsList = await client.list('VIW', { model: type });
-      const views = viewsList.isPaginated ? viewsList.results : viewsList;
+      const views = (viewsList.isPaginated ? viewsList.results : viewsList)
+        ?.filter((v: any) => isVisibleToUser(v, user?.id));
       if (!views || views.length === 0) return null;
       return views.find((v: any) => v.default === true) || views[0];
     },
@@ -70,7 +74,8 @@ export default function List() {
     queryKey: ['views', type],
     queryFn: async () => (await client.list('VIW', { model: type })) || [],
   });
-  const views = viewsData?.isPaginated ? viewsData.results : viewsData;
+  const views = (viewsData?.isPaginated ? viewsData.results : viewsData)
+    ?.filter((v: any) => isVisibleToUser(v, user?.id));
 
   const {
     isPending: isListLoading,

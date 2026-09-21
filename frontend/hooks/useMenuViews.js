@@ -17,13 +17,24 @@ function useMenuList(model, options = {}) {
   return { isPending, error, items: items || [] };
 }
 
-// All saved views, unfiltered — workspace tabs may pin views with
-// show_in_menu=False, so consumers that only want pinned views filter
-// `show_in_menu` client-side.
+// Only views with show_in_menu ever appear in a menu, including workspace tabs.
 export function useMenuViews(options = {}) {
-  return useMenuList('VIW', options);
+  const { items, ...rest } = useMenuList('VIW', options);
+  const menuViews = useMemo(() => items.filter((v) => v.show_in_menu), [items]);
+  return { ...rest, items: menuViews };
 }
 
 export function useWorkspaces(options = {}) {
   return useMenuList('WSP', options);
+}
+
+export function isMine(item, userId) {
+  const owner = typeof item.created_by === 'object' ? item.created_by?.id : item.created_by;
+  return owner != null && userId != null && String(owner) === String(userId);
+}
+
+// The API returns every view/workspace to superusers; only surface public
+// ones plus the current user's own private ones.
+export function isVisibleToUser(item, userId) {
+  return item.public || isMine(item, userId);
 }

@@ -3,7 +3,7 @@
 ## Unreleased
 
 - `crudkit_frontend`: feed items whose related object isn't an email (chat messages, calls,
-  meetings, ...) show the feed item's `body` instead of an empty frame.
+  meetings, ...) show the feed item's `body` instead of an empty frame. (#36)
 
 ## 0.3.0 (2026-09-21)
 

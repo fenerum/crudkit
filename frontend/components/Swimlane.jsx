@@ -23,6 +23,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { url } from "../utils/urls";
+import { formatApiError } from "../utils/apiErrors";
 import { PriorityBars } from "./ui";
 import {
     AMOUNT_FIELDS, PRIORITY_FIELDS,
@@ -460,7 +461,7 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                 refetch();
             })
             .catch(error => {
-                toast.error('Failed to update');
+                toast.error(formatApiError(error, metadata.fields) || 'Failed to update');
                 console.error('Error updating item:', error);
                 refetch();
             });

@@ -1654,3 +1654,6 @@ div[dir="auto"] > * {
   .widget-width-2 { grid-column: span 2 !important; }
   .widget-width-3 { grid-column: span 3 !important; }
 }
+
+/* Multi-line error toasts (one line per field error). */
+.Toastify__toast-body { white-space: pre-line; }

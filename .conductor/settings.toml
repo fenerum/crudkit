@@ -39,3 +39,9 @@ icon = "flame"
 [scripts.run.test-frontend]
 command = "cd frontend && npm run test:watch"
 icon = "test-tube"
+
+# Playwright UI tests against the built SPA (auto-starts the demo on a throwaway DB).
+[scripts.run.e2e]
+command = "cd frontend && npm run build && npx playwright install chromium && E2E_PORT=$((CONDUCTOR_PORT+2)) npm run e2e"
+available_in = ["local"]
+icon = "test-tube"

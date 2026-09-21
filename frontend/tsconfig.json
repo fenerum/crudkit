@@ -21,6 +21,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["src", "components", "context", "data", "hooks", "layouts", "utils", "shared", "__tests__"],
+  "include": ["src", "components", "context", "data", "hooks", "layouts", "utils", "shared", "__tests__", "e2e"],
   "exclude": ["node_modules", "dist", "maestro"]
 }

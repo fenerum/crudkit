@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   // Build output lands outside frontend/ (backend static dir); dist/ kept as a safety net.
-  { ignores: ['dist/**'] },
+  { ignores: ['dist/**', 'playwright-report/**', 'test-results/**'] },
 
   js.configs.recommended,
 
@@ -59,7 +59,7 @@ export default tseslint.config(
   },
 
   {
-    files: ['scripts/**', '*.config.{js,ts,mjs}'],
+    files: ['scripts/**', '*.config.{js,ts,mjs}', 'e2e/**'],
     languageOptions: { globals: globals.node },
   }
 );

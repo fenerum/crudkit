@@ -29,6 +29,8 @@ npm install
 npm test
 npm run lint
 npm run build
+npm run e2e    # Playwright against the demo + built SPA (build first;
+               # `npx playwright install chromium` once)
 ```
 
 ## Workflow

@@ -51,7 +51,8 @@ TEMPLATES = [
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        # Overridable so the Playwright suite runs against a throwaway DB.
+        "NAME": os.environ.get("DEMO_DB_PATH", BASE_DIR / "db.sqlite3"),
     }
 }
 

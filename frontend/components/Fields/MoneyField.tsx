@@ -24,7 +24,7 @@ export default function MoneyField({
 
   if (typeof defaultValue === 'object' && defaultValue !== null && 'amount' in defaultValue) {
     initialValue = defaultValue as MoneyFieldValue;
-  } else if (defaultValue !== undefined && defaultValue !== "") {
+  } else if (defaultValue != null && defaultValue !== "") {
     const amount = typeof defaultValue === 'number'
       ? defaultValue.toFixed(2)
       : String(defaultValue);

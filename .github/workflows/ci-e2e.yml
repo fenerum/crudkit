@@ -13,7 +13,7 @@ concurrency:
 # build the wheel, install it (not editable) into a clean venv, and serve the
 # demo project from it, then drive the UI in a real browser with Playwright.
 jobs:
-  demo:
+  e2e:
     runs-on: ubuntu-latest
     env:
       # Deliberately not "static/": proves the SPA has no hardcoded prefix.

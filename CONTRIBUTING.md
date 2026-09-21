@@ -50,7 +50,7 @@ npm run e2e                       # headless; `npm run e2e:ui` for the UI runner
 ## Workflow
 
 `main` is protected: every change goes through a pull request, and the
-`backend`, `frontend`, and `demo` checks must pass before merging. There are
+`backend`, `frontend`, and `e2e` checks must pass before merging. There are
 no direct pushes.
 
 CI runs the backend suite on a Python × Django matrix (plus a fresh-migrate

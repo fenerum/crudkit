@@ -36,7 +36,7 @@ npm run e2e    # Playwright against the demo + built SPA (build first;
 ## Workflow
 
 - `main` is protected: all changes go through PRs; required checks are
-  `backend`, `frontend`, and `demo`. Never push to `main` directly.
+  `backend`, `frontend`, and `e2e`. Never push to `main` directly.
 - Releases: tag `vX.Y.Z` on `main` (plain `v` prefix — one version covers
   backend and frontend). The `publish-python` workflow builds the SPA, then
   the wheel, and publishes to PyPI as `crudkit` via Trusted Publishing.

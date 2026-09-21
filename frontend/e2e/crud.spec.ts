@@ -34,4 +34,5 @@ test('creates, edits and deletes a book', async ({ page }) => {
   await expect(page).not.toHaveURL(/\/delete$/);
   await page.goto(`/BOK?q=${encodeURIComponent(title)}`);
   await expect(page.getByRole('main').getByText('Nothing here yet')).toBeVisible();
+  await expect(page.getByRole('main').getByText('Showing 0 of 0')).toBeVisible();
 });

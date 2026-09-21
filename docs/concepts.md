@@ -104,13 +104,14 @@ The built SPA shell (`index.html`) is served as a Django template by
 by `frontend/scripts/postbuild.mjs`):
 
 - `{{ csrf_token }}` — rendered into `<meta name="csrf-token">`.
-- `{{ crudkit_config_json }}` — the `CRUDKIT_FRONTEND_CONFIG` setting rendered
-  as JSON into `<script id="crudkit-config" type="application/json">` by the
+- `{{ crudkit_config_json }}` — the `CRUDKIT_FRONTEND_CONFIG` setting, plus
+  `default_currency` from `CRUDKIT_DEFAULT_CURRENCY`, rendered as JSON into `<script id="crudkit-config" type="application/json">` by the
   `crudkit_frontend.context_processors.crudkit_config` context processor.
 
 At startup the SPA parses that script tag (`frontend/utils/appConfig.ts`) and
 merges it over defaults: `app_name`, `org_name`, `logo_url`, `auth_mode`
-(`password` or `saml`), `storage_prefix`, `conversation_link_pattern`.
+(`password` or `saml`), `storage_prefix`, `conversation_link_pattern`,
+`default_currency`.
 Branding is therefore a runtime concern of the host project — nothing is
 compiled into the bundle.
 

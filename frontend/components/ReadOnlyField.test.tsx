@@ -37,6 +37,18 @@ describe("ReadOnlyField", () => {
         expect(container.querySelector(".ck-ro-text")).toBeNull();
     });
 
+    test("renders the label of a choice value", () => {
+        const metadata = { type: "CharField", choices: [["to_read", "To read"]] };
+        const { container } = render(<ReadOnlyField value="to_read" metadata={metadata} />);
+        expect(container.textContent).toBe("To read");
+    });
+
+    test("falls back to the raw value for an unknown choice", () => {
+        const metadata = { type: "CharField", choices: [["to_read", "To read"]] };
+        const { container } = render(<ReadOnlyField value="legacy" metadata={metadata} />);
+        expect(container.textContent).toBe("legacy");
+    });
+
     test("does not wrap choice values", () => {
         const metadata = { type: "TextField", choices: [["a", "A"]] };
         const { container } = render(

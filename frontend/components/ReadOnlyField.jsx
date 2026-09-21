@@ -2,6 +2,7 @@ import moment from "moment-timezone";
 import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { url, valid_url } from "../utils/urls";
+import { choiceLabel } from "../utils/choices";
 import { Icon } from "./ui";
 
 // Values longer than this can't fit on one line in a detail cell, so they get
@@ -120,7 +121,7 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
                 )}
             </span>
         ) : (
-            <span>{value}</span>
+            <span>{choiceLabel(metadata, value)}</span>
         )}
     </>;
 

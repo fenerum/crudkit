@@ -44,6 +44,9 @@ test.describe('layouts', () => {
     await expect(column('To read')).toContainText('Anarchist utopia');
     await expect(column('Reading')).toContainText('Sower for school');
     await expect(column('Finished')).toContainText('Book club: Kindred');
+
+    const card = page.locator('.ck-deal-card').filter({ hasText: 'Anarchist utopia' });
+    await expect(card.getByRole('img', { name: 'priority: High' })).toBeVisible();
   });
 
   test('kanban drag and drop moves a card to another column', async ({ page, request }) => {
@@ -75,7 +78,8 @@ test.describe('layouts', () => {
   test('gallery filters cards by choice', async ({ page }) => {
     await openView(page, 'Covers');
     const main = page.getByRole('main');
-    await expect(main.getByRole('link', { name: /Anarchist utopia/ })).toBeVisible();
+    // The eyebrow shows the second field's value (status), not its name.
+    await expect(main.getByRole('link', { name: /Anarchist utopia/ }).locator('.ck-gal-cat')).toHaveText('To read');
 
     await main.getByRole('button', { name: 'Finished', exact: true }).click();
     await expect(main.getByRole('link', { name: /Book club: Kindred/ })).toBeVisible();
@@ -101,8 +105,11 @@ test.describe('layouts', () => {
     await openView(page, 'Lanes');
     const row = (label: string) => page.locator('.ck-swim-row').filter({ has: page.locator('.ck-srh-label', { hasText: label }) });
     await expect(page.locator('.ck-swim-head')).toContainText('Priority');
-    await expect(row('high')).toContainText('Anarchist utopia');
-    await expect(row('high')).not.toContainText('Traveller, again');
-    await expect(row('low')).toContainText('Traveller, again');
+    await expect(row('High')).toContainText('Anarchist utopia');
+    await expect(row('High')).not.toContainText('Traveller, again');
+    await expect(row('Low')).toContainText('Traveller, again');
+    // No aggregate_by on this view, so no money totals.
+    await expect(page.getByRole('main')).not.toContainText('Grand total');
+    await expect(page.getByRole('main')).not.toContainText('DKK');
   });
 });

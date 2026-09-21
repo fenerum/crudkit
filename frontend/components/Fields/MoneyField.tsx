@@ -1,4 +1,5 @@
 import BaseField, { BaseFieldProps } from "./BaseField";
+import { appConfig } from "../../utils/appConfig";
 
 interface MoneyFieldValue {
   currency: string;
@@ -30,10 +31,10 @@ export default function MoneyField({
       : String(defaultValue);
 
     initialValue = {
-      currency: "DKK",
+      currency: appConfig.default_currency,
       amount: amount,
       amount_default_currency: amount,
-      default_currency: "DKK"
+      default_currency: appConfig.default_currency
     };
   }
 
@@ -49,10 +50,10 @@ export default function MoneyField({
           const numericRegex = /^-?\d*\.?\d*$/;
           if (text === "" || numericRegex.test(text)) {
             const currentValue = value || {
-              currency: "DKK",
+              currency: appConfig.default_currency,
               amount: "",
               amount_default_currency: "",
-              default_currency: "DKK"
+              default_currency: appConfig.default_currency
             };
             onChange({ ...currentValue, amount: text });
           }
@@ -64,7 +65,7 @@ export default function MoneyField({
 
         const currentCurrency = value && typeof value === 'object' && 'currency' in value
           ? value.currency
-          : "DKK";
+          : appConfig.default_currency;
 
         return (
           <div className="flex flex-row items-center gap-2">

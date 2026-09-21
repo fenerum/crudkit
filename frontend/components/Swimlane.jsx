@@ -25,10 +25,8 @@ import { CSS } from '@dnd-kit/utilities';
 import { url } from "../utils/urls";
 import { formatApiError } from "../utils/apiErrors";
 import { PriorityBars } from "./ui";
-import {
-    AMOUNT_FIELDS, PRIORITY_FIELDS,
-    findFieldByNames, priorityLevel,
-} from "../utils/cardFields";
+import { AMOUNT_FIELDS, findFieldByNames, priorityBadge } from "../utils/cardFields";
+import { appConfig } from "../utils/appConfig";
 
 function sum(arr) {
    return arr.reduce(function (a, b) {
@@ -51,14 +49,13 @@ function SwimCard({ id, object, view, metadata }) {
     const titleField = view.fields[0];
     const amountField = view.aggregate_by || findFieldByNames(object, AMOUNT_FIELDS);
     const amountMeta = amountField ? metadata.fields[amountField] : null;
-    const priorityField = findFieldByNames(object, PRIORITY_FIELDS);
-    const prioLevel = priorityLevel(priorityField ? object[priorityField] : null);
+    const priority = priorityBadge(object, metadata);
 
     return (
         <Link to={url(object.id)} ref={setNodeRef} style={style} {...attributes} {...listeners} className="ck-swim-card">
             <div className="ck-dc-head">
                 <span className="ck-sc-id">{object.id}</span>
-                {prioLevel != null && <PriorityBars level={prioLevel} />}
+                {priority && <PriorityBars level={priority.level} label={priority.label} />}
             </div>
             <div className="ck-sc-title truncate">
                 {titleField ? (
@@ -145,7 +142,9 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
     );
 
     // Default currency from system settings
-    const DEFAULT_CURRENCY = 'DKK';
+    const DEFAULT_CURRENCY = appConfig.default_currency;
+    // Money totals only mean something when the view aggregates a field.
+    const showTotals = Boolean(view.aggregate_by);
     
     // Format currency based on currency code
     const formatMoney = (amount, currencyCode) => {
@@ -527,7 +526,7 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
     // Build the column-template string used by both header and row grids:
     // 200px row-head + N columns + 140px total column.
     const colCount = columns.length;
-    const gridTemplate = `200px repeat(${colCount}, minmax(180px, 1fr)) 140px`;
+    const gridTemplate = `200px repeat(${colCount}, minmax(180px, 1fr))${showTotals ? ' 140px' : ''}`;
 
     return (
         <div className="ck-fullbleed flex flex-col gap-3" style={{ height: '100%' }}>
@@ -557,7 +556,7 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                                 <span className="truncate">{label}</span>
                             </div>
                         ))}
-                        <div>Total</div>
+                        {showTotals && <div>Total</div>}
                     </div>
 
                     {/* Body rows */}
@@ -597,8 +596,7 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                                         </div>
                                         <div className="ck-srh-meta">
                                             {rowItemCount} {rowItemCount === 1 ? 'item' : 'items'}
-                                            {' · '}
-                                            {formatMoney(rowTotals[pivotBy] || 0, DEFAULT_CURRENCY)}
+                                            {showTotals && ` · ${formatMoney(rowTotals[pivotBy] || 0, DEFAULT_CURRENCY)}`}
                                         </div>
                                     </div>
 
@@ -615,8 +613,9 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                                                     <>
                                                         {cellCount > 0 && (
                                                             <div className="text-xs text-fg-3 px-1 pb-1">
-                                                                {cellCount} · {formatMoney(cellTotal, DEFAULT_CURRENCY)}
-                                                                {Object.entries(cellByCurrency)
+                                                                {cellCount}
+                                                                {showTotals && ` · ${formatMoney(cellTotal, DEFAULT_CURRENCY)}`}
+                                                                {showTotals && Object.entries(cellByCurrency)
                                                                     .filter(([cur]) => cur !== DEFAULT_CURRENCY)
                                                                     .map(([cur, amt]) => (
                                                                         <span key={cur} className="ml-1 font-mono">
@@ -644,49 +643,53 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                                         );
                                     })}
 
-                                    <div>
-                                        <div className="text-sm text-fg-1 font-medium">
-                                            {formatMoney(rowTotals[pivotBy] || 0, DEFAULT_CURRENCY)}
+                                    {showTotals && (
+                                        <div>
+                                            <div className="text-sm text-fg-1 font-medium">
+                                                {formatMoney(rowTotals[pivotBy] || 0, DEFAULT_CURRENCY)}
+                                            </div>
+                                            {Object.entries(rowCurrencyTotals[pivotBy] || {})
+                                                .filter(([curr]) => curr !== DEFAULT_CURRENCY)
+                                                .map(([curr, amt]) => (
+                                                    <div key={curr} className="text-xs text-fg-3 font-mono">
+                                                        {formatMoney(amt, curr)}
+                                                    </div>
+                                                ))}
                                         </div>
-                                        {Object.entries(rowCurrencyTotals[pivotBy] || {})
-                                            .filter(([curr]) => curr !== DEFAULT_CURRENCY)
-                                            .map(([curr, amt]) => (
-                                                <div key={curr} className="text-xs text-fg-3 font-mono">
-                                                    {formatMoney(amt, curr)}
-                                                </div>
-                                            ))}
-                                    </div>
+                                    )}
                                 </div>
                             </React.Fragment>
                         );
                     })}
 
                     {/* Footer totals row */}
-                    <div className="ck-swim-row" style={{ gridTemplateColumns: gridTemplate }}>
-                        <div className="ck-swim-row-head">
-                            <div className="ck-srh-label">Grand total</div>
-                            <div className="ck-srh-meta">{DEFAULT_CURRENCY}</div>
-                        </div>
-                        {columns.map(([colId]) => (
-                            <div key={colId}>
-                                <div className="text-sm text-fg-1 font-medium">
-                                    {formatMoney(columnTotals[colId] || 0, DEFAULT_CURRENCY)}
+                    {showTotals && (
+                        <div className="ck-swim-row" style={{ gridTemplateColumns: gridTemplate }}>
+                            <div className="ck-swim-row-head">
+                                <div className="ck-srh-label">Grand total</div>
+                                <div className="ck-srh-meta">{DEFAULT_CURRENCY}</div>
+                            </div>
+                            {columns.map(([colId]) => (
+                                <div key={colId}>
+                                    <div className="text-sm text-fg-1 font-medium">
+                                        {formatMoney(columnTotals[colId] || 0, DEFAULT_CURRENCY)}
+                                    </div>
+                                    {Object.entries(currencyTotals[colId] || {})
+                                        .filter(([curr]) => curr !== DEFAULT_CURRENCY)
+                                        .map(([curr, amt]) => (
+                                            <div key={curr} className="text-xs text-fg-3 font-mono">
+                                                {formatMoney(amt, curr)}
+                                            </div>
+                                        ))}
                                 </div>
-                                {Object.entries(currencyTotals[colId] || {})
-                                    .filter(([curr]) => curr !== DEFAULT_CURRENCY)
-                                    .map(([curr, amt]) => (
-                                        <div key={curr} className="text-xs text-fg-3 font-mono">
-                                            {formatMoney(amt, curr)}
-                                        </div>
-                                    ))}
-                            </div>
-                        ))}
-                        <div>
-                            <div className="text-sm text-fg-1 font-medium">
-                                {formatMoney(grandTotal, DEFAULT_CURRENCY)}
+                            ))}
+                            <div>
+                                <div className="text-sm text-fg-1 font-medium">
+                                    {formatMoney(grandTotal, DEFAULT_CURRENCY)}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    )}
 
                     <DragOverlay>
                         {activeId && draggedItemData && (

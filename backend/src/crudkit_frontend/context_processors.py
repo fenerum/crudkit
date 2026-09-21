@@ -5,9 +5,11 @@ import json
 from django.conf import settings
 from django.utils.safestring import mark_safe
 
+from crudkit.fields import DEFAULT_CURRENCY
+
 
 def crudkit_config(request):
-    config = getattr(settings, "CRUDKIT_FRONTEND_CONFIG", {})
+    config = {"default_currency": DEFAULT_CURRENCY, **getattr(settings, "CRUDKIT_FRONTEND_CONFIG", {})}
     # Escape "<" so "</script>" in values cannot break out of the script tag.
     payload = json.dumps(config).replace("<", "\\u003c")
     # settings.STATIC_URL is already "/"-prefixed by Django on access.

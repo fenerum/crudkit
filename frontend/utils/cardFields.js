@@ -2,6 +2,8 @@
 // cards can render a consistent layout (priority, amount) without the caller
 // having to know which field on which model carries each piece of info.
 
+import { choiceLabel } from './choices';
+
 export const PRIORITY_FIELDS = ['priority', 'severity', 'importance'];
 export const AMOUNT_FIELDS = ['amount', 'value', 'price', 'mrr', 'arr', 'total'];
 
@@ -23,4 +25,14 @@ export function priorityLevel(value) {
   if (/(medium|normal)/.test(s)) return 2;
   if (/low/.test(s)) return 1;
   return null;
+}
+
+// Level + accessible label ("priority: High") for the PriorityBars badge.
+export function priorityBadge(object, metadata) {
+  const field = findFieldByNames(object, PRIORITY_FIELDS);
+  const level = priorityLevel(field ? object[field] : null);
+  if (level == null) return null;
+  const meta = metadata.fields[field];
+  const label = meta ? `${meta.verbose_name}: ${choiceLabel(meta, object[field])}` : undefined;
+  return { field, level, label };
 }

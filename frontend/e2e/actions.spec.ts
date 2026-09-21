@@ -6,7 +6,8 @@ test('runs a model action from the detail menu', async ({ page, request }) => {
   const reading = await createObject(request, 'RDG', { name });
 
   await page.goto(`/${reading.id}`);
-  await expect(page.getByRole('main').getByText('to_read')).toBeVisible();
+  // Choice fields render their label, not the stored value.
+  await expect(page.getByRole('main').getByText('To read', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /^Actions/ }).click();
   page.once('dialog', (dialog) => {
@@ -17,7 +18,7 @@ test('runs a model action from the detail menu', async ({ page, request }) => {
 
   await expect(page.getByText(`${name} marked finished`)).toBeVisible();
   await page.reload();
-  await expect(page.getByRole('main').getByText('finished', { exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByText('Finished', { exact: true })).toBeVisible();
 });
 
 test('lists only the list-page menu entries on a list', async ({ page }) => {

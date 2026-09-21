@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
-import { Icon, PageSizeSelect } from "./ui";
+import { Icon, PageRange, PageSizeSelect } from "./ui";
 
 export default function ObjectList({
     objectList,
@@ -141,18 +141,11 @@ export default function ObjectList({
                 <div
                     className="sticky bottom-0 z-10 flex items-center justify-between border-t border-border-1 bg-bg-1 px-3.5 py-2"
                 >
-                    <span className="text-xs text-fg-3">
-                        Showing{' '}
-                        <span className="font-mono text-fg-2">
-                            {((pagination.current_page - 1) * pagination.page_size) + 1}
-                        </span>
-                        –
-                        <span className="font-mono text-fg-2">
-                            {Math.min(pagination.current_page * pagination.page_size, pagination.count)}
-                        </span>
-                        {' '}of{' '}
-                        <span className="font-mono text-fg-2">{pagination.count}</span>
-                    </span>
+                    <PageRange
+                        page={pagination.current_page}
+                        pageSize={pagination.page_size}
+                        count={pagination.count}
+                    />
 
                     <nav className="flex items-center gap-2" aria-label="Pagination">
                         {onPageSizeChange && (

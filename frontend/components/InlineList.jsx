@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import ReadOnlyField from './ReadOnlyField';
-import { PageSizeSelect } from './ui';
+import { PageRange, PageSizeSelect } from './ui';
 import { url } from '@/utils/urls';
 import CrudKitAPIClient from '@/data/api';
 import { getStoredPageSize, storePageSize } from '@/utils/pageSize';
@@ -182,18 +182,11 @@ export default function InlineList({ fields, model, metadata, parent_object_id, 
         </div>
         {paginationData && (
           <div className="flex items-center justify-between px-3.5 py-2 border-t border-border-1">
-            <span className="text-xs text-fg-3">
-              Showing{' '}
-              <span className="font-mono text-fg-2">
-                {((paginationData.current_page - 1) * paginationData.page_size) + 1}
-              </span>
-              –
-              <span className="font-mono text-fg-2">
-                {Math.min(paginationData.current_page * paginationData.page_size, paginationData.count)}
-              </span>
-              {' '}of{' '}
-              <span className="font-mono text-fg-2">{paginationData.count}</span>
-            </span>
+            <PageRange
+              page={paginationData.current_page}
+              pageSize={paginationData.page_size}
+              count={paginationData.count}
+            />
             <nav className="flex items-center gap-2" aria-label="Pagination">
               <PageSizeSelect
                 value={paginationData.page_size}

@@ -6,11 +6,13 @@ which Django checks before app template dirs, so a locally built index.html
 cannot shadow it.
 """
 
+import json
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase, override_settings
 
+from crudkit.fields import DEFAULT_CURRENCY
 from crudkit_frontend.context_processors import crudkit_config
 
 STUB_TEMPLATES = [
@@ -48,7 +50,7 @@ class CrudkitConfigContextProcessorTests(TestCase):
 
     def test_defaults_without_setting(self):
         context = crudkit_config(request=None)
-        self.assertEqual(context["crudkit_config_json"], "{}")
+        self.assertEqual(context["crudkit_config_json"], json.dumps({"default_currency": DEFAULT_CURRENCY}))
         self.assertEqual(context["crudkit_app_name"], "CrudKit")
 
         response = self.client.get("/")

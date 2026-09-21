@@ -1,13 +1,15 @@
 # CrudKit demo project
 
-A from-scratch Django project on `crudkit`: two models (`Author` AUT,
-`Book` BOK) and the generic REST API — no per-model serializers, viewsets or
-routes.
+A from-scratch Django project on `crudkit`: three models (`Author` AUT,
+`Book` BOK, `Reading` RDG) and the generic REST API — no per-model
+serializers, viewsets or routes. `Reading` has choice and numeric fields plus
+a `Mark finished` action, so it exercises the kanban, gallery, quadrant and
+swimlane views.
 
 ```
 uv sync
 uv run manage.py migrate
-uv run manage.py seed        # superuser admin/admin + sample authors and books
+uv run manage.py seed        # admin/admin, sample data, saved views, Author layout
 uv run manage.py runserver
 ```
 

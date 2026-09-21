@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.2.3 (2026-09-21)
+
+- `crudkit_api`: `GET /api/v1/` no longer returns 403 under `CrudKitModelPermissions`.
+  `has_permission` checks authentication first and honours DRF's
+  `_ignore_model_permissions`; the API root (`CrudKitRouter`/`CrudKitAPIRootView`) now lists
+  only the models the user may view. (#25)
+- `crudkit_frontend`: the detail view wraps long (over 60 characters) and multiline text,
+  with a Show more/less toggle when it overflows, instead of a single ellipsised line. (#26)
+- `crudkit_api`: fix a 500 when listing FeedItem or ExternalObject rows; generic relations
+  are no longer included in the list prefetch. (#27)
+- `crudkit`: multi-table-inheritance children are reachable by their own CK-ID again; the
+  parent's `CrudKitIDField` accepts the TYPE_IDs of its descendants. (#28)
+
 ## 0.2.2 (2026-09-19)
 
 - `crudkit_api`: list endpoints no longer build a serializer per row. `GenericViewSet.list`

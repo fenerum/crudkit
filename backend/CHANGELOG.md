@@ -1,16 +1,20 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 (2026-09-21)
 
 - `crudkit_frontend`: related-record pickers offer `+ Create <model> "<typed text>"`, which
   opens the target's create form in a modal (prefilled from the first `search_fields` entry)
   and selects the new record without leaving the form. Modals nest; Esc/Enter only affect the
-  topmost one.
+  topmost one. (#34)
 - `crudkit_api`: the metadata endpoint also returns `search_fields`, `can_create` (add
   permission for the requesting user) and `inline_create`. `build_model_metadata` takes an
-  optional `user`.
+  optional `user`. (#34)
 - `crudkit`: new `CrudKitSettings.inline_create` (default `True`); set `False` to hide the
-  inline create option for a model.
+  inline create option for a model. (#34)
+- `crudkit_frontend`: a failed Kanban/Swimlane drop shows the server's validation error
+  instead of a generic message. (#31)
+- `crudkit_frontend`: inline email images are hidden behind a toggle; image attachments
+  preview on hover. (#32)
 
 ## 0.2.3 (2026-09-21)
 

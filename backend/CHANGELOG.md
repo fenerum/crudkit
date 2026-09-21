@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `crudkit_frontend`: feed items whose related object isn't an email (chat messages, calls,
+  meetings, ...) show the feed item's `body` instead of an empty frame.
+
 ## 0.3.0 (2026-09-21)
 
 - `crudkit_frontend`: related-record pickers offer `+ Create <model> "<typed text>"`, which

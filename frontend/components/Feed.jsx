@@ -59,7 +59,7 @@ function AttachmentRow({attachment}) {
     );
 }
 
-function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
+export function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
     let internalFeedItem = object.related_object === null;
     const client = new CrudKitAPIClient();
     const [relatedObject, setRelatedObject] = useState(null);
@@ -144,7 +144,7 @@ function FeedItem({object, model, sendEmailAction, onReply, isReplyTarget}) {
     const hasTranslation = isEmail && relatedObject && relatedObject.translation
         && relatedObject.detected_language && relatedObject.detected_language !== preferredLanguage;
     const emailHtml = isEmail && relatedObject ? (relatedObject.text_html || relatedObject.text || "") : "";
-    const emailContent = emailHtml ? contributeAttachments(emailHtml) : "";
+    const emailContent = emailHtml ? contributeAttachments(emailHtml) : (object.body || "");
     // Attachments referenced from the body via cid: are already rendered in
     // the iframe, so keep them out of the list unless asked for.
     const isInline = (attachment) => !!attachment.content_id && emailHtml.includes(`cid:${attachment.content_id}`);

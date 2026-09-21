@@ -3,6 +3,7 @@ import { FormProvider } from "react-hook-form";
 import DetailPane from "./DetailPane";
 import ActionButton from "./ActionButton";
 import { useHotkeys } from "react-hotkeys-hook";
+import { isModalOpen } from "./Modal";
 
 export default function FormContainer({
   isLoading,
@@ -15,15 +16,18 @@ export default function FormContainer({
   onSubmit,
   submitButtonText = "Save",
   cancelHref,
+  onCancel = null,
   deleteHref = null,
   formMethods,
   modelType,
 }) {
   const navigate = useNavigate();
 
+  // A form rendered inside a Modal (onCancel) leaves Esc to the Modal; the page
+  // form must ignore Esc while any modal is open or it would discard itself.
   useHotkeys('escape', () => {
-    if (cancelHref) navigate(cancelHref);
-  });
+    if (cancelHref && !isModalOpen()) navigate(cancelHref);
+  }, { enabled: !onCancel });
 
   if (isLoading) {
     return <p>Loading...</p>;
@@ -52,12 +56,22 @@ export default function FormContainer({
             Delete
           </Link>
         )}
-        <Link
-          to={cancelHref}
-          className="text-sm font-semibold leading-6 text-fg-1"
-        >
-          Cancel [Esc]
-        </Link>
+        {onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="text-sm font-semibold leading-6 text-fg-1"
+          >
+            Cancel [Esc]
+          </button>
+        ) : (
+          <Link
+            to={cancelHref}
+            className="text-sm font-semibold leading-6 text-fg-1"
+          >
+            Cancel [Esc]
+          </Link>
+        )}
         <ActionButton
           text={submitButtonText}
           onPress={onSubmit}
@@ -72,8 +86,11 @@ export default function FormContainer({
   // `onSubmit` from useCreate/useEditForm is already a `formMethods.handleSubmit`
   // wrapper, so the form's submit handler just hands the event off to it. Wrapping
   // again here would re-run validation and accidentally double-invoke mutations.
+  // React events bubble through portals, so a form inside a Modal must not
+  // let its submit reach the form rendered underneath it.
   const handleFormSubmit = (e) => {
     e.preventDefault();
+    e.stopPropagation();
     if (formMethods?.formState.isSubmitting) return;
     onSubmit();
   };

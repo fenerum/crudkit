@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import CrudKitAPIClient from "@/data/api";
 import { formatDuration } from "../utils/time";
+import Modal from "./Modal";
 
 const TimeTracker = () => {
   const client = new CrudKitAPIClient();
@@ -236,68 +237,59 @@ const TimeTracker = () => {
       )}
 
       {isAdjustModalOpen && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.6)' }}
-          onClick={() => setIsAdjustModalOpen(false)}
-        >
-          <div
-            className="rounded-lg border border-border-1 bg-bg-2 p-5 w-full max-w-md"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-lg font-semibold text-fg-1 mb-4">Complete with Custom Time</h2>
+        <Modal onClose={() => setIsAdjustModalOpen(false)}>
+          <h2 className="text-lg font-semibold text-fg-1 mb-4">Complete with Custom Time</h2>
 
-            <div className="eyebrow mb-2">Duration</div>
-            <div className="flex gap-2 mb-3">
-              {[
-                { label: 'hours', value: adjustedHours, set: setAdjustedHours, max: null },
-                { label: 'min', value: adjustedMinutes, set: setAdjustedMinutes, max: 59 },
-                { label: 'sec', value: adjustedSeconds, set: setAdjustedSeconds, max: 59 },
-              ].map(({ label, value, set, max }) => (
-                <div key={label} className="flex-1 flex flex-col items-center">
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    value={String(value)}
-                    onChange={(e) => {
-                      const v = parseInt(e.target.value) || 0;
-                      set(max != null ? Math.min(v, max) : v);
-                    }}
-                    className="ck-input font-mono text-center w-full"
-                    placeholder="0"
-                  />
-                  <span className="text-xs text-fg-3 mt-1">{label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="eyebrow mb-2">Notes</div>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="ck-input w-full"
-              rows={4}
-              placeholder="Add notes about this work session"
-            />
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                className="ck-btn ck-btn-ghost ck-btn-sm"
-                onClick={() => setIsAdjustModalOpen(false)}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="ck-btn ck-btn-primary ck-btn-sm"
-                onClick={() => adjustTracking.mutate()}
-              >
-                Save
-              </button>
-            </div>
+          <div className="eyebrow mb-2">Duration</div>
+          <div className="flex gap-2 mb-3">
+            {[
+              { label: 'hours', value: adjustedHours, set: setAdjustedHours, max: null },
+              { label: 'min', value: adjustedMinutes, set: setAdjustedMinutes, max: 59 },
+              { label: 'sec', value: adjustedSeconds, set: setAdjustedSeconds, max: 59 },
+            ].map(({ label, value, set, max }) => (
+              <div key={label} className="flex-1 flex flex-col items-center">
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  value={String(value)}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value) || 0;
+                    set(max != null ? Math.min(v, max) : v);
+                  }}
+                  className="ck-input font-mono text-center w-full"
+                  placeholder="0"
+                />
+                <span className="text-xs text-fg-3 mt-1">{label}</span>
+              </div>
+            ))}
           </div>
-        </div>
+
+          <div className="eyebrow mb-2">Notes</div>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="ck-input w-full"
+            rows={4}
+            placeholder="Add notes about this work session"
+          />
+
+          <div className="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              className="ck-btn ck-btn-ghost ck-btn-sm"
+              onClick={() => setIsAdjustModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="ck-btn ck-btn-primary ck-btn-sm"
+              onClick={() => adjustTracking.mutate()}
+            >
+              Save
+            </button>
+          </div>
+        </Modal>
       )}
     </>
   );

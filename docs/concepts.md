@@ -44,6 +44,8 @@ class Book(BaseCrudKitModel):
 - `search_fields` — used by list search and the global `/api/v1/search/`.
 - `allowed_prefills` — query params accepted by the `/initial/` action to
   prefill create forms (e.g. "new book for author AUT7").
+- `inline_create` — set to `False` to hide the "Create new…" option in
+  related-object pickers that target this model (default `True`).
 - `ai_trigger_children` — related objects whose changes re-trigger AI fields.
 - `assistant_prompt` / `assistant_tools` — configure the per-object AI
   assistant (`crudkit_assistant`).
@@ -57,7 +59,8 @@ Project-wide configuration lives in ordinary Django settings with the
 `GET /api/v1/<TYPE_ID>/metadata/` describes a model so clients can render it
 without compile-time knowledge: `verbose_name`, the `fields` map (type,
 choices, required, editable, related model and its TYPE_ID, …), reverse and
-generic `relations`, `allowed_prefills`, and `actions`.
+generic `relations`, `allowed_prefills`, `search_fields`, `actions`, and
+for the requesting user `can_create` (add permission) plus `inline_create`.
 
 Actions are model methods decorated with `@crm_action("Verbose name")`
 (`crudkit.decorators`); they show up as buttons in the UI and are invoked via

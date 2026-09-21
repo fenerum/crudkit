@@ -1,3 +1,4 @@
+import functools
 import re
 
 from django.conf import settings
@@ -18,6 +19,13 @@ from crudkit.utils import get_model_types, get_system_user
 
 def get_ck_id(type_id, pk):
     return f"{type_id}{pk}"
+
+
+@functools.lru_cache(maxsize=None)
+def get_accepted_type_ids(model):
+    """The TYPE_IDs that address a row of `model`: its own, plus those of its
+    multi-table-inheritance children, which share the parent's pk column."""
+    return frozenset(type_id for type_id, mdl in get_model_types().items() if issubclass(mdl, model))
 
 
 def parse_ck_id(ck_id: str) -> tuple[str, int]:
@@ -87,7 +95,9 @@ class CrudKitIDField(models.BigAutoField):
 
     def _validate_type_id(self, type_id):
         expected = getattr(self.model, "TYPE_ID", None)
-        if expected is not None and type_id != expected:
+        if expected is None or type_id == expected:
+            return
+        if type_id not in get_accepted_type_ids(self.model):
             raise ValueError(f"Expected a {expected} ID, got {type_id}")
 
 

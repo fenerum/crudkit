@@ -93,3 +93,45 @@ class SubclassIDSerializationTest(TestCase):
                 comment_id.startswith("URG"),
                 f"Comment ID should start with URG, but got {comment_id}",
             )
+
+
+class SubclassDetailRouteTest(TestCase):
+    """The API serialises a MTI child with its own prefix (URG), so every detail
+    route has to accept that id back — retrieve, update, merge and action."""
+
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="detailuser", password="testpass")
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+        self.ticket = Ticket.objects.create(
+            subject="Broken invoice",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        self.comment = UrgentComment.objects.create(
+            ticket=self.ticket,
+            body="Test content",
+            escalation_reason="production down",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        self.ck_id = self.client.get(f"/api/v1/URG/{self.comment.pk}/").data["id"]
+        self.assertTrue(self.ck_id.startswith("URG"))
+
+    def test_retrieve_by_serialized_id(self):
+        response = self.client.get(f"/api/v1/URG/{self.ck_id}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], self.ck_id)
+
+    def test_update_by_serialized_id(self):
+        response = self.client.patch(f"/api/v1/URG/{self.ck_id}/", {"body": "Edited"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.body, "Edited")
+
+    def test_action_by_serialized_id(self):
+        response = self.client.post(f"/api/v1/URG/{self.ck_id}/action/", {"action": "escalate"}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.comment.refresh_from_db()
+        self.assertEqual(self.comment.escalation_reason, "escalated")

@@ -1,7 +1,9 @@
+from django.contrib.auth.models import User
 from django.db import connection
 from django.test import TestCase
 
 from crudkit.models import CrudKitIDField, CrudKitPositiveIntegerField, parse_ck_id
+from tests.testapp.models import Comment, Ticket, UrgentComment
 
 
 class TestModel:
@@ -121,3 +123,32 @@ class CrudKitPositiveIntegerFieldTests(TestCase):
             pk = 42
 
         self.assertEqual(self.field.get_prep_value(_FakeInstance()), 42)
+
+
+class SubclassCkIdLookupTests(TestCase):
+    """A multi-table-inheritance child shares the parent's pk column, so both the
+    parent's and the child's TYPE_ID address the same row."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(username="fielduser", password="pw")
+        self.ticket = Ticket.objects.create(subject="Broken invoice", created_by=self.user, updated_by=self.user)
+        self.comment = UrgentComment.objects.create(
+            ticket=self.ticket,
+            body="Test content",
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        self.pk = int(str(self.comment.pk).removeprefix("COM").removeprefix("URG"))
+
+    def test_lookup_by_child_type_id(self):
+        self.assertEqual(UrgentComment.objects.get(pk=f"URG{self.pk}"), self.comment)
+
+    def test_lookup_by_parent_type_id(self):
+        self.assertEqual(UrgentComment.objects.get(pk=f"COM{self.pk}"), self.comment)
+
+    def test_parent_queryset_accepts_child_type_id(self):
+        self.assertEqual(Comment.objects.get(pk=f"URG{self.pk}").pk, self.comment.pk)
+
+    def test_unrelated_type_id_still_rejected(self):
+        with self.assertRaises(ValueError):
+            UrgentComment.objects.get(pk=f"TIC{self.pk}")

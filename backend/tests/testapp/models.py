@@ -122,3 +122,9 @@ class UrgentComment(Comment):
     TYPE_ID = "URG"
 
     escalation_reason = models.CharField(max_length=255, blank=True, default="")
+
+    @crm_action(verbose_name="Escalate")
+    def escalate(self, request):
+        self.escalation_reason = "escalated"
+        self.save(update_fields=["escalation_reason", "updated_at"])
+        return self

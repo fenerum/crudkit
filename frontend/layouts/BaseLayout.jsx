@@ -4,7 +4,7 @@ import {fetchObjects} from "@/data/api";
 import {Link, Outlet, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
-import {useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
+import {isMine, isVisibleToUser, useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
 import {resolveWorkspaceViews} from "../utils/workspaces";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
 import defaultLogoUrl from "../images/logo.svg";
@@ -185,36 +185,27 @@ function BaseLayoutInner() {
     link.href = faviconUrl;
   }, []);
 
-  const {isPending, items: allViews} = useMenuViews();
+  const {isPending, items: menuViews} = useMenuViews();
   const {isPending: workspacesPending, items: allWorkspaces} = useWorkspaces();
   const {activeWorkspaceId, setActiveWorkspaceId} = useWorkspace();
 
   // Group views by ownership: public views show under "Workspace"; private
   // views the current user created show under "My Views" with colored dots.
   const userId = user?.id;
-  const isMineAndPrivate = useCallback((v) => {
-    if (v.public) return false;
-    const owner = typeof v.created_by === 'object' ? v.created_by?.id : v.created_by;
-    return owner != null && userId != null && String(owner) === String(userId);
-  }, [userId]);
-
-  const rootViews = useMemo(() => allViews.filter(v => v.show_in_menu), [allViews]);
-  const myViews = useMemo(() => rootViews.filter(isMineAndPrivate), [rootViews, isMineAndPrivate]);
-  const workspaceViews = useMemo(() => rootViews.filter(v => !isMineAndPrivate(v)), [rootViews, isMineAndPrivate]);
+  const myViews = useMemo(() => menuViews.filter(v => !v.public && isMine(v, userId)), [menuViews, userId]);
+  const workspaceViews = useMemo(() => menuViews.filter(v => v.public), [menuViews]);
 
   const visibleWorkspaces = useMemo(
-    () => allWorkspaces.filter(w => w.public || isMineAndPrivate(w)),
-    [allWorkspaces, isMineAndPrivate]
+    () => allWorkspaces.filter(w => isVisibleToUser(w, userId)),
+    [allWorkspaces, userId]
   );
   const activeWorkspace = useMemo(
     () => visibleWorkspaces.find(w => String(w.id) === String(activeWorkspaceId)) || null,
     [visibleWorkspaces, activeWorkspaceId]
   );
-  // Tabs may pin any view, including ones with show_in_menu=False, so resolve
-  // against the full view list.
   const workspaceTabs = useMemo(
-    () => resolveWorkspaceViews(activeWorkspace, allViews),
-    [activeWorkspace, allViews]
+    () => resolveWorkspaceViews(activeWorkspace, workspaceViews),
+    [activeWorkspace, workspaceViews]
   );
 
   // Clear a stale stored workspace id (deleted, or not visible to this user).
@@ -228,13 +219,13 @@ function BaseLayoutInner() {
 
   // Only poll counts for views currently displayed in the sidebar.
   const viewsWithBadges = useMemo(() => {
-    const displayed = activeWorkspace ? [...workspaceTabs, ...myViews] : rootViews;
+    const displayed = activeWorkspace ? [...workspaceTabs, ...myViews] : [...workspaceViews, ...myViews];
     const badged = new Map();
     displayed.forEach((v) => {
       if (v.show_badge_in_menu && !badged.has(v.id)) badged.set(v.id, v);
     });
     return [...badged.values()];
-  }, [activeWorkspace, workspaceTabs, myViews, rootViews]);
+  }, [activeWorkspace, workspaceTabs, myViews, workspaceViews]);
 
   useEffect(() => {
     const fetchBadgeCounts = async () => {
@@ -284,7 +275,8 @@ function BaseLayoutInner() {
       <TopbarSlotsProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-bg-1 text-fg-1">
         {/* Sidebar */}
-        <div
+        <nav
+          aria-label="Sidebar"
           className={sidebarClasses}
           style={{width: 'var(--sidebar-w)', padding: '10px 8px'}}
         >
@@ -425,7 +417,7 @@ function BaseLayoutInner() {
             </Link>
             <ThemeToggle />
           </div>
-        </div>
+        </nav>
 
         {/* Main content area — sidebar is `lg:fixed` so only reserve its
             240px gutter at lg+ viewports, otherwise the content takes the

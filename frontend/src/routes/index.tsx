@@ -6,8 +6,7 @@ import { useMenuViews } from '../../hooks/useMenuViews';
 export default function Index() {
   const client = new CrudKitAPIClient();
 
-  const { isPending, error, items: allViews } = useMenuViews();
-  const rootViews = allViews.filter((v) => v.show_in_menu);
+  const { isPending, error, items: rootViews } = useMenuViews();
 
   const {
     isPending: isPendingWidgets,

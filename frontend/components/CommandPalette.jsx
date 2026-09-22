@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CrudKitAPIClient from "../data/api";
-import { useMenuViews } from "../hooks/useMenuViews";
+import { isVisibleToUser, useMenuViews } from "../hooks/useMenuViews";
+import { useAuth } from "../context/AuthContext";
 import { Icon, Kbd } from "./ui";
 import { getIdPrefix, isObjectTypeCode } from "../utils/crudkit";
 import { detail as detailRegex } from "../utils/urls";
@@ -20,8 +21,9 @@ export default function CommandPalette({ open, onClose }) {
   const [directMatch, setDirectMatch] = useState(null);
   const [typeMatch, setTypeMatch] = useState(null);
 
-  const { items: allViews } = useMenuViews({ enabled: open });
-  const rootViews = allViews.filter((v) => v.show_in_menu);
+  const { items: menuViews } = useMenuViews({ enabled: open });
+  const { user } = useAuth();
+  const rootViews = menuViews.filter((v) => isVisibleToUser(v, user?.id));
 
   useEffect(() => {
     if (open) {

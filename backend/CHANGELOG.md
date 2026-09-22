@@ -1,9 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.3.1 (2026-09-22)
 
 - `crudkit_frontend`: feed items whose related object isn't an email (chat messages, calls,
   meetings, ...) show the feed item's `body` instead of an empty frame. (#36)
+- `crudkit_frontend`: views only appear in menus (sidebar, workspace tabs, command palette)
+  when `show_in_menu` is set. The shared Workspace section and workspace tabs only list public
+  views; per-type view tabs, the default-view pick and the command palette only list public or
+  own views, so superusers no longer see other users' private views there. (#37)
 
 ## 0.3.0 (2026-09-21)
 

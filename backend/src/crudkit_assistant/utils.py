@@ -1,5 +1,4 @@
 
-from crudkit.authorization import get_authorized_queryset
 from crudkit.utils import get_model_types
 
 
@@ -17,13 +16,6 @@ def get_instance(type_id: str, pk: int):
         return model.objects.get(pk=pk)
     except model.DoesNotExist:
         return None
-
-
-def get_authorized_instance(user, type_id: str, pk: int, action: str = "view"):
-    model = resolve_model(type_id)
-    if model is None:
-        return None
-    return get_authorized_queryset(user, model.objects.all(), action).filter(pk=pk).first()
 
 
 def get_assistant_prompt(instance) -> str:

@@ -19,6 +19,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "crudkit",
     "crudkit_frontend",
+    "crudkit_mcp",
     "library",
 ]
 
@@ -74,6 +75,10 @@ REST_FRAMEWORK = {
 
 CELERY_TASK_ALWAYS_EAGER = True
 CRUDKIT_DEFAULT_CURRENCY = "EUR"
+
+# The MCP OAuth consent page needs a session login.
+LOGIN_URL = "/admin/login/"
+CRUDKIT_MCP_SERVER_NAME = "crudkit-demo"
 
 CRUDKIT_FRONTEND_CONFIG = {
     "app_name": "CrudKit Demo",

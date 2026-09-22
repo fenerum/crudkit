@@ -35,6 +35,7 @@ fields (`AISummaryField`, `AICategoryField`, `AIBooleanField`, `AITagsField`,
 ```
 pip install crudkit[api]          # REST API included
 pip install crudkit[assistant]    # + per-object AI assistant (Channels)
+pip install crudkit[mcp]          # + remote MCP server with OAuth (e.g. a Claude connector)
 ```
 
 ```python
@@ -79,6 +80,48 @@ permission and can be narrowed further with
 | `CRUDKIT_ASSISTANT_NAME`, `CRUDKIT_ASSISTANT_SYSTEM_PROMPT`, `CRUDKIT_ASSISTANT_AVATAR_URL` | assistant branding |
 | `CRUDKIT_FRONTEND_CONFIG` | dict injected into the bundled SPA at runtime (`app_name`, `logo_url`, ...) |
 | `CRUDKIT_FRONTEND_LOGIN_REQUIRED` | redirect anonymous users of the SPA view to `LOGIN_URL` |
+| `CRUDKIT_MCP_SERVER_NAME` | `serverInfo.name` reported by the MCP server (default `"crudkit"`) |
+| `CRUDKIT_MCP_WRITE_ENABLED` | offer the `write` OAuth scope and the create/update/action/note tools (default `False`) |
+| `CRUDKIT_MCP_MODELS` | list of TYPE_IDs to expose over MCP (default: every project model) |
+| `CRUDKIT_MCP_EXTRA_TOOLS` | dotted paths to `crudkit_mcp.tools.Tool` instances; added to, or replacing, the generated tools |
+| `CRUDKIT_MCP_BASE_URL` | public origin for OAuth metadata URLs when the request's host/scheme is wrong (e.g. behind a proxy) |
+
+## MCP server
+
+`crudkit_mcp` exposes the models as a remote [MCP](https://modelcontextprotocol.io)
+server (streamable HTTP) with its own OAuth 2.1 authorization server
+(dynamic client registration, PKCE, rotating refresh tokens), so it can be
+added as e.g. a Claude connector by URL.
+
+```python
+INSTALLED_APPS = [..., "crudkit_mcp"]
+LOGIN_URL = "/login/"  # the OAuth consent page needs a session login
+
+urlpatterns = [
+    path("api/v1/", include("crudkit_mcp.urls")),       # /api/v1/mcp, /api/v1/oauth/...
+    path("", include("crudkit_mcp.well_known_urls")),   # /.well-known/oauth-* (site root)
+    ...,
+]
+```
+
+The tool set is fixed — records are addressed by TYPE_ID and CK-ID, so the
+same tools serve any project:
+
+| Tool | |
+|---|---|
+| `describe_types` | the record types; for one `type`, its filters, writable fields, actions and permissions |
+| `search` | free-text search across types, returning `{id, label}` |
+| `list_records` | one `type`, a `filters` object (keys from `describe_types`), `query`, `order_by`, `limit`, `offset` |
+| `get_record` | one record by ID, with its feed, change log and available actions |
+
+With `CRUDKIT_MCP_WRITE_ENABLED` and a token granted the `write` scope, four
+more: `create_record`, `update_record`, `run_action` and `add_note`.
+
+Every call is filtered through the token user's model, row and action
+permissions, so a type the user can't view isn't listed and can't be read.
+CrudKit's own models and Django's (including `User`) are never exposed;
+narrow the rest with `CRUDKIT_MCP_MODELS = ["CMP", "PER", ...]` or opt a
+single model out with `CrudKitSettings.mcp_exclude = True`.
 
 ## Bundled frontend
 
@@ -115,7 +158,7 @@ backend; `npm run build` there regenerates the bundled assets.
 ```
 cd backend
 uv sync --all-extras
-uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests
+uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend crudkit_mcp tests
 ```
 
 ## License

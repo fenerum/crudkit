@@ -378,6 +378,8 @@ class BaseCrudKitModel(models.Model):
         # this model. Lets the CRM (or any consumer) plug in model-specific
         # capabilities without touching the framework app.
         assistant_tools = []
+        # Leave this model out of the MCP server's generated tools.
+        mcp_exclude = False
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

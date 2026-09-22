@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Authorize {{ client.client_name }}</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 480px; margin: 80px auto; padding: 20px; }
+        .card { border: 1px solid #ddd; border-radius: 8px; padding: 32px; }
+        h1 { font-size: 20px; margin-top: 0; }
+        .scope { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; }
+        .scope input { margin-top: 3px; }
+        .scope small { display: block; color: #666; }
+        .actions { display: flex; gap: 12px; margin-top: 24px; }
+        button { padding: 10px 24px; border-radius: 6px; border: 1px solid #ccc; cursor: pointer; font-size: 14px; }
+        .allow { background: #2563eb; color: white; border-color: #2563eb; }
+        .deny { background: white; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Authorize {{ client.client_name }}</h1>
+        <p>This application wants to access your {{ site_name }} data as {{ request.user.get_username }}.</p>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="client_id" value="{{ client.client_id }}">
+            <input type="hidden" name="redirect_uri" value="{{ redirect_uri }}">
+            <input type="hidden" name="code_challenge" value="{{ code_challenge }}">
+            <input type="hidden" name="state" value="{{ state }}">
+            <input type="hidden" name="scope" value="{{ scope }}">
+            <label class="scope">
+                <input type="checkbox" checked disabled>
+                <span>Read<small>View records you have access to</small></span>
+            </label>
+            {% if write_available %}
+            <label class="scope">
+                <input type="checkbox" name="write">
+                <span>Write<small>Create and change records, add notes and run actions</small></span>
+            </label>
+            {% endif %}
+            <div class="actions">
+                <button type="submit" name="action" value="allow" class="allow">Allow</button>
+                <button type="submit" name="action" value="deny" class="deny">Deny</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>

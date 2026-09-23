@@ -6,7 +6,7 @@ from django.contrib.auth.models import Permission, User
 from django.test import TestCase, override_settings
 from django.utils import timezone, translation
 
-from crudkit.models import ChangeLog, FeedItem
+from crudkit.models import ChangeLog, FeedItem, parse_ck_id
 from crudkit_mcp.models import AccessToken, OAuthClient
 from crudkit_mcp.server import PROTOCOL_VERSION, MCPServer
 from crudkit_mcp.tools import Tool
@@ -32,6 +32,12 @@ class MCPTestCase(TestCase):
         self.customer = Customer.objects.create(
             name="Acme Corp", topic=self.topic, created_by=self.user, updated_by=self.user
         )
+
+    def missing_id(self, model):
+        """A CK-ID of the right type that no row has. Postgres keeps its
+        sequences across tests, so pk values can't be assumed."""
+        last = model.objects.order_by("-pk").first()
+        return f"{model.TYPE_ID}{parse_ck_id(last.id)[1] + 1 if last else 1}"
 
     def server(self, scopes=("read",), user=None):
         # Fresh user so permission grants in the test aren't hidden by the perm cache.
@@ -138,7 +144,8 @@ class ReadToolsTest(MCPTestCase):
 
     def test_search(self):
         self.assertEqual(
-            self.call("search", {"query": "acme"}), [{"id": "CUS1", "label": "Acme Corp", "object_images": []}]
+            self.call("search", {"query": "acme"}),
+            [{"id": self.customer.id, "label": "Acme Corp", "object_images": []}],
         )
         self.assertEqual(self.call("search", {"query": ""}), "No query provided")
         self.assertEqual(self.call("search", {"query": "zzz"}), "No results found")
@@ -181,7 +188,7 @@ class ReadToolsTest(MCPTestCase):
         self.assertEqual(data["actions"], [])  # No change permission.
 
     def test_get_record_errors(self):
-        self.assertIn("not found", self.call("get_record", {"id": "CUS999"})["error"])
+        self.assertIn("not found", self.call("get_record", {"id": self.missing_id(Customer)})["error"])
         self.assertIn("Invalid ID", self.call("get_record", {"id": "1"})["error"])
         self.assertIn("Unknown type", self.call("get_record", {"id": "ZZZ1"})["error"])
 
@@ -255,7 +262,8 @@ class WriteToolsTest(MCPTestCase):
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_update_rejects_missing_fk_instead_of_clearing_it(self):
-        result = self.call("update_record", {"id": self.customer.id, "fields": {"topic": "TOP999"}}, scopes=self.WRITE)
+        missing = self.missing_id(Topic)
+        result = self.call("update_record", {"id": self.customer.id, "fields": {"topic": missing}}, scopes=self.WRITE)
         self.assertIn("not found", result["error"])
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.topic, self.topic)

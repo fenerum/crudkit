@@ -204,7 +204,7 @@ class TokenView(View):
             except AuthorizationCode.DoesNotExist:
                 return JsonResponse({"error": "invalid_grant"}, status=400)
 
-            if auth_code.is_used or auth_code.is_expired:
+            if auth_code.is_used or auth_code.is_expired or not auth_code.user.is_active:
                 return JsonResponse({"error": "invalid_grant"}, status=400)
 
             if auth_code.redirect_uri != redirect_uri:
@@ -245,6 +245,10 @@ class TokenView(View):
                 return JsonResponse({"error": "invalid_grant"}, status=400)
 
             if rt.is_expired:
+                return JsonResponse({"error": "invalid_grant"}, status=400)
+
+            if not rt.user.is_active:
+                rt.revoke_family()
                 return JsonResponse({"error": "invalid_grant"}, status=400)
 
             if not rt.client.is_active:

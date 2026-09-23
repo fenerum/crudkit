@@ -190,6 +190,23 @@ class TokenViewTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "invalid_grant")
 
+    def test_token_exchange_inactive_user_rejected(self):
+        self.user.is_active = False
+        self.user.save()
+        response = self.client.post(
+            "/api/v1/oauth/token/",
+            {
+                "grant_type": "authorization_code",
+                "code": self.auth_code.code,
+                "redirect_uri": "http://localhost:3000/callback",
+                "client_id": self.oauth_client.client_id,
+                "code_verifier": self.code_verifier,
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "invalid_grant")
+        self.assertEqual(AccessToken.objects.count(), 0)
+
     def test_token_exchange_expired_code(self):
         self.auth_code.expires_at = timezone.now() - timedelta(minutes=1)
         self.auth_code.save()
@@ -296,6 +313,17 @@ class OAuthBearerAuthenticationTest(TestCase):
     def test_expired_token_rejected(self):
         self.token.expires_at = timezone.now() - timedelta(hours=1)
         self.token.save()
+        response = self.client.post(
+            "/api/v1/mcp/",
+            data='{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.token.token}",
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_inactive_user_token_rejected(self):
+        self.user.is_active = False
+        self.user.save()
         response = self.client.post(
             "/api/v1/mcp/",
             data='{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}',
@@ -545,6 +573,23 @@ class RefreshTokenGrantTest(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.json()["error"], "invalid_grant")
+
+    def test_refresh_grant_inactive_user_rejected_and_family_revoked(self):
+        initial = self._exchange_code()
+        self.user.is_active = False
+        self.user.save()
+        response = self.client.post(
+            "/api/v1/oauth/token/",
+            {
+                "grant_type": "refresh_token",
+                "refresh_token": initial["refresh_token"],
+                "client_id": self.oauth_client.client_id,
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "invalid_grant")
+        self.assertTrue(RefreshToken.objects.get(token=initial["refresh_token"]).is_revoked)
+        self.assertEqual(AccessToken.objects.count(), 1)
 
     def test_refresh_grant_client_mismatch_rejected(self):
         initial = self._exchange_code()

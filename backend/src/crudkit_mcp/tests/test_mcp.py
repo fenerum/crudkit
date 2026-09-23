@@ -91,6 +91,11 @@ class MCPServerProtocolTest(MCPTestCase):
         result = self.server().handle_message({"jsonrpc": "2.0", "id": 5, "method": "unknown/method", "params": {}})
         self.assertEqual(result["error"]["code"], -32601)
 
+    def test_batch_request_rejected(self):
+        result = self.server().handle_message([{"jsonrpc": "2.0", "id": 1, "method": "ping"}])
+        self.assertEqual(result["error"]["code"], -32600)
+        self.assertIsNone(result["id"])
+
     def test_tools_call_without_read_scope(self):
         self.assertIn("scope", self.call("search", {"query": "acme"}, scopes=())["error"])
 
@@ -364,6 +369,16 @@ class McpViewIntegrationTest(TestCase):
             HTTP_AUTHORIZATION=f"Bearer {self.token.token}",
         )
         self.assertEqual(response.status_code, 415)
+
+    def test_batch_request_via_http(self):
+        response = self.client.post(
+            "/api/v1/mcp/",
+            data=json.dumps([{"jsonrpc": "2.0", "id": 1, "method": "ping"}]),
+            content_type="application/json",
+            HTTP_AUTHORIZATION=f"Bearer {self.token.token}",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["error"]["code"], -32600)
 
     def test_get_returns_event_stream(self):
         response = self.client.get("/api/v1/mcp/")

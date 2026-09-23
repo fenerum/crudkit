@@ -29,7 +29,7 @@ from django.utils import translation
 from django.utils.module_loading import import_string
 
 from crudkit.authorization import get_authorized_queryset, has_action_permission, has_model_permission
-from crudkit.models import ck_id_regex, get_accepted_type_ids, parse_ck_id
+from crudkit.models import ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import services
 from crudkit_api.serializers import get_serializer
@@ -417,9 +417,6 @@ def _get_instance(user, object_id, action: str):
         raise ValueError(f"Invalid ID {object_id!r}; expected e.g. CUS123")
     type_id, pk = parse_ck_id(object_id)
     model = _resolve_type(user, type_id)
-    # An MTI child shares its parent's pk column, so address it by its own TYPE_ID.
-    if type_id not in get_accepted_type_ids(model):
-        raise ValueError(f"{object_id!r} is not a {model._meta.verbose_name} ID")
     instance = _visible(model, user, action).filter(pk=pk).first()
     if instance is None:
         raise ValueError(f"{object_id} not found, or not available for {action}")

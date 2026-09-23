@@ -23,6 +23,8 @@ class MCPServer:
         self.oauth_scopes = oauth_scopes or []
 
     def handle_message(self, message: dict) -> dict | None:
+        if not isinstance(message, dict):
+            return self._error_response(None, -32600, "Invalid Request: expected a single JSON-RPC object")
         method = message.get("method")
         msg_id = message.get("id")
         params = message.get("params") or {}

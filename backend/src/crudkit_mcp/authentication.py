@@ -22,6 +22,9 @@ class OAuthBearerAuthentication(BaseAuthentication):
         if token.is_expired:
             raise AuthenticationFailed("Access token has expired")
 
+        if not token.user.is_active:
+            raise AuthenticationFailed("User is inactive")
+
         if not token.client.is_active:
             raise AuthenticationFailed("OAuth client is inactive")
 

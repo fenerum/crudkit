@@ -9,7 +9,8 @@ contract. [CONTRIBUTING.md](CONTRIBUTING.md) has the full workflow details.
 ## Layout
 
 - `backend/` — the `crudkit` Python package (PyPI: `crudkit`). Django apps:
-  `crudkit`, `crudkit_api`, `crudkit_assistant`, `crudkit_frontend`.
+  `crudkit`, `crudkit_api`, `crudkit_assistant`, `crudkit_frontend`,
+  `crudkit_mcp`.
 - `frontend/` — React SPA source. `npm run build` emits into
   `backend/src/crudkit_frontend/` so the built UI ships inside the wheel.
   Never published to npm.
@@ -20,7 +21,7 @@ contract. [CONTRIBUTING.md](CONTRIBUTING.md) has the full workflow details.
 ```bash
 # Backend (cd backend; requires uv, Python >= 3.12)
 uv sync --all-extras
-uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests
+uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend crudkit_mcp tests
 uv run ruff check src tests
 uv run manage.py makemigrations --check --dry-run   # must stay clean
 
@@ -48,7 +49,7 @@ npm run e2e    # Playwright against the demo + built SPA (build first;
 Downstream projects (notably fenerum-crm) depend on them:
 
 - App labels stay `crudkit`, `crudkit_api`, `crudkit_assistant`,
-  `crudkit_frontend`.
+  `crudkit_frontend`, `crudkit_mcp`.
 - `crudkit/migrations/0001_squashed.py`: never edit `replaces`, never
   renumber. New schema changes are new migrations, generated under Django 5.1.
 - No settings-derived values in migrations (see `CurrencyField.deconstruct()`

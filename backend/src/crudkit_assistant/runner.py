@@ -19,9 +19,10 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 
 from crudkit import llm
+from crudkit.authorization import get_authorized_instance
 from crudkit_assistant.agent import assistant_agent
 from crudkit_assistant.deps import AssistantDeps
-from crudkit_assistant.utils import get_assistant_tools, get_authorized_instance
+from crudkit_assistant.utils import get_assistant_tools
 
 logger = logging.getLogger(__name__)
 

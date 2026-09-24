@@ -62,6 +62,12 @@ jobs:
           echo "GET /api/v1/BOK/metadata/ -> $code"
           test "$code" = "200"
 
+          curl -sf http://127.0.0.1:8000/.well-known/oauth-protected-resource | grep -F '"resource": "http://127.0.0.1:8000/api/v1/mcp/"'
+          code=$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"initialize"}' http://127.0.0.1:8000/api/v1/mcp)
+          echo "POST /api/v1/mcp (no token) -> $code"
+          test "$code" = "401"
+
           curl -s http://127.0.0.1:8000/ > /tmp/index.html
           grep -F 'id="crudkit-config"' /tmp/index.html
           grep -F 'CrudKit Demo' /tmp/index.html

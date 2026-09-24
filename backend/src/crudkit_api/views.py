@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import connection, models, reset_queries, transaction
-from django.db.models import ProtectedError, Q
+from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
 from django.utils.safestring import mark_safe
 from rest_framework import viewsets
@@ -18,13 +18,13 @@ from crudkit.authorization import (
     get_authorized_queryset,
     get_permission_action,
     has_action_permission,
-    has_model_permission,
 )
 from crudkit.models import BaseCrudKitModel, ChangeLog
 from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
+from crudkit_api.services import search_filter, search_objects
 
 
 class GenericViewSet(viewsets.ModelViewSet):
@@ -41,10 +41,7 @@ class GenericViewSet(viewsets.ModelViewSet):
             queryset = queryset.filter(deleted=False)
         search = self.request.GET.get("_q", False)
         if search:
-            search_filters = Q()
-            for field in self.queryset.model.CrudKitSettings.search_fields:
-                search_filters = search_filters | (Q(**{f"{field}__icontains": search.strip()}))
-            queryset = queryset.filter(search_filters)
+            queryset = queryset.filter(search_filter(self.queryset.model, search))
         return queryset
 
     @transaction.atomic
@@ -229,9 +226,6 @@ class SearchViewSet(viewsets.ViewSet):
         if not query:
             return Response({"results": []})
 
-        # Try getting
-        results = []
-
         if len(query) > 3 and CRM_TYPE_REGEX.match(query) and ":" in query:
             search_type, query = query.split(":")
             possible_searches = [
@@ -246,18 +240,7 @@ class SearchViewSet(viewsets.ViewSet):
                 if hasattr(mdl, "CrudKitSettings") and mdl.CrudKitSettings.search_fields
             ]
 
-        for mdl in possible_searches:
-            if not has_model_permission(request.user, mdl, "view"):
-                continue
-            serializer_cls = get_serializer(mdl, depth=0, fields=["id", "label", "object_images"])
-            allowed = get_authorized_queryset(request.user, mdl.objects.all(), "view")
-            qs = mdl.objects.none()
-            for field in mdl.CrudKitSettings.search_fields:
-                qs = qs | allowed.filter(**{f"{field}__icontains": query.strip()})
-            if "deleted" in [field.name for field in mdl._meta.fields]:
-                qs = qs.filter(deleted=False)
-            results += [serializer_cls(obj).data for obj in qs[0 : (20 if len(possible_searches) == 1 else 5)]]
-
+        results = search_objects(request.user, query, possible_searches, 20 if len(possible_searches) == 1 else 5)
         return Response({"results": results})
 
 

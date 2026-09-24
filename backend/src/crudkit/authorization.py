@@ -1,6 +1,8 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Model, QuerySet
 
+from crudkit.utils import get_model_types
+
 
 def get_permission_action(method: str, view_action: str | None = None) -> str:
     if view_action in {"create", "initial_data"}:
@@ -29,6 +31,16 @@ def get_authorized_queryset(user, queryset: QuerySet, action: str = "view") -> Q
     settings = getattr(model, "CrudKitSettings", None)
     authorize = getattr(settings, "get_authorized_queryset", None)
     return authorize(user, queryset, action) if authorize else queryset
+
+
+def get_authorized_instance(user, type_id: str, pk: int, action: str = "view"):
+    model = get_model_types().get(type_id)
+    if model is None:
+        return None
+    queryset = get_authorized_queryset(user, model.objects.all(), action)
+    if hasattr(model, "deleted"):
+        queryset = queryset.filter(deleted=False)
+    return queryset.filter(pk=pk).first()
 
 
 def has_object_permission(user, instance: Model, action: str = "view") -> bool:

@@ -22,12 +22,11 @@ from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from pydantic_ai import RunContext
 
-from crudkit.authorization import get_authorized_queryset, has_action_permission
-from crudkit.models import ChangeLog, FeedItem
+from crudkit.authorization import get_authorized_instance, get_authorized_queryset, has_action_permission
+from crudkit_api import services
 from crudkit_api.metadata import build_instance_metadata
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
-from crudkit_assistant.utils import get_authorized_instance
 
 logger = logging.getLogger(__name__)
 
@@ -83,20 +82,7 @@ async def get_changelog(ctx: RunContext[AssistantDeps], limit: int = 20) -> list
 
     def _run():
         instance = _load_instance(ctx.deps)
-        if instance is None:
-            return []
-        ct = ContentType.objects.get_for_model(instance.__class__)
-        qs = ChangeLog.objects.filter(related_content_type=ct, related_object_id=instance.pk).order_by("-updated_at")[
-            :limit
-        ]
-        return [
-            {
-                "at": cl.updated_at.isoformat(),
-                "by": str(cl.updated_by) if cl.updated_by_id else None,
-                "field_changes": cl.field_changes or {},
-            }
-            for cl in qs
-        ]
+        return services.get_changelog(instance, limit) if instance is not None else []
 
     return await sync_to_async(_run)()
 
@@ -106,24 +92,7 @@ async def get_feed(ctx: RunContext[AssistantDeps], limit: int = 20) -> list[dict
 
     def _run():
         instance = _load_instance(ctx.deps)
-        if instance is None:
-            return []
-        ct = ContentType.objects.get_for_model(instance.__class__)
-        qs = FeedItem.objects.filter(parent_content_type=ct, parent_object_id=instance.pk, deleted=False).order_by(
-            "-created_at"
-        )[:limit]
-        results = []
-        for fei in qs:
-            results.append(
-                {
-                    "at": fei.created_at.isoformat(),
-                    "by": str(fei.created_by) if fei.created_by_id else None,
-                    "body": fei.body or "",
-                    "related_model": fei.related_content_type.model if fei.related_content_type_id else None,
-                    "related_id": str(fei.related_object_id) if fei.related_object_id else None,
-                }
-            )
-        return results
+        return services.get_feed(instance, limit) if instance is not None else []
 
     return await sync_to_async(_run)()
 

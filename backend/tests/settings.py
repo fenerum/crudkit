@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "crudkit",
     "crudkit_assistant",
     "crudkit_frontend",
+    "crudkit_mcp",
     "tests.testapp",
 ]
 

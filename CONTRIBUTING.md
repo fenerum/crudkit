@@ -21,7 +21,7 @@ Backend (Python ≥ 3.12, [uv](https://docs.astral.sh/uv/)):
 ```bash
 cd backend
 uv sync --all-extras
-uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend tests
+uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend crudkit_mcp tests
 uv run ruff check src tests
 ```
 

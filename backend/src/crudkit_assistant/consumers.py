@@ -28,11 +28,10 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import AccessToken
 
-from crudkit.authorization import has_object_permission
+from crudkit.authorization import get_authorized_instance, has_object_permission
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
 from crudkit_assistant.runner import run_turn
-from crudkit_assistant.utils import get_authorized_instance
 
 logger = logging.getLogger(__name__)
 

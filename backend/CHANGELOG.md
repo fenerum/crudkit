@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.4.0 (2026-09-24)
 
 - `crudkit_mcp` (new app, `crudkit[mcp]`): remote MCP server + OAuth 2.1 provider, moved from
   fenerum-crm. A fixed, type-parameterised tool set addressing records by TYPE_ID/CK-ID —
@@ -9,11 +9,11 @@
   `run_action`, `add_note`; all respecting model/row/action permissions. New settings `CRUDKIT_MCP_SERVER_NAME`, `CRUDKIT_MCP_WRITE_ENABLED`,
   `CRUDKIT_MCP_EXTRA_TOOLS`, `CRUDKIT_MCP_MODELS`, `CRUDKIT_MCP_BASE_URL`; new
   `CrudKitSettings.mcp_exclude`. The consent page always grants `read` and offers `write`
-  as a checkbox.
+  as a checkbox. (#39)
 - `crudkit`: `get_authorized_instance` moved from `crudkit_assistant.utils` to
-  `crudkit.authorization`.
+  `crudkit.authorization`. (#39)
 - `crudkit_api`: new `crudkit_api.services` with the search, feed, change log and mutation
-  helpers shared by the REST API, the assistant and the MCP server.
+  helpers shared by the REST API, the assistant and the MCP server. (#39)
 
 ## 0.3.1 (2026-09-22)
 

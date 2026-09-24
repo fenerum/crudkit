@@ -1,6 +1,6 @@
 [project]
 name = "crudkit"
-version = "0.3.1"
+version = "0.4.0"
 description = "A metadata-driven CRUD framework for Django: typed object IDs, soft delete, merge, change log, activity feed, saved views, AI fields and a generic REST API."
 readme = "README.md"
 license = "MIT"

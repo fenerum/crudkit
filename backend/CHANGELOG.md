@@ -8,6 +8,13 @@
   be able to view its type.
 - `crudkit_api`: saved-view ordering moved out of `BasicFilter` into `get_order_fields` and
   `order_queryset` in `crudkit_api.filters`.
+- `crudkit_frontend`: saved views get a visual filter editor instead of the raw JSON
+  textarea — per-field value pickers (choices, yes/no, numbers, dates, related records),
+  variables like "Current user" (`${user}`), and invalid filters highlighted in red and
+  editable instead of breaking the form.
+- `crudkit`: `View.clean()` rejects unknown filter comparators and entries that aren't
+  exactly `[field, comparator, value]`, so they fail on save (400) instead of when the view
+  is applied (500).
 
 ## 0.4.0 (2026-09-24)
 

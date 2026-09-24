@@ -451,6 +451,9 @@ class Layout(BaseCrudKitModel):
 class View(BaseCrudKitModel):
     TYPE_ID = "VIW"
 
+    # Comparators understood by `filter()`.
+    FILTER_COMPARATORS = ("=", "!=", ">", ">=", "<", "<=")
+
     class ViewLayoutChoices(models.TextChoices):
         LIST = "list"
         KANBAN = "kanban"
@@ -528,17 +531,19 @@ class View(BaseCrudKitModel):
         # Validate filter fields exist
         if self.filters:
             for field_spec in self.filters:
-                if not field_spec or len(field_spec) < 3:
+                if not isinstance(field_spec, list) or len(field_spec) != 3 or not isinstance(field_spec[0], str):
                     raise ValidationError(
                         {"filters": _("Filter format is invalid. Should be [field, comparator, value]")}
                     )
 
-                field_name = field_spec[0]
+                field_name, comparator, _value = field_spec
                 # Skip validating field paths with relationships (field__subfield)
                 if "__" not in field_name and field_name not in model_field_names:
                     raise ValidationError(
                         {"filters": _(f"Field '{field_name}' does not exist on model '{self.model}'.")}
                     )
+                if comparator not in self.FILTER_COMPARATORS:
+                    raise ValidationError({"filters": _(f"Unknown comparator '{comparator}'.")})
 
         # Validate order_by fields exist
         if self.order_by:

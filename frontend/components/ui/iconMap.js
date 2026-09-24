@@ -5,7 +5,7 @@
 import {
   Activity, AlertCircle, AlertTriangle, ArrowDown, ArrowDownUp,
   ArrowLeft, ArrowRight, ArrowRightCircle, ArrowUp, AtSign, BarChart, BarChart2,
-  Bell, Bold, Briefcase, Building, Building2, Calendar,
+  Bell, Bold, Braces, Briefcase, Building, Building2, Calendar,
   Check, CheckCircle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, ChevronsUpDown, Circle,
   Clock, Columns, Copy, CornerUpLeft, CreditCard, DollarSign, Download, Edit,
   Edit3, ExternalLink, Eye, EyeOff, File, FileText, Filter,
@@ -192,6 +192,7 @@ const ICONS = {
   'at-sign': AtSign,
   'hash': Hash,
   'bold': Bold,
+  'braces': Braces,
   'italic': Italic,
   'menu': Menu,
   'dollar-sign': DollarSign,

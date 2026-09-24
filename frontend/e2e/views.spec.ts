@@ -1,13 +1,23 @@
+import { type Locator, expect, test } from '@playwright/test';
 import { createObject, unique } from './helpers';
-import { expect, test } from '@playwright/test';
+
+// Pick an option in a react-select by typing it and pressing Enter.
+async function choose(select: Locator, text: string) {
+  await select.pressSequentially(text);
+  await select.press('Enter');
+}
 
 test('creates a filtered saved view and switches to it', async ({ page }) => {
   const name = unique('Finished high');
   await page.goto('/VIW/create?model=RDG&next=/RDG');
   await page.locator('input[name="name"]').fill(name);
-  await page
-    .locator('textarea[name="filters"]')
-    .fill('[["status", "=", "finished"], ["priority", "=", "high"]]');
+  const filters = page.getByTestId('filters-editor');
+  const rows = filters.getByTestId('filter-row');
+  for (const [field, value] of [['Status', 'Finished'], ['Priority', 'High']]) {
+    await choose(filters.getByLabel('Filter field').last(), field);
+    await choose(rows.last().getByLabel('Filter value'), value);
+  }
+  await expect(rows).toHaveCount(2);
   await page.getByRole('main').getByRole('button', { name: 'Create', exact: true }).click();
 
   await expect(page).toHaveURL('/RDG');

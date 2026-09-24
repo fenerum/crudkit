@@ -7,6 +7,7 @@ cannot shadow it.
 """
 
 import json
+from importlib.metadata import version
 from pathlib import Path
 
 from django.contrib.auth import get_user_model
@@ -50,7 +51,7 @@ class CrudkitConfigContextProcessorTests(TestCase):
 
     def test_defaults_without_setting(self):
         context = crudkit_config(request=None)
-        self.assertEqual(context["crudkit_config_json"], json.dumps({"default_currency": DEFAULT_CURRENCY}))
+        self.assertEqual(context["crudkit_config_json"], json.dumps({"default_currency": DEFAULT_CURRENCY, "crudkit_version": version("crudkit")}))
         self.assertEqual(context["crudkit_app_name"], "CrudKit")
 
         response = self.client.get("/")

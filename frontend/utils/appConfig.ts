@@ -12,6 +12,7 @@ export interface AppConfig {
   storage_prefix: string;
   conversation_link_pattern: string;
   default_currency: string;
+  crudkit_version: string | null;
 }
 
 const defaults: AppConfig = {
@@ -23,6 +24,7 @@ const defaults: AppConfig = {
   conversation_link_pattern: 'deal|opportunity|case',
   // Matches the backend's CRUDKIT_DEFAULT_CURRENCY fallback.
   default_currency: 'EUR',
+  crudkit_version: null,
 };
 
 function load(): AppConfig {

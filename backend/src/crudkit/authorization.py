@@ -37,7 +37,10 @@ def get_authorized_instance(user, type_id: str, pk: int, action: str = "view"):
     model = get_model_types().get(type_id)
     if model is None:
         return None
-    return get_authorized_queryset(user, model.objects.all(), action).filter(pk=pk).first()
+    queryset = get_authorized_queryset(user, model.objects.all(), action)
+    if hasattr(model, "deleted"):
+        queryset = queryset.filter(deleted=False)
+    return queryset.filter(pk=pk).first()
 
 
 def has_object_permission(user, instance: Model, action: str = "view") -> bool:

@@ -6,7 +6,7 @@ from django.contrib.auth.models import Permission, User
 from django.test import TestCase, override_settings
 from django.utils import timezone, translation
 
-from crudkit.models import ChangeLog, FeedItem, parse_ck_id
+from crudkit.models import ChangeLog, FeedItem, View, parse_ck_id
 from crudkit_mcp.models import AccessToken, OAuthClient
 from crudkit_mcp.server import PROTOCOL_VERSION, MCPServer
 from crudkit_mcp.tools import Tool
@@ -200,6 +200,70 @@ class ReadToolsTest(MCPTestCase):
     @override_settings(CRUDKIT_MCP_EXTRA_TOOLS=["crudkit_mcp.tests.test_mcp.EXTRA_TOOL"])
     def test_extra_tools_override_generated(self):
         self.assertEqual(self.call("list_records"), "custom")
+
+
+class SavedViewTest(MCPTestCase):
+    def setUp(self):
+        super().setUp()
+        grant(self.user, View, "view")
+        self.other = User.objects.create_user("other")
+        Customer.objects.create(name="Beta", status="churned", created_by=self.user, updated_by=self.user)
+        Customer.objects.create(name="Cyan", status="churned", created_by=self.user, updated_by=self.user)
+        self.view = self.make_view("Churned", filters=[["status", "=", "churned"]], order_by="-name")
+
+    def make_view(self, name, created_by=None, **kwargs):
+        user = created_by or self.user
+        kwargs = {"model": "CUS", "fields": ["name", "status"], **kwargs}
+        return View.objects.create(name=name, created_by=user, updated_by=user, **kwargs)
+
+    def listed(self, **arguments):
+        return self.call("list_records", {"view": self.view.id, **arguments})
+
+    def test_view_applies_filters_ordering_and_columns(self):
+        data = self.listed()
+        self.assertEqual(data["total"], 2)
+        self.assertEqual([row["name"] for row in data["results"]], ["Cyan", "Beta"])
+        self.assertEqual(set(data["results"][0]), {"id", "label", "name", "status"})
+
+    def test_view_combines_with_arguments(self):
+        self.assertEqual(self.listed(query="beta")["total"], 1)
+        self.assertEqual(self.listed(filters={"name": "cyan"})["total"], 1)
+        self.assertEqual(self.listed(order_by="name")["results"][0]["name"], "Beta")
+        self.assertEqual(len(self.listed(limit=1)["results"]), 1)
+        self.assertEqual(self.listed(type="CUS")["total"], 2)
+        self.assertIn("not TOP", self.listed(type="TOP")["error"])
+
+    def test_view_resolves_user_variable(self):
+        self.customer.owner = self.user
+        self.customer.save()
+        self.view.filters = [["owner", "=", "${user}"]]
+        self.view.save()
+        self.assertEqual([row["id"] for row in self.listed()["results"]], [self.customer.id])
+
+    def test_view_access(self):
+        grant(self.other, Customer, "view")
+        private = self.make_view("Mine", public=False)
+        self.assertEqual(self.call("list_records", {"view": private.id})["total"], 3)
+        # No View permission, then a private view of another user.
+        self.assertIn("not found", self.call("list_records", {"view": private.id}, user=self.other)["error"])
+        grant(self.other, View, "view")
+        self.assertIn("not found", self.call("list_records", {"view": private.id}, user=self.other)["error"])
+        self.assertEqual(self.call("list_records", {"view": self.view.id}, user=self.other)["total"], 2)
+
+    def test_view_of_type_user_cannot_view(self):
+        grant(self.other, View, "view")
+        self.assertEqual(self.call("list_records", {"view": self.view.id}, user=self.other)["error"], "Permission denied")
+
+    def test_invalid_view_ids(self):
+        self.assertIn("Invalid view ID", self.call("list_records", {"view": self.customer.id})["error"])
+        self.assertIn("not found", self.call("list_records", {"view": self.missing_id(View)})["error"])
+        self.view.soft_delete()
+        self.assertIn("not found", self.listed()["error"])
+
+    def test_describe_type_lists_accessible_views(self):
+        self.make_view("Someone else's", created_by=self.other, public=False)
+        self.make_view("Topics", model="TOP", fields=["name"])
+        self.assertEqual(self.call("describe_types", {"type": "CUS"})["views"], {self.view.id: "Churned"})
 
 
 class WriteToolsTest(MCPTestCase):

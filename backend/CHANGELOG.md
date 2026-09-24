@@ -15,6 +15,8 @@
 - `crudkit`: `View.clean()` rejects unknown filter comparators and entries that aren't
   exactly `[field, comparator, value]`, so they fail on save (400) instead of when the view
   is applied (500).
+- `crudkit_frontend`: the sidebar shows the installed crudkit version (`crudkit vX.Y.Z`)
+  at the bottom; exposed to the SPA as `crudkit_version` in the frontend config.
 
 ## 0.4.0 (2026-09-24)
 

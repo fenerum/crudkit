@@ -1,6 +1,7 @@
 """Context processors for the SPA shell template."""
 
 import json
+from importlib.metadata import version
 
 from django.conf import settings
 from django.utils.safestring import mark_safe
@@ -9,7 +10,11 @@ from crudkit.fields import DEFAULT_CURRENCY
 
 
 def crudkit_config(request):
-    config = {"default_currency": DEFAULT_CURRENCY, **getattr(settings, "CRUDKIT_FRONTEND_CONFIG", {})}
+    config = {
+        "default_currency": DEFAULT_CURRENCY,
+        **getattr(settings, "CRUDKIT_FRONTEND_CONFIG", {}),
+        "crudkit_version": version("crudkit"),
+    }
     # Escape "<" so "</script>" in values cannot break out of the script tag.
     payload = json.dumps(config).replace("<", "\\u003c")
     # settings.STATIC_URL is already "/"-prefixed by Django on access.

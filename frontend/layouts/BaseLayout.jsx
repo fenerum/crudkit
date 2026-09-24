@@ -417,6 +417,11 @@ function BaseLayoutInner() {
             </Link>
             <ThemeToggle />
           </div>
+          {appConfig.crudkit_version && (
+            <div className="px-2 pt-1 text-2xs text-fg-3 font-mono opacity-60 select-all">
+              <a href="https://github.com/fenerum/crudkit" target="_blank" rel="noopener noreferrer" className="text-inherit">crudkit</a> v{appConfig.crudkit_version}
+            </div>
+          )}
         </nav>
 
         {/* Main content area — sidebar is `lg:fixed` so only reserve its

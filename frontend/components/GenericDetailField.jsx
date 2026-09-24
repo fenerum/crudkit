@@ -14,6 +14,7 @@ import EmailWYSIWYGEditorField from "./Fields/EmailWYSIWYGEditorField";
 import Checkbox from "./Fields/Checkbox";
 import JSONField from "./Fields/JSONField";
 import FieldsEditor from "./Fields/FieldsEditor";
+import FiltersEditor from "./Fields/FiltersEditor";
 import LayoutFieldsEditor from "./Fields/LayoutFieldsEditor";
 import InlinesEditor from "./Fields/InlinesEditor";
 import MoneyField from "./Fields/MoneyField";
@@ -55,6 +56,9 @@ export default function GenericDetailField({ fieldName, value, form, metadata, m
   }
   if (fieldName === "fields" && modelType === "VIW") {
     return <FieldsEditor {...fieldProps} />;
+  }
+  if (fieldName === "filters" && modelType === "VIW") {
+    return <FiltersEditor {...fieldProps} />;
   }
 
   // Smart editor for Layout's `inlines` — a list of (related model, fields)

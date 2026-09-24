@@ -501,6 +501,7 @@ div[dir="auto"] > * {
   .ck-input:hover { border-color: var(--border-2); }
   .ck-input:focus { border-color: var(--primary-400); box-shadow: var(--shadow-focus); }
   .ck-input:disabled { opacity: 0.5; cursor: not-allowed; }
+  .ck-input.is-error { border-color: var(--danger); }
 
   /* ---- Avatar wrapper ---- */
   .ck-avatar-wrap { position: relative; display: inline-flex; }

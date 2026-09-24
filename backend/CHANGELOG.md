@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `crudkit_mcp`: `list_records` takes a saved `view` (VIW CK-ID) and returns its rows with the
+  view's filters, ordering and columns applied; `describe_types` lists a type's views. Access
+  follows the REST API's `_view`: the view must be public or the user's own, and the user must
+  be able to view its type.
+- `crudkit_api`: saved-view ordering moved out of `BasicFilter` into `get_order_fields` and
+  `order_queryset` in `crudkit_api.filters`.
+
 ## 0.4.0 (2026-09-24)
 
 - `crudkit_mcp` (new app, `crudkit[mcp]`): remote MCP server + OAuth 2.1 provider, moved from

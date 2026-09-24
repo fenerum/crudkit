@@ -10,7 +10,9 @@ and, with the `write` scope and CRUDKIT_MCP_WRITE_ENABLED:
 
 `describe_types` is the schema tool: it reports each type's filters, writable
 fields and actions, which `list_records`/`create_record`/… then take as a
-`filters`/`fields` object. Every call is filtered through the token user's
+`filters`/`fields` object. `describe_types` also lists a type's saved views;
+`list_records` with a `view` returns that view's rows, filtered, ordered and
+trimmed to its columns as in the UI. Every call is filtered through the token user's
 model, row and action permissions.
 
 Projects add or override tools with CRUDKIT_MCP_EXTRA_TOOLS: dotted paths to
@@ -29,9 +31,10 @@ from django.utils import translation
 from django.utils.module_loading import import_string
 
 from crudkit.authorization import get_authorized_queryset, has_action_permission, has_model_permission
-from crudkit.models import ck_id_regex, parse_ck_id
+from crudkit.models import View, ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import services
+from crudkit_api.filters import get_order_fields, order_queryset
 from crudkit_api.serializers import get_serializer
 from crudkit_mcp.conf import write_enabled
 
@@ -72,7 +75,7 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
     tools = [
         Tool(
             "describe_types",
-            "List the record types, and for one type its filters, writable fields and actions. "
+            "List the record types, and for one type its filters, writable fields, actions and saved views. "
             "Call this before list_records or any write tool.",
             _describe_types,
             _schema({"type": types}),
@@ -85,12 +88,17 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
         ),
         Tool(
             "list_records",
-            "List records of one type. Returns {total, results}. `filters` keys come from "
-            "describe_types; unknown keys are rejected.",
+            "List records of one type, or of a saved view. Returns {total, results}. Give `type` "
+            "or `view`. `filters` keys come from describe_types; unknown keys are rejected.",
             _list_records,
             _schema(
                 {
                     "type": types,
+                    "view": {
+                        "type": "string",
+                        "description": "Saved view ID (e.g. VIW3), see describe_types. Applies the view's "
+                        "filters, ordering and columns",
+                    },
                     "filters": {"type": "object", "description": "Field filters, see describe_types"},
                     "query": {"type": "string", "description": "Free-text search over the type's search fields"},
                     "order_by": {"type": "string", "description": "Field to sort by; prefix with '-' for descending"},
@@ -100,7 +108,6 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
                     },
                     "offset": {"type": "integer", "description": "Number of results to skip"},
                 },
-                ["type"],
             ),
         ),
         Tool(
@@ -321,6 +328,7 @@ def _type_detail(user, model) -> dict:
         "actions": _action_names(model) if can_change else {},
         "can_create": has_model_permission(user, model, "add"),
         "can_update": can_change,
+        "views": {view.id: view.name for view in _views(user).filter(model=model.TYPE_ID)},
     }
 
 
@@ -332,7 +340,10 @@ def _search(user, arguments: dict):
 
 
 def _list_records(user, arguments: dict) -> dict:
-    model = _resolve_type(user, arguments.get("type"))
+    view = _get_view(user, arguments["view"]) if arguments.get("view") else None
+    model = _resolve_type(user, view.model if view else arguments.get("type"))
+    if view and arguments.get("type") not in (None, view.model):
+        raise ValueError(f"{view.id} is a view of {view.model}, not {arguments['type']}")
     _, lookups = _filters(model)
     filters = arguments.get("filters") or {}
     if not isinstance(filters, dict):
@@ -347,13 +358,16 @@ def _list_records(user, arguments: dict) -> dict:
             qs = qs.filter(**{lookups[name]: value})
     if query := arguments.get("query"):
         qs = qs.filter(services.search_filter(model, query))
-    if order_by := arguments.get("order_by"):
-        if order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields}:
-            raise ValueError(f"Cannot order by {order_by!r}")
-        qs = qs.order_by(order_by)
+    if view:
+        qs = view.filter(qs, request=services.RequestShim(user))
+    order_by = arguments.get("order_by")
+    if order_by and order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields}:
+        raise ValueError(f"Cannot order by {order_by!r}")
+    qs = order_queryset(qs, get_order_fields(view, order_by))
     limit = min(max(int(arguments.get("limit") or DEFAULT_LIMIT), 1), MAX_LIMIT)
     offset = max(int(arguments.get("offset") or 0), 0)
-    return {"total": qs.count(), "results": _serialize(model, qs[offset : offset + limit], depth=0)}
+    fields = ["id", "label", *view.fields] if view else "__all__"
+    return {"total": qs.count(), "results": _serialize(model, qs[offset : offset + limit], depth=0, fields=fields)}
 
 
 def _get_record(user, arguments: dict) -> dict:
@@ -412,6 +426,19 @@ def _visible(model, user, action: str):
     return qs
 
 
+def _views(user):
+    return get_authorized_queryset(user, View.objects.all(), "view").filter(deleted=False)
+
+
+def _get_view(user, view_id) -> View:
+    if not isinstance(view_id, str) or not ck_id_regex.fullmatch(view_id) or parse_ck_id(view_id)[0] != View.TYPE_ID:
+        raise ValueError(f"Invalid view ID {view_id!r}; expected e.g. VIW3")
+    view = _views(user).filter(pk=view_id).first()
+    if view is None:
+        raise ValueError(f"{view_id} not found")
+    return view
+
+
 def _get_instance(user, object_id, action: str):
     if not isinstance(object_id, str) or not ck_id_regex.fullmatch(object_id):
         raise ValueError(f"Invalid ID {object_id!r}; expected e.g. CUS123")
@@ -446,10 +473,10 @@ def _checked_fields(model, user, fields) -> dict:
     return fields
 
 
-def _serialize(model, rows, depth: int) -> list[dict]:
+def _serialize(model, rows, depth: int, fields="__all__") -> list[dict]:
     # One serializer for all rows, re-pointed per row: MoneyField reads the
     # currency from `parent.instance`.
-    serializer = get_serializer(model, depth=depth)()
+    serializer = get_serializer(model, depth=depth, fields=fields)()
     data = []
     for obj in rows:
         serializer.instance = obj

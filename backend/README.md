@@ -109,9 +109,9 @@ same tools serve any project:
 
 | Tool | |
 |---|---|
-| `describe_types` | the record types; for one `type`, its filters, writable fields, actions and permissions |
+| `describe_types` | the record types; for one `type`, its filters, writable fields, actions, permissions and saved views |
 | `search` | free-text search across types, returning `{id, label}` |
-| `list_records` | one `type`, a `filters` object (keys from `describe_types`), `query`, `order_by`, `limit`, `offset` |
+| `list_records` | one `type` or saved `view` (its filters, ordering and columns), a `filters` object (keys from `describe_types`), `query`, `order_by`, `limit`, `offset` |
 | `get_record` | one record by ID, with its feed, change log and available actions |
 
 With `CRUDKIT_MCP_WRITE_ENABLED` and a token granted the `write` scope, four

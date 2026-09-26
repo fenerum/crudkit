@@ -240,7 +240,8 @@ class SearchViewSet(viewsets.ViewSet):
                 if hasattr(mdl, "CrudKitSettings") and mdl.CrudKitSettings.search_fields
             ]
 
-        results = search_objects(request.user, query, possible_searches, 20 if len(possible_searches) == 1 else 5)
+        # One more than the palette shows per type, so it knows when to offer "Show all".
+        results = search_objects(request.user, query, possible_searches, 21 if len(possible_searches) == 1 else 6)
         return Response({"results": results})
 
 

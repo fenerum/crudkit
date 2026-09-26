@@ -17,6 +17,10 @@
   is applied (500).
 - `crudkit_frontend`: the sidebar shows the installed crudkit version (`crudkit vX.Y.Z`)
   at the bottom; exposed to the SPA as `crudkit_version` in the frontend config.
+- `crudkit_frontend`: the command palette labels result groups with the type's name
+  (`Companies (CMP)`) and adds a "Show all <type>" row when a type has more matches than
+  shown, linking to its list filtered by the query. The search endpoint now returns one extra
+  row per type (6, or 21 for a `CMP:` scoped search) so the palette can tell.
 
 ## 0.4.0 (2026-09-24)
 

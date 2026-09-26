@@ -10,6 +10,8 @@ DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
+    # First, so `runserver` serves ASGI (HTTP + the ws/changes/ socket).
+    "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -32,6 +34,9 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "demo.urls"
+ASGI_APPLICATION = "demo.asgi.application"
+# Single process, so in-memory is enough; multi-process deployments need Redis.
+CHANNEL_LAYERS = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}
 
 TEMPLATES = [
     {
@@ -54,6 +59,9 @@ DATABASES = {
         "ENGINE": "django.db.backends.sqlite3",
         # Overridable so the Playwright suite runs against a throwaway DB.
         "NAME": os.environ.get("DEMO_DB_PATH", BASE_DIR / "db.sqlite3"),
+        # Parallel e2e writers otherwise hit "database is locked" when a read
+        # transaction tries to upgrade to a write.
+        "OPTIONS": {"transaction_mode": "IMMEDIATE"},
     }
 }
 

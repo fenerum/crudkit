@@ -15,6 +15,7 @@ import { url } from '../../utils/urls';
 import { getStoredPageSize, storePageSize } from '../../utils/pageSize';
 import { isVisibleToUser } from '../../hooks/useMenuViews';
 import { useAuth } from '../../context/AuthContext';
+import { useRealtimeConnected } from '../../data/realtime';
 
 export default function List() {
   const { segment: type, view: viewId } = useParams() as { segment: string; view?: string };
@@ -22,6 +23,7 @@ export default function List() {
   const navigate = useNavigate();
   const client = useMemo(() => new CrudKitAPIClient(), []);
   const { user } = useAuth();
+  const realtimeConnected = useRealtimeConnected();
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pageParam = searchParams.get('page');
@@ -120,7 +122,7 @@ export default function List() {
     },
     enabled: !isViewLoading,
     ...((currentView?.layout === 'conversation' || currentView?.layout === 'kanban') && {
-      refetchInterval: 60_000,
+      refetchInterval: realtimeConnected ? false : 60_000,
       refetchIntervalInBackground: false,
     }),
   });

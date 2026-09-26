@@ -31,9 +31,12 @@ api = [
     "djangorestframework-simplejwt>=5.4",
     "drf-extra-fields>=3.7",
 ]
-assistant = [
+realtime = [
     "crudkit[api]",
     "channels>=4.1",
+]
+assistant = [
+    "crudkit[realtime]",
 ]
 mcp = [
     "crudkit[api]",
@@ -57,6 +60,7 @@ artifacts = ["src/crudkit_frontend/static", "src/crudkit_frontend/templates"]
 
 [dependency-groups]
 dev = [
+    "daphne>=4.1",
     "psycopg2-binary>=2.9",
     "ruff>=0.7.0",
 ]

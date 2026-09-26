@@ -5,6 +5,7 @@ from django.db import transaction
 from django.db.models.signals import post_delete, post_save
 
 from crudkit.models import BaseCrudKitModel
+from crudkit.realtime import broadcast_change
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +57,17 @@ def _dispatch_ai_processing(model_cls, pk):
     transaction.on_commit(_dispatch)
 
 
+def _broadcast_on_commit(sender, instance, action):
+    type_id = getattr(sender, "TYPE_ID", None)
+    if not type_id:
+        return
+    pk = instance.pk
+    by = getattr(instance, "updated_by_id", None)
+    transaction.on_commit(lambda: broadcast_change(type_id, pk, action, by))
+
+
 def _handle_post_save(sender, instance, update_fields=None, **kwargs):
+    _broadcast_on_commit(sender, instance, "saved")
     if not issubclass(sender, BaseCrudKitModel):
         return
 
@@ -70,6 +81,7 @@ def _handle_post_save(sender, instance, update_fields=None, **kwargs):
 
 
 def _handle_post_delete(sender, instance, **kwargs):
+    _broadcast_on_commit(sender, instance, "deleted")
     if not issubclass(sender, BaseCrudKitModel):
         return
 

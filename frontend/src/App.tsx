@@ -10,6 +10,7 @@ import {
 import { ToastContainer } from 'react-toastify';
 
 import { AuthProvider, useAuth } from '../context/AuthContext';
+import { isRealtimeConnected } from '../data/realtime';
 import BaseLayout from '../layouts/BaseLayout';
 import ErrorBoundary from './ErrorBoundary';
 
@@ -27,7 +28,10 @@ import DeleteRoute from './routes/delete';
 import Merge from './routes/merge';
 import NotFound from './routes/not-found';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  // Pushed change hints keep data fresh while the socket is up.
+  defaultOptions: { queries: { refetchOnWindowFocus: () => !isRealtimeConnected() } },
+});
 
 // auth_mode "saml" bounces unauthenticated users into Django's SAML flow
 // (mirrors `LOGIN_URL = "/saml2/login/"` from settings.py); "password" uses

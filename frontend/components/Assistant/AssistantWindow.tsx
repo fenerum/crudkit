@@ -1,12 +1,11 @@
-import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import SafeMarkdown from '../../shared/SafeMarkdown';
 import { Icon } from '../ui';
 import { useAuth } from '../../context/AuthContext';
-import { getAccessToken } from '../../data/api';
 import { invalidateModel } from '../../data/invalidate';
 import ConfirmCard from './ConfirmCard';
-import { useAssistantSocket } from './useAssistantSocket';
+import { useReconnectingSocket, wsUrl } from '../../hooks/useReconnectingSocket';
 import type { ChatItem, IncomingEvent, OutgoingEvent } from './types';
 
 type Props = {
@@ -16,9 +15,8 @@ type Props = {
 };
 
 function buildWsUrl(objectType: string, objectId: string): string {
-  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const numericId = objectId.replace(/^[A-Z]{3}/, '');
-  return `${proto}//${window.location.host}/ws/assistant/${objectType}/${numericId}/`;
+  return wsUrl(`/ws/assistant/${objectType}/${numericId}/`);
 }
 
 let _itemSeq = 0;
@@ -80,15 +78,9 @@ export default function AssistantWindow({ objectType, objectId, onClose }: Props
     }
   }, [queryClient, objectType]);
 
-  const authFrame = useMemo<OutgoingEvent | null>(() => {
-    const token = getAccessToken();
-    return token ? { type: 'auth', token } : null;
-  }, []);
-
-  const { state, send } = useAssistantSocket({
+  const { state, send } = useReconnectingSocket<IncomingEvent, OutgoingEvent>({
     url: buildWsUrl(objectType, objectId),
     onMessage: handleIncoming,
-    authFrame,
   });
 
   useEffect(() => {

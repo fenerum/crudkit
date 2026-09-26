@@ -1,6 +1,8 @@
 import * as React from "react";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
+import {useQueries} from "@tanstack/react-query";
 import {fetchObjects} from "@/data/api";
+import {RealtimeProvider, useRealtimeConnected} from "@/data/realtime";
 import {Link, Outlet, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
@@ -125,7 +127,9 @@ function Topbar({ menuActive, setMenuActive, handleNavClick }) {
 export default function BaseLayout() {
   return (
     <WorkspaceProvider>
-      <BaseLayoutInner />
+      <RealtimeProvider>
+        <BaseLayoutInner />
+      </RealtimeProvider>
     </WorkspaceProvider>
   );
 }
@@ -215,9 +219,7 @@ function BaseLayoutInner() {
     }
   }, [activeWorkspaceId, workspacesPending, activeWorkspace, setActiveWorkspaceId]);
 
-  const [badgeCounts, setBadgeCounts] = useState({});
-
-  // Only poll counts for views currently displayed in the sidebar.
+  // Only count views currently displayed in the sidebar.
   const viewsWithBadges = useMemo(() => {
     const displayed = activeWorkspace ? [...workspaceTabs, ...myViews] : [...workspaceViews, ...myViews];
     const badged = new Map();
@@ -227,31 +229,15 @@ function BaseLayoutInner() {
     return [...badged.values()];
   }, [activeWorkspace, workspaceTabs, myViews, workspaceViews]);
 
-  useEffect(() => {
-    const fetchBadgeCounts = async () => {
-      if (!viewsWithBadges.length) return;
-      const counts = {};
-      await Promise.all(viewsWithBadges.map(async (view) => {
-        try {
-          const response = await fetchObjects(view.model, {
-            page_size: 1,
-            _fields: 'id',
-            _view: view.id,
-            ...view.filters
-          });
-          if (response && response.count !== undefined) {
-            counts[view.id] = response.count;
-          }
-        } catch (err) {
-          console.error(`Error fetching count for view ${view.id}:`, err);
-        }
-      }));
-      setBadgeCounts(counts);
-    };
-    fetchBadgeCounts();
-    const id = setInterval(fetchBadgeCounts, 60000);
-    return () => clearInterval(id);
-  }, [viewsWithBadges]);
+  const realtimeConnected = useRealtimeConnected();
+  const badgeQueries = useQueries({
+    queries: viewsWithBadges.map((view) => ({
+      queryKey: ['list', view.model, 'badge', view.id, view.filters],
+      queryFn: () => fetchObjects(view.model, {page_size: 1, _fields: 'id', _view: view.id, ...view.filters}),
+      refetchInterval: realtimeConnected ? false : 60_000,
+    })),
+  });
+  const badgeCounts = Object.fromEntries(viewsWithBadges.map((view, i) => [view.id, badgeQueries[i]?.data?.count]));
 
   const handleNavClick = useCallback(() => {
     if (window.innerWidth < 1024) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FormProvider, useForm } from 'react-hook-form';
@@ -202,18 +202,31 @@ export function useEditForm({ type, id }) {
     queryFn: () => client.retrieve(type, id),
   });
 
-  useEffect(() => {
-    if (!objectQuery.data || !formUtils.metadataQuery.data) return;
+  // The object the form was last seeded from. Refetches (pushed changes,
+  // focus) must not overwrite what the user is typing, so a newer server
+  // version only raises `remoteChanged` until they choose to reload.
+  const [seededObject, setSeededObject] = useState(null);
+  const metadata = formUtils.metadataQuery.data;
+  const seed = useCallback((object) => {
     // Only seed values for keys the model actually exposes as fields. The
     // detail endpoint returns server-side extras (`label`, `object_images`, …)
     // that aren't editable and would otherwise get echoed back in the
     // submission payload, tripping cleanObject's "Key not found in metadata".
-    const fields = formUtils.metadataQuery.data.fields || {};
-    for (const [key, value] of Object.entries(objectQuery.data)) {
+    const fields = metadata.fields || {};
+    for (const [key, value] of Object.entries(object)) {
       if (!fields[key]) continue;
       formMethods.setValue(key, value, { shouldValidate: true });
     }
-  }, [objectQuery.data, formUtils.metadataQuery.data, formMethods]);
+    setSeededObject(object);
+  }, [metadata, formMethods]);
+
+  const latest = objectQuery.data;
+  useEffect(() => {
+    if (latest && metadata && seededObject?.id !== latest.id) seed(latest);
+  }, [latest, metadata, seededObject, seed]);
+
+  const remoteChanged = !!latest && seededObject?.id === latest.id && seededObject.updated_at !== latest.updated_at;
+  const reloadRemote = useCallback(() => seed(latest), [seed, latest]);
 
   const updateMutation = useMutation({
     mutationFn: (data) => {
@@ -242,6 +255,9 @@ export function useEditForm({ type, id }) {
   return {
     ...formUtils,
     objectQuery,
+    seededObject,
+    remoteChanged,
+    reloadRemote,
     updateMutation,
     handleSubmit,
     FormProvider,

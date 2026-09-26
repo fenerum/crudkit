@@ -1,3 +1,4 @@
+import { createObject, unique } from './helpers';
 import { expect, test } from '@playwright/test';
 
 const palette = (page) => page.getByRole('textbox', { name: 'Search objects, navigate, or run actions…' });
@@ -13,6 +14,25 @@ test('finds objects across models and opens the chosen one', async ({ page }) =>
 
   await expect(page).toHaveURL(/\/RDG\d+$/);
   await expect(page.getByRole('banner').getByText('Book club: Kindred')).toBeVisible();
+});
+
+test('offers "Show all" when a type has more results than shown', async ({ page, request }) => {
+  const tag = unique('Overflow');
+  for (let i = 0; i < 6; i++) {
+    await createObject(request, 'RDG', { name: `${tag} ${i}` });
+  }
+
+  await page.goto('/');
+  await page.getByRole('button', { name: /^Search/ }).click();
+  await palette(page).fill(tag);
+
+  const results = page.locator('.ck-cmd-item');
+  await expect(page.locator('.ck-cmd .eyebrow', { hasText: 'readings (RDG)' })).toBeVisible();
+  await expect(results.filter({ hasText: tag })).toHaveCount(5);
+  await results.filter({ hasText: 'Show all readings' }).click();
+
+  await expect(page).toHaveURL(`/RDG?q=${encodeURIComponent(tag)}`);
+  await expect(page.getByText(`${tag} 5`)).toBeVisible();
 });
 
 test('opens with the keyboard shortcut and closes with Escape', async ({ page }) => {

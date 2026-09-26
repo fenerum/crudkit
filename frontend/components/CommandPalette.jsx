@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueries } from "@tanstack/react-query";
 import CrudKitAPIClient from "../data/api";
 import { isVisibleToUser, useMenuViews } from "../hooks/useMenuViews";
 import { useAuth } from "../context/AuthContext";
@@ -8,6 +9,11 @@ import { getIdPrefix, isObjectTypeCode } from "../utils/crudkit";
 import { detail as detailRegex } from "../utils/urls";
 
 const SEARCH_DEBOUNCE_MS = 220;
+// The search endpoint returns one more row per type than we show, so a type
+// with more rows than this gets a "Show all" link to its filtered list.
+const RESULTS_PER_TYPE = 5;
+const RESULTS_PER_TYPE_SCOPED = 20;
+const TYPE_SCOPED_QUERY = /^[A-Z]{3}:/;
 
 export default function CommandPalette({ open, onClose }) {
   const navigate = useNavigate();
@@ -109,6 +115,29 @@ export default function CommandPalette({ open, onClose }) {
     return () => { cancelled = true; };
   }, [open, query, client]);
 
+  const resultGroups = useMemo(() => {
+    const groups = new Map();
+    searchResults.forEach((obj) => {
+      const prefix = getIdPrefix(obj.id) || "Results";
+      if (!groups.has(prefix)) groups.set(prefix, []);
+      groups.get(prefix).push(obj);
+    });
+    return groups;
+  }, [searchResults]);
+
+  const perType = TYPE_SCOPED_QUERY.test(query) ? RESULTS_PER_TYPE_SCOPED : RESULTS_PER_TYPE;
+  const resultTypes = useMemo(() => [...resultGroups.keys()].filter(isObjectTypeCode), [resultGroups]);
+  // Same cache key as the list/detail routes, so type names are usually already loaded.
+  const typeNames = useQueries({
+    queries: resultTypes.map((type) => ({
+      queryKey: ["metadata", type],
+      queryFn: () => client.metadata(type),
+      staleTime: 60_000,
+    })),
+    combine: (results) =>
+      Object.fromEntries(resultTypes.map((type, i) => [type, results[i]?.data?.verbose_name_plural])),
+  });
+
   const navItems = useMemo(() => {
     return rootViews.map((view) => ({
       kind: "nav",
@@ -169,26 +198,28 @@ export default function CommandPalette({ open, onClose }) {
       });
     }
 
-    if (searchResults.length > 0) {
-      const groups = new Map();
-      searchResults.forEach((obj) => {
-        const prefix = getIdPrefix(obj.id) || "Results";
-        if (!groups.has(prefix)) groups.set(prefix, []);
-        groups.get(prefix).push(obj);
-      });
-      groups.forEach((rows, prefix) => {
-        out.push({ kind: "group", label: prefix });
-        rows.forEach((obj) => {
-          out.push({
-            kind: "result",
-            id: obj.id,
-            label: obj.label || obj.object_repr || obj.id,
-            sub: obj.id,
-            href: `/${obj.id}`,
-          });
+    resultGroups.forEach((rows, prefix) => {
+      const name = typeNames[prefix];
+      out.push({ kind: "group", label: name ? `${name} (${prefix})` : prefix });
+      rows.slice(0, perType).forEach((obj) => {
+        out.push({
+          kind: "result",
+          id: obj.id,
+          label: obj.label || obj.object_repr || obj.id,
+          sub: obj.id,
+          href: `/${obj.id}`,
         });
       });
-    }
+      if (rows.length > perType) {
+        out.push({
+          kind: "nav",
+          icon: "list",
+          label: name ? `Show all ${name}` : "Show all",
+          sub: prefix,
+          href: `/${prefix}?q=${encodeURIComponent(query.replace(TYPE_SCOPED_QUERY, ""))}`,
+        });
+      }
+    });
 
     const navMatching = navItems.filter((it) =>
       !ql || it.label.toLowerCase().includes(ql)
@@ -206,7 +237,7 @@ export default function CommandPalette({ open, onClose }) {
       actionMatching.forEach((it) => out.push(it));
     }
     return out;
-  }, [searchResults, query, navItems, actionItems, directMatch, typeMatch]);
+  }, [resultGroups, perType, typeNames, query, navItems, actionItems, directMatch, typeMatch]);
 
   const selectableIndexes = useMemo(
     () => items.map((it, i) => (it.kind === "group" ? -1 : i)).filter((i) => i >= 0),

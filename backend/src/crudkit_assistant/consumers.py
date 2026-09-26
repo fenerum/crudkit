@@ -15,30 +15,21 @@ Outbound message types:
 """
 
 import asyncio
-import json
 import logging
 from typing import Optional
 from uuid import uuid4
 
 from asgiref.sync import sync_to_async
 from channels.db import database_sync_to_async
-from channels.generic.websocket import AsyncWebsocketConsumer
 from django.contrib.auth import get_user_model
-from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.settings import api_settings
-from rest_framework_simplejwt.tokens import AccessToken
 
 from crudkit.authorization import get_authorized_instance, has_object_permission
+from crudkit_api.ws_auth import AuthenticatedConsumer
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
 from crudkit_assistant.runner import run_turn
 
 logger = logging.getLogger(__name__)
-
-# Browsers can't attach Authorization headers to a WebSocket upgrade, so JWT
-# clients send `{"type":"auth","token":...}` as the first frame. Sockets that
-# don't authenticate within this many seconds get closed.
-AUTH_TIMEOUT_SECONDS = 5
 
 # Synthetic first-turn prompt. The assistant treats this as the user's
 # opening request and produces a proactive briefing/proposal — but the prompt
@@ -51,7 +42,7 @@ INITIAL_BRIEFING_PROMPT = (
 )
 
 
-class AssistantConsumer(AsyncWebsocketConsumer):
+class AssistantConsumer(AuthenticatedConsumer):
     """Per-detail-page assistant socket. One instance per browser tab."""
 
     async def connect(self):
@@ -59,109 +50,36 @@ class AssistantConsumer(AsyncWebsocketConsumer):
         self.object_pk: int = int(self.scope["url_route"]["kwargs"]["pk"])
         self.session_key: str = uuid4().hex
         self.message_history: list = []
-        self.user_id: Optional[int] = None
-        self._auth_timeout_task: Optional[asyncio.Task] = None
         self._briefing_task: Optional[asyncio.Task] = None
-
-        user = self.scope.get("user")
-        if user and getattr(user, "is_authenticated", False):
-            # Session-based auth (e.g. SAML) — already done by AuthMiddlewareStack.
-            await self.accept()
-            await self._finish_auth(user.pk)
-            return
-
-        # No session auth. Accept and wait for an auth frame containing a JWT.
-        await self.accept()
-        self._auth_timeout_task = asyncio.create_task(self._auth_timeout())
+        await super().connect()
 
     async def disconnect(self, close_code):
-        if self._auth_timeout_task is not None:
-            self._auth_timeout_task.cancel()
-            self._auth_timeout_task = None
+        await super().disconnect(close_code)
         if self._briefing_task is not None:
             self._briefing_task.cancel()
             self._briefing_task = None
 
-    async def _auth_timeout(self):
-        try:
-            await asyncio.sleep(AUTH_TIMEOUT_SECONDS)
-        except asyncio.CancelledError:
-            return
-        if self.user_id is None:
-            await self._send_json({"type": "error", "message": "Auth timeout."})
-            await self.close(code=4001)
-
-    async def _finish_auth(self, user_id: int):
-        user = await self._get_user_by_id(user_id)
-        if user is None or not user.is_active:
-            await self.close(code=4001)
-            return
+    async def on_authenticated(self, user) -> bool:
         instance = await sync_to_async(get_authorized_instance)(user, self.type_id, self.object_pk)
         if instance is None:
             await self.close(code=4403)
-            return
-        self.user_id = user_id
-        if self._auth_timeout_task is not None:
-            self._auth_timeout_task.cancel()
-            self._auth_timeout_task = None
-        await self._send_json({"type": "ready", "session": self.session_key})
+            return False
+        await self.send_json({"type": "ready", "session": self.session_key})
         # Kick off a proactive first turn so the user sees an observation /
         # recommended action instead of a static greeting. Detached so we
         # don't block the receive loop, but tracked so disconnect can cancel
         # it (e.g. user closes the window before the LLM responds).
         self._briefing_task = asyncio.create_task(self._handle_user_message(INITIAL_BRIEFING_PROMPT, is_briefing=True))
+        return True
 
-    async def receive(self, text_data: Optional[str] = None, bytes_data=None):
-        if not text_data:
-            return
-        try:
-            data = json.loads(text_data)
-        except json.JSONDecodeError:
-            await self._send_json({"type": "error", "message": "Invalid JSON"})
-            return
-
+    async def on_message(self, data: dict):
         msg_type = data.get("type")
-
-        if self.user_id is None:
-            if msg_type != "auth":
-                await self._send_json({"type": "error", "message": "Auth required."})
-                await self.close(code=4001)
-                return
-            await self._handle_auth(data.get("token"))
-            return
-
         if msg_type == "user_message":
             await self._handle_user_message(data.get("text", ""))
         elif msg_type == "confirm":
             await self._handle_confirm(data.get("id"), bool(data.get("ok")))
         else:
-            await self._send_json({"type": "error", "message": f"Unknown message type {msg_type!r}"})
-
-    async def _handle_auth(self, token):
-        if not token or not isinstance(token, str):
-            await self._send_json({"type": "error", "message": "Missing token."})
-            await self.close(code=4001)
-            return
-        try:
-            access = AccessToken(token)
-            user_id = access[api_settings.USER_ID_CLAIM]
-        except (TokenError, KeyError):
-            await self._send_json({"type": "error", "message": "Invalid token."})
-            await self.close(code=4001)
-            return
-        user = await self._get_user_by_id(user_id)
-        if user is None or not user.is_active:
-            await self._send_json({"type": "error", "message": "Invalid token."})
-            await self.close(code=4001)
-            return
-        await self._finish_auth(user.pk)
-
-    @database_sync_to_async
-    def _get_user_by_id(self, user_id):
-        try:
-            return get_user_model().objects.get(pk=user_id)
-        except get_user_model().DoesNotExist:
-            return None
+            await self.send_json({"type": "error", "message": f"Unknown message type {msg_type!r}"})
 
     async def _handle_user_message(self, text: str, is_briefing: bool = False):
         text = (text or "").strip()
@@ -180,7 +98,7 @@ class AssistantConsumer(AsyncWebsocketConsumer):
             if is_briefing:
                 # The proactive first turn is best-effort. Don't surface a
                 # scary error to the user — invite them to drive instead.
-                await self._send_json(
+                await self.send_json(
                     {
                         "type": "assistant_message",
                         "text": (
@@ -190,23 +108,23 @@ class AssistantConsumer(AsyncWebsocketConsumer):
                     }
                 )
             else:
-                await self._send_json({"type": "error", "message": "The assistant ran into an error."})
+                await self.send_json({"type": "error", "message": "The assistant ran into an error."})
             return
 
         self.message_history = (self.message_history or []) + (result.new_messages or [])
 
         for envelope in result.pending_events:
-            await self._send_json(envelope)
+            await self.send_json(envelope)
         if result.output_text:
-            await self._send_json({"type": "assistant_message", "text": result.output_text})
+            await self.send_json({"type": "assistant_message", "text": result.output_text})
 
     async def _handle_confirm(self, proposal_id, ok: bool):
         proposal = await self._load_proposal(proposal_id)
         if proposal is None:
-            await self._send_json({"type": "error", "message": "Proposal not found."})
+            await self.send_json({"type": "error", "message": "Proposal not found."})
             return
         if proposal.status != AssistantProposal.Status.PENDING:
-            await self._send_json(
+            await self.send_json(
                 {
                     "type": "tool_outcome",
                     "id": proposal.id,
@@ -219,12 +137,12 @@ class AssistantConsumer(AsyncWebsocketConsumer):
 
         user = await self._get_user()
         if not await self._can_change_proposal_target(proposal, user):
-            await self._send_json({"type": "error", "message": "Proposal not found."})
+            await self.send_json({"type": "error", "message": "Proposal not found."})
             return
         if ok:
             outcome = await sync_to_async(proposal.apply)(user)
             applied = proposal.status == AssistantProposal.Status.CONFIRMED
-            await self._send_json(
+            await self.send_json(
                 {
                     "type": "tool_outcome",
                     "id": proposal.id,
@@ -241,7 +159,7 @@ class AssistantConsumer(AsyncWebsocketConsumer):
             )
         else:
             await sync_to_async(proposal.skip)(user)
-            await self._send_json(
+            await self.send_json(
                 {
                     "type": "tool_outcome",
                     "id": proposal.id,
@@ -272,9 +190,6 @@ class AssistantConsumer(AsyncWebsocketConsumer):
     def _can_change_proposal_target(self, proposal, user):
         target = proposal.target
         return target is not None and has_object_permission(user, target, "change")
-
-    async def _send_json(self, payload: dict):
-        await self.send(text_data=json.dumps(payload, default=str))
 
 
 def _summarize_outcome(outcome: Optional[dict], proposal: AssistantProposal) -> str:

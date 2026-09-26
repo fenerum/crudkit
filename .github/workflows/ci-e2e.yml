@@ -39,7 +39,7 @@ jobs:
       - name: Install the wheel into a fresh venv
         run: |
           uv venv /tmp/e2e
-          uv pip install --python /tmp/e2e "crudkit[api] @ file://$PWD/$(ls backend/dist/*.whl)"
+          uv pip install --python /tmp/e2e "crudkit[realtime] @ file://$PWD/$(ls backend/dist/*.whl)" daphne
       - name: Migrate, create a user and seed
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput

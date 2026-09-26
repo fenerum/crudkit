@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { IncomingEvent, OutgoingEvent } from './types';
+import { getAccessToken } from '../data/api';
 
 export type ConnectionState = 'connecting' | 'authenticating' | 'open' | 'closed';
 
@@ -7,27 +7,55 @@ const MIN_BACKOFF = 1000;
 const MAX_BACKOFF = 15000;
 // Close codes the server uses for terminal failures — reconnecting just hides
 // the underlying problem (bad token, missing object).
-const TERMINAL_CLOSE_CODES = new Set([4001, 4404]);
+const DEFAULT_TERMINAL_CLOSE_CODES: ReadonlySet<number> = new Set([4001, 4404]);
 
-type Options = {
+export function wsUrl(path: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${proto}//${window.location.host}${path}`;
+}
+
+// Browsers can't send an Authorization header on the upgrade, so JWT users
+// authenticate with a first frame. Read on every (re)connect so a reconnect
+// picks up a refreshed token. Session/SAML users have no token and the server
+// sends `ready` straight away.
+function authFrame() {
+  const token = getAccessToken();
+  return token ? { type: 'auth', token } : null;
+}
+
+type Options<In> = {
   url: string | null;
-  onMessage: (msg: IncomingEvent) => void;
-  authFrame?: OutgoingEvent | null;
+  onMessage: (msg: In) => void;
+  terminalCloseCodes?: ReadonlySet<number>;
+  // Stop after this many failed attempts if the server has never sent `ready`
+  // (e.g. the route isn't deployed). Once connected, always reconnect.
+  maxAttemptsBeforeReady?: number;
 };
 
-export function useAssistantSocket({ url, onMessage, authFrame }: Options) {
+// A CrudKit socket (see crudkit_api.ws_auth): authenticates, becomes `open` on
+// the server's `ready` frame, and reconnects with backoff.
+export function useReconnectingSocket<In extends { type: string }, Out = unknown>({
+  url,
+  onMessage,
+  terminalCloseCodes = DEFAULT_TERMINAL_CLOSE_CODES,
+  maxAttemptsBeforeReady = Infinity,
+}: Options<In>) {
   const [state, setState] = useState<ConnectionState>('connecting');
   const wsRef = useRef<WebSocket | null>(null);
   const backoffRef = useRef(MIN_BACKOFF);
   const reconnectTimerRef = useRef<number | null>(null);
   const onMessageRef = useRef(onMessage);
   onMessageRef.current = onMessage;
-  const authFrameRef = useRef(authFrame);
-  authFrameRef.current = authFrame;
+  const terminalCloseCodesRef = useRef(terminalCloseCodes);
+  terminalCloseCodesRef.current = terminalCloseCodes;
+  const maxAttemptsBeforeReadyRef = useRef(maxAttemptsBeforeReady);
+  maxAttemptsBeforeReadyRef.current = maxAttemptsBeforeReady;
 
   useEffect(() => {
     if (!url) return;
     let cancelled = false;
+    let everReady = false;
+    let failedAttempts = 0;
 
     const connect = () => {
       if (cancelled) return;
@@ -36,19 +64,15 @@ export function useAssistantSocket({ url, onMessage, authFrame }: Options) {
       wsRef.current = ws;
       ws.addEventListener('open', () => {
         backoffRef.current = MIN_BACKOFF;
-        const frame = authFrameRef.current;
-        if (frame) {
-          ws.send(JSON.stringify(frame));
-          setState('authenticating');
-        } else {
-          // SAML/session users: server sends `ready` immediately.
-          setState('authenticating');
-        }
+        const frame = authFrame();
+        if (frame) ws.send(JSON.stringify(frame));
+        setState('authenticating');
       });
       ws.addEventListener('message', (event) => {
         try {
-          const data = JSON.parse(event.data) as IncomingEvent;
+          const data = JSON.parse(event.data) as In;
           if (data.type === 'ready') {
+            everReady = true;
             setState('open');
             return;
           }
@@ -60,7 +84,8 @@ export function useAssistantSocket({ url, onMessage, authFrame }: Options) {
       ws.addEventListener('close', (event) => {
         setState('closed');
         if (cancelled) return;
-        if (TERMINAL_CLOSE_CODES.has(event.code)) return;
+        if (terminalCloseCodesRef.current.has(event.code)) return;
+        if (!everReady && ++failedAttempts >= maxAttemptsBeforeReadyRef.current) return;
         const delay = backoffRef.current;
         backoffRef.current = Math.min(MAX_BACKOFF, delay * 2);
         reconnectTimerRef.current = window.setTimeout(connect, delay);
@@ -82,7 +107,7 @@ export function useAssistantSocket({ url, onMessage, authFrame }: Options) {
     };
   }, [url]);
 
-  const send = useCallback((payload: OutgoingEvent) => {
+  const send = useCallback((payload: Out) => {
     const ws = wsRef.current;
     if (!ws || ws.readyState !== WebSocket.OPEN) return false;
     ws.send(JSON.stringify(payload));

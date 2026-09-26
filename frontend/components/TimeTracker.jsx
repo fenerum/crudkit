@@ -4,6 +4,7 @@ import { toast } from "react-toastify";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import CrudKitAPIClient from "@/data/api";
+import { useRealtimeConnected } from "@/data/realtime";
 import { formatDuration } from "../utils/time";
 import Modal from "./Modal";
 
@@ -12,6 +13,7 @@ const TimeTracker = () => {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { pathname } = useLocation();
+  const realtimeConnected = useRealtimeConnected();
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
   const [notes, setNotes] = useState("");
   const [isDetailPage, setIsDetailPage] = useState(false);
@@ -64,7 +66,7 @@ const TimeTracker = () => {
       }
     },
     enabled: !!user?.id,
-    refetchInterval: 30000,
+    refetchInterval: realtimeConnected ? false : 30000,
   });
 
   useEffect(() => {

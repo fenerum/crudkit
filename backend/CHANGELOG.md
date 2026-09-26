@@ -21,6 +21,19 @@
   (`Companies (CMP)`) and adds a "Show all <type>" row when a type has more matches than
   shown, linking to its list filtered by the query. The search endpoint now returns one extra
   row per type (6, or 21 for a `CMP:` scoped search) so the palette can tell.
+- Realtime change hints (new extra `crudkit[realtime]`; `crudkit[assistant]` now includes
+  it): every save/delete of a TYPE_ID model sends `{model, id, action, by}` after commit to
+  a new `ws/changes/` socket (saves only to users who may view that row; deletes without
+  `id`/`by`), and the SPA invalidates the affected lists, details, menu,
+  badges and worklog instead of polling. Polling and focus refetches only run while the
+  socket is down. **Upgrade:** add `crudkit_api.routing.websocket_urlpatterns` to the
+  project's ASGI `URLRouter`; it needs a shared `CHANNEL_LAYERS` (e.g. Redis) when running
+  more than one process. Without a channel layer the socket closes (4503), and without the
+  route the SPA gives up after three attempts; either way it keeps polling as before.
+- `crudkit_api`: `crudkit_api.ws_auth.AuthenticatedConsumer` — the session-or-JWT-first-frame
+  WebSocket auth, extracted from the assistant consumer.
+- `crudkit_frontend`: the edit form no longer overwrites typed values when the record is
+  refetched; it shows a "changed elsewhere — Reload" banner instead.
 
 ## 0.4.0 (2026-09-24)
 

@@ -3,10 +3,10 @@ import Icon from './Icon';
 export default function Button({
   variant = 'secondary',
   size = 'md',
-  icon,
-  iconRight,
-  shortcut,
-  children,
+  icon = null,
+  iconRight = null,
+  shortcut = null,
+  children = null,
   className = '',
   type = 'button',
   ...rest

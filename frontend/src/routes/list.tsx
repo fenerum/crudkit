@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
+import { Icon, OverflowMenu, useScreenContext, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -125,6 +125,12 @@ export default function List() {
       refetchInterval: realtimeConnected ? false : 60_000,
       refetchIntervalInBackground: false,
     }),
+  });
+
+  const rows = objectList?.isPaginated ? objectList.results : objectList;
+  useScreenContext({
+    view_id: currentView?.id,
+    visible_ids: Array.isArray(rows) ? rows.map((row: any) => row.id) : [],
   });
 
   useHotkeys('r', () => {

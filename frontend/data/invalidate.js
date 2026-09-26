@@ -25,3 +25,12 @@ export function invalidateModel(qc, model, options = {}) {
     qc.invalidateQueries({ queryKey: ['views', m] });
   });
 }
+
+// After a change made outside the page's own forms (e.g. a confirmed assistant
+// proposal): refresh the object's model and every inline list, count and feed,
+// which are keyed by their own model rather than the parent's.
+export function invalidateObject(qc, ckId) {
+  if (!qc || !ckId) return;
+  invalidateModel(qc, ckId.slice(0, 3));
+  ['inline-list', 'inline-count', 'inline-feed'].forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
+}

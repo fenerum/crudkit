@@ -122,6 +122,7 @@
 
   /* Layout */
   --sidebar-w: 240px;
+  --assistant-w: 380px;
   --topbar-h: 44px;
   --inspector-w: 400px;
   --row-h: 36px;

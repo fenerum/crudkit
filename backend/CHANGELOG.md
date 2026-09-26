@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- `crudkit_assistant`: the assistant is now a sidebar available on every page (toggle in the
+  topbar or ⌘J / Ctrl+J), replacing the per-record floating window. The SPA reports what is on
+  screen — open record and tab, or list type, saved view, search, filters, visible and
+  selected rows — and each turn starts with a `[Screen]` block describing it; ids are re-read
+  through the user's permissions. New read tools `search`, `describe_types`, `list_records`,
+  `get_record`, `get_screen_rows`; record and propose tools take an optional `id` and default
+  to the record on screen, so proposals can target any record the user may change.
+  Conversations are saved (`AssistantConversation`, ASC, migration `0002`) and resume after a
+  reload. The automatic briefing on connect is gone; the sidebar offers suggestions instead.
+  New WebSocket route `ws/assistant/` (the per-record route still works).
+  **Breaking for custom `assistant_tools`:** `AssistantDeps` is now `user_id`, `session_key`,
+  `screen`; `object_type_id`/`object_pk` remain as read-only properties derived from the open
+  record. The user profile's `assistant` gains `enabled` — true only when `crudkit_assistant`
+  is installed and an AI model is configured (`CRUDKIT_AI_MODEL` /
+  `CRUDKIT_AI_MODEL_FACTORY`); the SPA hides the assistant otherwise.
+- `crudkit_api`: new `crudkit_api.records` with the type descriptions, listing, saved-view and
+  record reads the MCP tools used, now shared with the assistant.
+- Demo: installs `crudkit_assistant` next to the realtime socket; set `DEMO_AI_MODEL` to a
+  pydantic-ai model name to try the assistant.
 - `crudkit_mcp`: `list_records` takes a saved `view` (VIW CK-ID) and returns its rows with the
   view's filters, ordering and columns applied; `describe_types` lists a type's views. Access
   follows the REST API's `_view`: the view must be public or the user's own, and the user must

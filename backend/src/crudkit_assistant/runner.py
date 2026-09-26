@@ -1,5 +1,5 @@
 """
-Runs one turn of the assistant against an open object. Owns the lifecycle
+Runs one turn of the assistant against what the user has on screen. Owns the lifecycle
 of the per-turn LLM client and threads an asyncio.Queue (the "outbox") onto
 RunContext.deps so proposal tools can emit `tool_call_pending` events as
 they fire.
@@ -19,9 +19,9 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 
 from crudkit import llm
-from crudkit.authorization import get_authorized_instance
 from crudkit_assistant.agent import assistant_agent
 from crudkit_assistant.deps import AssistantDeps
+from crudkit_assistant.screen import describe_screen, screen_model
 from crudkit_assistant.utils import get_assistant_tools
 
 logger = logging.getLogger(__name__)
@@ -71,11 +71,11 @@ async def run_turn(
     deps._outbox = outbox  # type: ignore[attr-defined]
 
     extra_tools: list = await sync_to_async(_load_extra_tools)(deps)
+    screen_block = await sync_to_async(_describe_screen)(deps)
 
     logger.info(
-        "Assistant turn start: object=%s.%s prompt=%r history_len=%d extra_tools=%d",
-        deps.object_type_id,
-        deps.object_pk,
+        "Assistant turn start: screen=%s prompt=%r history_len=%d extra_tools=%d",
+        deps.screen.record_id or deps.screen.path,
         _truncate(user_prompt),
         len(message_history or []),
         len(extra_tools),
@@ -88,7 +88,7 @@ async def run_turn(
         async with llm.model_context() as model:
             _install_tool_name_sanitiser(model)
             async with assistant_agent.iter(
-                user_prompt,
+                f"{screen_block}\n\n{user_prompt}",
                 deps=deps,
                 model=model,
                 message_history=message_history or [],
@@ -102,10 +102,9 @@ async def run_turn(
         new_messages = list(result.new_messages()) if result is not None and hasattr(result, "new_messages") else []
     except Exception:
         logger.exception(
-            "Assistant turn FAILED after %d step(s): object=%s.%s prompt=%r",
+            "Assistant turn FAILED after %d step(s): screen=%s prompt=%r",
             steps,
-            deps.object_type_id,
-            deps.object_pk,
+            deps.screen.record_id or deps.screen.path,
             _truncate(user_prompt),
         )
         raise
@@ -115,9 +114,8 @@ async def run_turn(
         pending.append(outbox.get_nowait())
 
     logger.info(
-        "Assistant turn done: object=%s.%s steps=%d pending_proposals=%d output=%r",
-        deps.object_type_id,
-        deps.object_pk,
+        "Assistant turn done: screen=%s steps=%d pending_proposals=%d output=%r",
+        deps.screen.record_id or deps.screen.path,
         steps,
         len(pending),
         _truncate(output_text),
@@ -126,11 +124,12 @@ async def run_turn(
 
 
 def _load_extra_tools(deps: AssistantDeps) -> list:
-    user = get_user_model().objects.get(pk=deps.user_id)
-    instance = get_authorized_instance(user, deps.object_type_id, deps.object_pk)
-    if instance is None:
-        return []
-    return list(get_assistant_tools(instance))
+    model = screen_model(deps.screen)
+    return get_assistant_tools(model) if model is not None else []
+
+
+def _describe_screen(deps: AssistantDeps) -> str:
+    return describe_screen(get_user_model().objects.get(pk=deps.user_id), deps.screen)
 
 
 def _sanitise_tool_name(name: str) -> str:

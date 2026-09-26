@@ -34,7 +34,7 @@ fields (`AISummaryField`, `AICategoryField`, `AIBooleanField`, `AITagsField`,
 
 ```
 pip install crudkit[api]          # REST API included
-pip install crudkit[assistant]    # + per-object AI assistant (Channels)
+pip install crudkit[assistant]    # + AI assistant sidebar (Channels)
 pip install crudkit[mcp]          # + remote MCP server with OAuth (e.g. a Claude connector)
 ```
 
@@ -58,6 +58,27 @@ REST_FRAMEWORK = {
 # urls.py — one include registers a full CRUD API for every TYPE_ID model
 urlpatterns = [path("api/v1/", include("crudkit_api.urls"))]
 ```
+
+The assistant sidebar talks over a WebSocket at `ws/assistant/`, next to the
+realtime `ws/changes/` socket; route both in your ASGI application (see
+`examples/demo/demo/asgi.py`):
+
+```python
+application = ProtocolTypeRouter({
+    "http": get_asgi_application(),
+    "websocket": URLRouter(
+        crudkit_api.routing.websocket_urlpatterns + crudkit_assistant.routing.websocket_urlpatterns
+    ),
+})
+```
+
+The sidebar sees what the user has on screen — the open record, or the list
+with its saved view, search, filters, visible and selected rows — and can
+search and read across record types. It only *proposes* changes (to any record
+the user may change); each one waits for Confirm. Conversations are stored
+per user (`AssistantConversation`, ASC) and resume after a reload. The SPA
+only shows the assistant when an AI model is configured (`CRUDKIT_AI_MODEL` or
+`CRUDKIT_AI_MODEL_FACTORY`).
 
 CrudKit requires the standard Django model permissions for every API and
 assistant operation. Projects that need row-level rules can override

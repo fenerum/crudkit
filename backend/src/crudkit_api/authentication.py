@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
 from rest_framework import serializers, status
@@ -6,6 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from crudkit import llm
 from crudkit.profile import get_user_profile_adapter
 
 
@@ -69,6 +71,7 @@ class UserProfileView(APIView):
         safe_images = [img for img in images if _is_safe_image_path(img)]
         data["object_images"] = [request.build_absolute_uri(img) if img.startswith("/") else img for img in safe_images]
         data["assistant"] = {
+            "enabled": apps.is_installed("crudkit_assistant") and llm.is_configured(),
             "name": getattr(dj_settings, "CRUDKIT_ASSISTANT_NAME", "Assistant"),
             "avatar_url": getattr(dj_settings, "CRUDKIT_ASSISTANT_AVATAR_URL", ""),
         }

@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
-import { Icon, PageRange, PageSizeSelect } from "./ui";
+import { Icon, PageRange, PageSizeSelect, useScreenContext } from "./ui";
 
 export default function ObjectList({
     objectList,
@@ -15,6 +15,7 @@ export default function ObjectList({
     onPageSizeChange,
 }) {
     const [selectedRows, setSelectedRows] = useState([]);
+    useScreenContext({ selected_ids: selectedRows });
 
     const isPaginated = pagination && pagination.isPaginated;
     const items = isPaginated ? pagination.results : objectList;

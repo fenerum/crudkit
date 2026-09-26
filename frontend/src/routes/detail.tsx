@@ -6,7 +6,6 @@ import CrudKitAPIClient from '../../data/api';
 import DetailPane from '../../components/DetailPane';
 import InlineList from '../../components/InlineList';
 import Feed from '../../components/Feed';
-import AssistantLauncher from '../../components/Assistant/AssistantLauncher';
 import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -393,7 +392,6 @@ export default function Detail() {
         type={type}
         id={id}
       />
-      <AssistantLauncher objectType={type} objectId={id} />
     </>
   );
 }

@@ -16,3 +16,4 @@ export { mapIcon } from './iconMap';
 export { AVATAR_PALETTE, hashName, colorForName, initialsFromName } from './avatarPalette';
 export { TopbarSlotsProvider, useTopbarSlots, useTopbarSlotsValue } from './TopbarSlots';
 export { PageSearchContext, usePageSearch } from './PageSearchContext';
+export { ScreenProvider, useScreen, useScreenContext, screenFromLocation } from './ScreenContext';

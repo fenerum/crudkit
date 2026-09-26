@@ -1,10 +1,14 @@
+import { Link } from 'react-router-dom';
 import { Icon } from '../ui';
+import { url } from '../../utils/urls';
 
 type Props = {
   label: string;
   kind: string;
   payload: any;
   reasoning?: string;
+  target?: string | null;
+  targetLabel?: string | null;
   resolved?: 'confirmed' | 'skipped' | 'failed';
   summary?: string;
   onConfirm: () => void;
@@ -38,6 +42,8 @@ export default function ConfirmCard({
   kind,
   payload,
   reasoning,
+  target,
+  targetLabel,
   resolved,
   summary,
   onConfirm,
@@ -50,6 +56,12 @@ export default function ConfirmCard({
         <Icon name={KIND_ICON[kind] || 'help-circle'} size={14} color="currentColor" />
         <span>{label}</span>
       </div>
+      {target && (
+        <Link to={url(target)} className="block text-xs text-fg-3 hover:text-fg-1 truncate">
+          <span className="font-mono">{target}</span>
+          {targetLabel && ` · ${targetLabel}`}
+        </Link>
+      )}
       {body && (
         <pre className="text-xs text-fg-2 whitespace-pre-wrap break-words font-mono bg-bg-1 rounded px-2 py-1">
           {body}

@@ -1,4 +1,5 @@
 import logging
+from uuid import uuid4
 
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
@@ -9,6 +10,10 @@ from django.utils import timezone
 from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField
 
 logger = logging.getLogger(__name__)
+
+
+def uuid4_hex() -> str:
+    return uuid4().hex
 
 
 class AssistantProposal(BaseCrudKitModel):
@@ -85,3 +90,32 @@ class AssistantProposal(BaseCrudKitModel):
         self.confirmed_at = timezone.now()
         self.confirmed_by = user
         self.save(update_fields=["status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+
+
+class AssistantConversation(BaseCrudKitModel):
+    """
+    One sidebar chat, owned by `created_by`. `messages` is the pydantic-ai history the model sees
+    (user turns include the `[Screen]` block); `transcript` is what the
+    sidebar renders: {role: user|assistant|system, text} items and
+    {role: proposal, id} references to AssistantProposal rows, whose status
+    is read live when the conversation is reopened.
+    """
+
+    TYPE_ID = "ASC"
+    TITLE_LENGTH = 120
+
+    session_key = models.CharField(max_length=64, unique=True, default=uuid4_hex, editable=False)
+    title = models.CharField(max_length=TITLE_LENGTH, blank=True, default="")
+    messages = models.JSONField(default=list, blank=True)
+    transcript = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return self.title or f"Conversation {self.id}"
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        @staticmethod
+        def get_authorized_queryset(user, queryset, action):
+            return queryset.filter(created_by=user)

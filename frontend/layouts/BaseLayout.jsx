@@ -17,9 +17,13 @@ import Breadcrumbs from "../components/Breadcrumbs";
 import CommandPalette from "../components/CommandPalette";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {useHotkeys} from "react-hotkeys-hook";
-import {Avatar, Dot, Icon, Kbd, ThemeProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
+import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
+import AssistantSidebar from "../components/Assistant/AssistantSidebar";
+import {AssistantContext, useAssistant} from "../components/Assistant/AssistantContext";
+
+const ASSISTANT_OPEN_KEY = "crudkit.assistant.open";
 
 const NavItem = React.memo(function NavItem({href, icon, label, count, color, active, onClick}) {
   const cls =
@@ -70,6 +74,7 @@ function NavSection({title, action, children}) {
 
 function Topbar({ menuActive, setMenuActive, handleNavClick }) {
   const slots = useTopbarSlotsValue();
+  const assistant = useAssistant();
   return (
     <header className="ck-topbar sticky top-0 z-40 flex items-center gap-3 px-3.5">
       <button
@@ -119,6 +124,19 @@ function Topbar({ menuActive, setMenuActive, handleNavClick }) {
         </div>
 
         {slots.primary}
+
+        {assistant.enabled && (
+          <button
+            type="button"
+            className={"ck-icon-btn ck-icon-btn-sm " + (assistant.open ? "text-primary-400" : "")}
+            onClick={() => assistant.setOpen(!assistant.open)}
+            aria-label="Toggle assistant"
+            aria-pressed={assistant.open}
+            title="Assistant (⌘J)"
+          >
+            <Icon name="sparkles" size={14} color="currentColor" />
+          </button>
+        )}
       </div>
     </header>
   );
@@ -141,6 +159,17 @@ function BaseLayoutInner() {
 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [menuActive, setMenuActive] = useState(false);
+
+  const assistantEnabled = !!user?.assistant?.enabled;
+  const [assistantOpen, setAssistantOpenState] = useState(() => localStorage.getItem(ASSISTANT_OPEN_KEY) === "1");
+  const setAssistantOpen = useCallback((open) => {
+    localStorage.setItem(ASSISTANT_OPEN_KEY, open ? "1" : "0");
+    setAssistantOpenState(open);
+  }, []);
+  const assistantValue = useMemo(
+    () => ({enabled: assistantEnabled, open: assistantEnabled && assistantOpen, setOpen: setAssistantOpen}),
+    [assistantEnabled, assistantOpen, setAssistantOpen]
+  );
 
   // Track the currently-mounted page-search input (if any) so "/" can focus it
   // instead of opening the palette.
@@ -168,6 +197,12 @@ function BaseLayoutInner() {
     e?.preventDefault?.();
     setPaletteOpen(true);
   });
+
+  // ⌘J / Ctrl+J toggles the assistant sidebar, also from inside its textarea.
+  useHotkeys('mod+j', (e) => {
+    e?.preventDefault?.();
+    if (assistantEnabled) setAssistantOpen(!assistantOpen);
+  }, {enableOnFormTags: true}, [assistantEnabled, assistantOpen, setAssistantOpen]);
 
   // "/" focuses the page-search input on list-style views; falls back to the
   // command palette so the muscle memory keeps working elsewhere.
@@ -257,7 +292,9 @@ function BaseLayoutInner() {
   return (
     <ThemeProvider>
     <CommandPaletteContext.Provider value={{open: paletteOpen, setOpen: setPaletteOpen}}>
+      <AssistantContext.Provider value={assistantValue}>
       <PageSearchContext.Provider value={pageSearchValue}>
+      <ScreenProvider>
       <TopbarSlotsProvider>
       <div className="flex flex-col h-screen overflow-hidden bg-bg-1 text-fg-1">
         {/* Sidebar */}
@@ -412,10 +449,11 @@ function BaseLayoutInner() {
 
         {/* Main content area — sidebar is `lg:fixed` so only reserve its
             240px gutter at lg+ viewports, otherwise the content takes the
-            full width and the hamburger reveals the sidebar as an overlay. */}
-        <div
-          className="flex flex-col flex-1 overflow-hidden lg:pl-[var(--sidebar-w)]"
-        >
+            full width and the hamburger reveals the sidebar as an overlay.
+            The assistant sits to the right of it: a column at lg+, an
+            overlay below. */}
+        <div className="flex flex-1 overflow-hidden lg:pl-[var(--sidebar-w)]">
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
           <Topbar
             menuActive={menuActive}
             setMenuActive={setMenuActive}
@@ -433,11 +471,19 @@ function BaseLayoutInner() {
             </main>
           </div>
         </div>
+        {assistantValue.open && (
+          <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[var(--assistant-w)] border-l border-border-1 shadow-2xl lg:static lg:z-auto lg:shadow-none lg:flex-shrink-0">
+            <AssistantSidebar onClose={() => setAssistantOpen(false)} />
+          </div>
+        )}
+        </div>
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       </div>
       </TopbarSlotsProvider>
+      </ScreenProvider>
       </PageSearchContext.Provider>
+      </AssistantContext.Provider>
     </CommandPaletteContext.Provider>
     </ThemeProvider>
   );

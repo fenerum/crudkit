@@ -21,6 +21,14 @@ class DefaultAdapterUserProfileViewTests(TestCase):
         self.assertEqual(response.data["object_images"], [])
         self.assertIn("assistant", response.data)
 
+    def test_assistant_enabled_only_with_a_model(self):
+        response = self.client.get("/api/v1/user/me/")
+        self.assertTrue(response.data["assistant"]["enabled"])  # tests/settings.py sets a model factory
+
+        with override_settings(CRUDKIT_AI_MODEL_FACTORY=None, CRUDKIT_AI_MODEL=None):
+            response = self.client.get("/api/v1/user/me/")
+        self.assertFalse(response.data["assistant"]["enabled"])
+
     def test_patch_is_noop(self):
         response = self.client.patch("/api/v1/user/me/", {"preferred_language": "da"}, format="json")
         self.assertEqual(response.status_code, 200)

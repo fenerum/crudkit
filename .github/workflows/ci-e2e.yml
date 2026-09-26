@@ -18,6 +18,8 @@ jobs:
     env:
       # Deliberately not "static/": proves the SPA has no hardcoded prefix.
       DEMO_STATIC_URL: media-x/
+      # pydantic-ai's offline test model: enables the assistant sidebar without an API key.
+      DEMO_AI_MODEL: test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -39,7 +41,7 @@ jobs:
       - name: Install the wheel into a fresh venv
         run: |
           uv venv /tmp/e2e
-          uv pip install --python /tmp/e2e "crudkit[realtime] @ file://$PWD/$(ls backend/dist/*.whl)" daphne
+          uv pip install --python /tmp/e2e "crudkit[assistant] @ file://$PWD/$(ls backend/dist/*.whl)" daphne
       - name: Migrate, create a user and seed
         run: |
           /tmp/e2e/bin/python examples/demo/manage.py migrate --noinput

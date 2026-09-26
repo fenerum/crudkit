@@ -61,7 +61,9 @@ test.describe('layouts', () => {
 
   test('kanban drag and drop moves a card to another column', async ({ page, request }) => {
     const name = unique('Drag me');
-    const reading = await createObject(request, 'RDG', { name });
+    // Start in "Reading": other specs pile new cards into "To read", which can
+    // push a new card there below the fold.
+    const reading = await createObject(request, 'RDG', { name, status: 'reading' });
     await page.reload();
     await openView(page, 'Board');
 

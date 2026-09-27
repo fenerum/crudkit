@@ -5,6 +5,15 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Machine-local overrides (e.g. a local LLM, see the README) from the repo-root
+# .env, which Conductor copies into each workspace. Real environment variables win.
+ENV_FILE = BASE_DIR.parent.parent / ".env"
+if ENV_FILE.exists():
+    for line in ENV_FILE.read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.strip().startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip())
+
 SECRET_KEY = "demo-only-secret-key"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]

@@ -8,20 +8,39 @@ they fire.
 so we can log each model response, tool call, tool return, and retry prompt.
 This is what makes `UnexpectedModelBehavior: Exceeded maximum retries` actually
 diagnosable — without the per-step trail, we only ever see the final failure.
+
+With an `on_event` callback the turn is streamed: model requests stream their
+reasoning and text as they are generated, and each tool call is reported as it
+starts and ends, so the user can follow along while a slow model works.
 """
 
 import asyncio
+import json
 import logging
 import re
+from collections.abc import Awaitable, Callable
 from typing import Any, Optional
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
+from pydantic_ai import Agent
+from pydantic_ai.messages import (
+    FunctionToolCallEvent,
+    FunctionToolResultEvent,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+    ThinkingPart,
+    ThinkingPartDelta,
+    ToolReturnPart,
+)
 
 from crudkit import llm
 from crudkit_assistant.agent import assistant_agent
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.screen import describe_screen, screen_model
+from crudkit_assistant.tools import describe_call
 from crudkit_assistant.utils import get_assistant_tools
 
 logger = logging.getLogger(__name__)
@@ -49,14 +68,23 @@ class TurnResult:
         self.pending_events = pending_events
 
 
+EventCallback = Callable[[dict[str, Any]], Awaitable[None]]
+
+
 async def run_turn(
     user_prompt: str,
     deps: AssistantDeps,
     message_history: Optional[list] = None,
+    on_event: Optional[EventCallback] = None,
 ) -> TurnResult:
     """Run one agent turn. Returns the assistant's text, any tool_call_pending
-    envelopes the proposal tools emitted during the run, and the new message
-    history segment to keep for the next turn."""
+    envelopes the proposal tools emitted during the run (with `on_event`, those
+    are sent as they happen instead), and the new message history segment to
+    keep for the next turn.
+
+    `on_event` receives, in order: `thinking_delta` / `text_delta` {text},
+    `tool_start` {id, tool, label}, `tool_end` {id, ok} and `tool_call_pending`
+    envelopes."""
 
     if not llm.is_configured():
         logger.warning("Assistant turn skipped: no CrudKit AI model configured")
@@ -86,7 +114,6 @@ async def run_turn(
     steps = 0
     try:
         async with llm.model_context() as model:
-            _install_tool_name_sanitiser(model)
             async with assistant_agent.iter(
                 f"{screen_block}\n\n{user_prompt}",
                 deps=deps,
@@ -95,8 +122,18 @@ async def run_turn(
                 **({"tools": extra_tools} if extra_tools else {}),
             ) as agent_run:
                 async for node in agent_run:
+                    if Agent.is_call_tools_node(node):
+                        _sanitise_tool_names(node.model_response)
                     _log_node(node)
                     steps += 1
+                    if on_event is not None and Agent.is_model_request_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                await _forward_model_event(event, on_event)
+                    elif on_event is not None and Agent.is_call_tools_node(node):
+                        async with node.stream(agent_run.ctx) as stream:
+                            async for event in stream:
+                                await _forward_tool_event(event, on_event, outbox)
                 result = agent_run.result
         output_text = _coerce_text(result.output if result is not None else None)
         new_messages = list(result.new_messages()) if result is not None and hasattr(result, "new_messages") else []
@@ -146,33 +183,75 @@ def _sanitise_tool_name(name: str) -> str:
     return cleaned.strip()
 
 
-def _install_tool_name_sanitiser(model) -> None:
-    """Wrap the model's `request` coroutine so we mutate any garbled
-    `ToolCallPart.tool_name` before pydantic-ai dispatches it. No-ops on
-    models that have already been wrapped (idempotent for safety in case
-    pydantic-ai caches the model instance across runs)."""
-    if getattr(model, "_assistant_tool_name_sanitised", False):
+def _sanitise_tool_names(response) -> None:
+    """Fix garbled `ToolCallPart.tool_name`s in a model response before
+    pydantic-ai dispatches its tool calls. Done on the CallToolsNode, so it
+    covers streamed and non-streamed requests alike."""
+    for part in getattr(response, "parts", []) or []:
+        if getattr(part, "part_kind", None) != "tool-call":
+            continue
+        raw = getattr(part, "tool_name", "") or ""
+        cleaned = _sanitise_tool_name(raw)
+        if cleaned and cleaned != raw:
+            logger.warning("Sanitised garbled tool name from model: %r -> %r", raw, cleaned)
+            part.tool_name = cleaned
+
+
+async def _forward_model_event(event, on_event: EventCallback) -> None:
+    """Reasoning and reply text as the model generates them."""
+    if isinstance(event, PartStartEvent):
+        part, text = event.part, getattr(event.part, "content", "")
+        kind = (
+            "thinking_delta" if isinstance(part, ThinkingPart) else "text_delta" if isinstance(part, TextPart) else ""
+        )
+    elif isinstance(event, PartDeltaEvent):
+        delta, text = event.delta, getattr(event.delta, "content_delta", "")
+        kind = (
+            "thinking_delta"
+            if isinstance(delta, ThinkingPartDelta)
+            else "text_delta"
+            if isinstance(delta, TextPartDelta)
+            else ""
+        )
+    else:
         return
-    original_request = model.request
+    if kind and text:
+        await on_event({"type": kind, "text": text})
 
-    async def request(*args, **kwargs):
-        response = await original_request(*args, **kwargs)
-        for part in getattr(response, "parts", []) or []:
-            if getattr(part, "part_kind", None) != "tool-call":
-                continue
-            raw = getattr(part, "tool_name", "") or ""
-            cleaned = _sanitise_tool_name(raw)
-            if cleaned and cleaned != raw:
-                logger.warning(
-                    "Sanitised garbled tool name from model: %r -> %r",
-                    raw,
-                    cleaned,
-                )
-                part.tool_name = cleaned
-        return response
 
-    model.request = request
-    model._assistant_tool_name_sanitised = True
+async def _forward_tool_event(event, on_event: EventCallback, outbox: asyncio.Queue) -> None:
+    """Tool calls as they start and end; proposals as soon as they exist."""
+    if isinstance(event, FunctionToolCallEvent):
+        part = event.part
+        await on_event(
+            {
+                "type": "tool_start",
+                "id": part.tool_call_id,
+                "tool": part.tool_name,
+                "label": describe_call(part.tool_name, _args(part)),
+            }
+        )
+    elif isinstance(event, FunctionToolResultEvent):
+        await on_event({"type": "tool_end", "id": event.tool_call_id, "ok": _succeeded(event.part)})
+        while not outbox.empty():
+            await on_event(outbox.get_nowait())
+
+
+def _args(part) -> dict:
+    try:
+        return part.args_as_dict()
+    except (ValueError, TypeError):
+        return {}
+
+
+def _succeeded(part) -> bool:
+    """Tools report failures as "ERROR: …" strings or {"error": …} dicts."""
+    if not isinstance(part, ToolReturnPart):
+        return False
+    content = part.content
+    if isinstance(content, str):
+        return not content.startswith("ERROR")
+    return not (isinstance(content, dict) and "error" in content)
 
 
 def _log_node(node) -> None:
@@ -224,8 +303,6 @@ def _stringify(value: Any) -> str:
     if isinstance(value, str):
         return value
     try:
-        import json
-
         return json.dumps(value, default=str)
     except Exception:
         return str(value)

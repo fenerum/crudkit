@@ -1,5 +1,8 @@
+export type Step = { id: string; label: string; ok: boolean | null };
+
 export type TranscriptItem =
   | { role: 'user' | 'assistant' | 'system'; text: string }
+  | { role: 'activity'; steps: Step[]; seconds: number }
   | {
       role: 'proposal';
       id: number | string;
@@ -16,6 +19,11 @@ export type TranscriptItem =
 export type IncomingEvent =
   | { type: 'ready'; session: string }
   | { type: 'conversation'; id: string; title: string; transcript: TranscriptItem[] }
+  | { type: 'turn_start' }
+  | { type: 'turn_end'; seconds: number }
+  | { type: 'thinking_delta' | 'text_delta'; text: string }
+  | { type: 'tool_start'; id: string; tool: string; label: string }
+  | { type: 'tool_end'; id: string; ok: boolean }
   | { type: 'assistant_message'; text: string }
   | {
       type: 'tool_call_pending';
@@ -37,7 +45,7 @@ export type OutgoingEvent =
   | { type: 'open_conversation'; id: string | null }
   | { type: 'screen'; screen: Screen }
   | { type: 'user_message'; text: string }
-  | { type: 'confirm'; id: number | string; ok: boolean };
+  | { type: 'confirm'; ids: (number | string)[]; ok: boolean };
 
 export type Resolution = 'confirmed' | 'skipped' | 'failed';
 
@@ -56,4 +64,14 @@ export type ChatItem =
       resolved?: Resolution;
       summary?: string;
     }
-  | { kind: 'system'; id: string; text: string };
+  | { kind: 'system'; id: string; text: string }
+  | {
+      kind: 'activity';
+      id: string;
+      steps: Step[];
+      // Live turns only: the model's latest reasoning, and when the turn started.
+      thinking: string;
+      live: boolean;
+      startedAt?: number;
+      seconds?: number;
+    };

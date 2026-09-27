@@ -17,7 +17,9 @@ describe("fromTranscript", () => {
         summary: "Applied fields: name",
       },
       { role: "proposal", id: "ASP5", kind: "note", label: "Add note", payload: {}, status: "pending" },
+      { role: "activity", steps: [{ id: "t1", label: "Reading CUS1", ok: true }], seconds: 12 },
     ]);
+    expect(items[3]).toMatchObject({ kind: "activity", live: false, seconds: 12, steps: [{ label: "Reading CUS1" }] });
     expect(items[0]).toMatchObject({ kind: "user", text: "rename it" });
     expect(items[1]).toMatchObject({ kind: "proposal", id: "ASP4", target: "CUS1", targetLabel: "Acme Ltd", resolved: "confirmed" });
     expect(items[2]).toMatchObject({ kind: "proposal", resolved: undefined });

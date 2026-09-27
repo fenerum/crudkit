@@ -38,7 +38,20 @@ uv run manage.py runserver
 ```
 
 Then open http://localhost:8000/ and log in with your superuser. To try the
-assistant sidebar (⌘J), start the server with a pydantic-ai model, e.g.
-`DEMO_AI_MODEL=anthropic:claude-sonnet-5 uv run manage.py runserver` plus the
-provider's API key in the environment. The app name
+assistant sidebar (⌘J), set `DEMO_AI_MODEL` to a pydantic-ai model plus the
+provider's API key, either in the environment or in a `.env` at the repository
+root (gitignored; Conductor copies it into new workspaces):
+
+```
+# a hosted model
+DEMO_AI_MODEL=anthropic:claude-sonnet-5
+ANTHROPIC_API_KEY=...
+
+# or a local OpenAI-compatible server (llama.cpp, Ollama, LM Studio, vLLM)
+DEMO_AI_MODEL=openai-chat:qwen3.8-27b
+OPENAI_BASE_URL=http://127.0.0.1:11434/v1
+OPENAI_API_KEY=local
+```
+
+The model needs tool calling. The app name
 comes from the `CRUDKIT_FRONTEND_CONFIG` setting ("CrudKit Demo" here).

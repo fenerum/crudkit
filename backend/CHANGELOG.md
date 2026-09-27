@@ -11,6 +11,12 @@
   to the record on screen, so proposals can target any record the user may change.
   Conversations are saved (`AssistantConversation`, ASC, migration `0002`) and resume after a
   reload. The automatic briefing on connect is gone; the sidebar offers suggestions instead.
+  Turns stream: the model's reasoning and reply appear as they are generated, and each tool
+  call shows as a step ("Reading RDG3", "Drafting a change to RDG3") with a running timer,
+  collapsing to "N steps · 38s" afterwards. Confirm/Skip apply immediately, also while a
+  turn is running, and no longer start a model turn: the outcome is passed to the agent with
+  the next message. "Confirm all / Skip all" resolves every waiting card (`confirm` takes
+  `ids`).
   New WebSocket route `ws/assistant/` (the per-record route still works).
   **Breaking for custom `assistant_tools`:** `AssistantDeps` is now `user_id`, `session_key`,
   `screen`; `object_type_id`/`object_pk` remain as read-only properties derived from the open

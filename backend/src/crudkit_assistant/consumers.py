@@ -9,20 +9,27 @@ screen. Inbound message types:
                                               — resume a conversation, or start one
 - {"type": "screen", "screen": {...}}         — what the user now has on screen
 - {"type": "user_message", "text": "..."}     — kick off a turn
-- {"type": "confirm", "id": <proposal_id>, "ok": true|false}
-                                              — apply or skip a pending proposal
+- {"type": "confirm", "id": <proposal_id> | "ids": [...], "ok": true|false}
+                                              — apply or skip pending proposals (no model
+                                                turn; the outcome reaches the agent with
+                                                the next user message)
 
 Outbound message types:
 
 - {"type": "ready", "session": "..."}
 - {"type": "conversation", id, title, transcript: [...]}
+- {"type": "turn_start"} … {"type": "turn_end", "seconds": n} around each turn, with
+  in between {"type": "thinking_delta" | "text_delta", "text": "..."},
+  {"type": "tool_start", id, tool, label} and {"type": "tool_end", id, ok}
 - {"type": "assistant_message", "text": "..."}
 - {"type": "tool_call_pending", id, kind, label, payload, reasoning, target, target_label}
 - {"type": "tool_outcome", id, ok, summary, status}
 - {"type": "error", "message": "..."}
 """
 
+import asyncio
 import logging
+import time
 from typing import Optional
 from uuid import uuid4
 
@@ -55,7 +62,16 @@ class AssistantConsumer(AuthenticatedConsumer):
         self.conversation: Optional[AssistantConversation] = None
         self.session_key: str = uuid4().hex
         self.message_history: list = []
+        # Turns run as tasks so confirms and screen updates aren't queued behind a
+        # slow model; the lock keeps turns (and the history they extend) in order.
+        self._turn_lock = asyncio.Lock()
+        self._turn_tasks: set[asyncio.Task] = set()
         await super().connect()
+
+    async def disconnect(self, close_code):
+        for task in self._turn_tasks:
+            task.cancel()
+        await super().disconnect(close_code)
 
     async def on_authenticated(self, user) -> bool:
         if self.screen.record_id and await sync_to_async(load_screen_record)(user, self.screen) is None:
@@ -71,9 +87,12 @@ class AssistantConsumer(AuthenticatedConsumer):
         elif msg_type == "screen":
             self.screen = parse_screen(data.get("screen"))
         elif msg_type == "user_message":
-            await self._handle_user_message(data.get("text", ""))
+            task = asyncio.create_task(self._handle_user_message(data.get("text", "")))
+            self._turn_tasks.add(task)
+            task.add_done_callback(self._turn_tasks.discard)
         elif msg_type == "confirm":
-            await self._handle_confirm(data.get("id"), bool(data.get("ok")))
+            ids = data.get("ids") if isinstance(data.get("ids"), list) else [data.get("id")]
+            await self._handle_confirm(ids, bool(data.get("ok")))
         else:
             await self.send_json({"type": "error", "message": f"Unknown message type {msg_type!r}"})
 
@@ -91,42 +110,87 @@ class AssistantConsumer(AuthenticatedConsumer):
             }
         )
 
-    async def _handle_user_message(self, text: str, synthetic: bool = False):
-        """Run a turn. `synthetic` turns (proposal outcomes) are not shown as user bubbles."""
+    async def _handle_user_message(self, text: str):
         text = (text or "").strip()
         if not text or self.user_id is None:
             return
+        async with self._turn_lock:
+            await self._run_turn(text)
+
+    async def _run_turn(self, text: str):
+        """Stream one turn between `turn_start` and `turn_end`; its tool steps are
+        kept in the transcript as one `activity` item. Proposal outcomes noted since
+        the previous turn are prepended to the prompt."""
         if self.conversation is None:
             await self._open_conversation(None)
-        transcript = [] if synthetic else [{"role": "user", "text": text}]
+        notes = _unsent_notes(self.conversation.transcript)
+        prompt = "\n".join([*notes, text]) if notes else text
+        await self._save([{"role": "user", "text": text}])
+        transcript: list[dict] = []
+        steps: list[dict] = []
+        proposals: list[dict] = []
+
+        async def on_event(event: dict):
+            if event["type"] == "tool_start":
+                steps.append({"id": event["id"], "label": event["label"], "ok": None})
+            elif event["type"] == "tool_end":
+                for step in steps:
+                    if step["id"] == event["id"]:
+                        step["ok"] = event["ok"]
+            elif event["type"] == "tool_call_pending":
+                proposals.append({"role": "proposal", "id": event["id"]})
+            await self.send_json(event)
+
+        started = time.monotonic()
+        await self.send_json({"type": "turn_start"})
         deps = AssistantDeps(user_id=self.user_id, session_key=self.session_key, screen=self.screen)
         try:
-            result = await run_turn(text, deps=deps, message_history=self.message_history)
+            result = await run_turn(prompt, deps=deps, message_history=self.message_history, on_event=on_event)
         except Exception:
             logger.exception("Assistant turn failed")
+            result = None
+        seconds = round(time.monotonic() - started)
+        if steps:
+            transcript.append({"role": "activity", "steps": steps, "seconds": seconds})
+        transcript += proposals
+
+        if result is None:
             await self.send_json({"type": "error", "message": "The assistant ran into an error."})
             transcript.append({"role": "system", "text": "Error: The assistant ran into an error."})
-            await self._save(transcript)
-            return
-
-        self.message_history = (self.message_history or []) + (result.new_messages or [])
-
-        for envelope in result.pending_events:
-            await self.send_json(envelope)
-            transcript.append({"role": "proposal", "id": envelope["id"]})
-        if result.output_text:
-            await self.send_json({"type": "assistant_message", "text": result.output_text})
-            transcript.append({"role": "assistant", "text": result.output_text})
+        else:
+            self.message_history = (self.message_history or []) + (result.new_messages or [])
+            for envelope in result.pending_events:
+                await self.send_json(envelope)
+                transcript.append({"role": "proposal", "id": envelope["id"]})
+            if result.output_text:
+                await self.send_json({"type": "assistant_message", "text": result.output_text})
+                transcript.append({"role": "assistant", "text": result.output_text})
+        await self.send_json({"type": "turn_end", "seconds": seconds})
         await self._save(transcript)
 
     async def _save(self, new_items: list[dict]):
         await database_sync_to_async(_save_conversation)(self.conversation, self.message_history, new_items)
 
-    async def _handle_confirm(self, proposal_id, ok: bool):
+    async def _handle_confirm(self, proposal_ids: list, ok: bool):
+        """Apply or skip proposals right away. No model turn: the cards show the
+        outcome, and the agent reads it as a note at the start of the next turn."""
+        if self.conversation is None:
+            await self.send_json({"type": "error", "message": "Proposal not found."})
+            return
+        notes = [
+            {"role": "note", "text": line}
+            for proposal_id in proposal_ids
+            if (line := await self._resolve_proposal(proposal_id, ok))
+        ]
+        if notes:
+            await self._save(notes)
+
+    async def _resolve_proposal(self, proposal_id, ok: bool) -> Optional[str]:
+        """Apply or skip one proposal; returns the outcome line for the agent."""
         proposal = await self._load_proposal(proposal_id)
         if proposal is None:
             await self.send_json({"type": "error", "message": "Proposal not found."})
-            return
+            return None
         if proposal.status != AssistantProposal.Status.PENDING:
             await self.send_json(
                 {
@@ -137,31 +201,13 @@ class AssistantConsumer(AuthenticatedConsumer):
                     "summary": "Already resolved.",
                 }
             )
-            return
+            return None
 
         user = await self._get_user()
         if not await self._can_change_proposal_target(proposal, user):
             await self.send_json({"type": "error", "message": "Proposal not found."})
-            return
-        if ok:
-            outcome = await sync_to_async(proposal.apply)(user)
-            applied = proposal.status == AssistantProposal.Status.CONFIRMED
-            await self.send_json(
-                {
-                    "type": "tool_outcome",
-                    "id": proposal.id,
-                    "ok": applied,
-                    "status": proposal.status,
-                    "summary": _summarize_outcome(outcome, proposal),
-                    "outcome": outcome,
-                }
-            )
-            synthetic = f"[system] Outcome of proposal {proposal.id}: " + (
-                f"{proposal.label} succeeded. {_summarize_outcome(outcome, proposal)}"
-                if applied
-                else f"{proposal.label} FAILED: {outcome.get('error', 'unknown error') if outcome else 'unknown error'}"
-            )
-        else:
+            return None
+        if not ok:
             await sync_to_async(proposal.skip)(user)
             await self.send_json(
                 {
@@ -172,10 +218,25 @@ class AssistantConsumer(AuthenticatedConsumer):
                     "summary": "Skipped by user.",
                 }
             )
-            synthetic = f"[system] User skipped proposal {proposal.id} ({proposal.label})."
+            return f"[system] User skipped proposal {proposal.id} ({proposal.label})."
 
-        # Re-run the agent so it can acknowledge the outcome in chat.
-        await self._handle_user_message(synthetic, synthetic=True)
+        outcome = await sync_to_async(proposal.apply)(user)
+        applied = proposal.status == AssistantProposal.Status.CONFIRMED
+        await self.send_json(
+            {
+                "type": "tool_outcome",
+                "id": proposal.id,
+                "ok": applied,
+                "status": proposal.status,
+                "summary": _summarize_outcome(outcome, proposal),
+                "outcome": outcome,
+            }
+        )
+        return f"[system] Outcome of proposal {proposal.id}: " + (
+            f"{proposal.label} succeeded. {_summarize_outcome(outcome, proposal)}"
+            if applied
+            else f"{proposal.label} FAILED: {outcome.get('error', 'unknown error') if outcome else 'unknown error'}"
+        )
 
     @database_sync_to_async
     def _load_proposal(self, proposal_id) -> Optional[AssistantProposal]:
@@ -227,8 +288,20 @@ def _save_conversation(conversation: AssistantConversation, messages: list, new_
     conversation.save(update_fields=["messages", "transcript", "title", "updated_at"])
 
 
+def _unsent_notes(transcript: list[dict]) -> list[str]:
+    """Proposal outcomes noted since the last user message."""
+    notes = []
+    for item in reversed(transcript):
+        if item["role"] == "user":
+            break
+        if item["role"] == "note":
+            notes.append(item["text"])
+    return notes[::-1]
+
+
 def _expand_transcript(conversation: AssistantConversation) -> list[dict]:
-    """The stored transcript with proposal references replaced by their current state."""
+    """The stored transcript for the sidebar: proposal references replaced by their
+    current state, notes (for the agent only) left out."""
     proposals = {
         proposal.id: proposal
         for proposal in AssistantProposal.objects.filter(session_key=conversation.session_key).prefetch_related(
@@ -237,6 +310,8 @@ def _expand_transcript(conversation: AssistantConversation) -> list[dict]:
     }
     out = []
     for item in conversation.transcript:
+        if item.get("role") == "note":
+            continue
         if item.get("role") != "proposal":
             out.append(item)
         elif proposal := proposals.get(item["id"]):

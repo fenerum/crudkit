@@ -11,6 +11,8 @@ type Props = {
   targetLabel?: string | null;
   resolved?: 'confirmed' | 'skipped' | 'failed';
   summary?: string;
+  // Set while a Confirm/Skip is on its way to the server.
+  deciding?: 'confirm' | 'skip';
   onConfirm: () => void;
   onSkip: () => void;
 };
@@ -46,6 +48,7 @@ export default function ConfirmCard({
   targetLabel,
   resolved,
   summary,
+  deciding,
   onConfirm,
   onSkip,
 }: Props) {
@@ -77,6 +80,11 @@ export default function ConfirmCard({
           {resolved === 'confirmed' && (summary || 'Done.')}
           {resolved === 'skipped' && 'Skipped.'}
           {resolved === 'failed' && (summary || 'Failed.')}
+        </div>
+      ) : deciding ? (
+        <div className="flex items-center gap-1.5 text-xs text-fg-3">
+          <span className="w-3 h-3 rounded-full border-2 border-fg-3 border-t-transparent animate-spin" />
+          {deciding === 'confirm' ? 'Applying…' : 'Skipping…'}
         </div>
       ) : (
         <div className="flex gap-2 pt-1">

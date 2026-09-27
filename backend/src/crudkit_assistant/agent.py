@@ -91,11 +91,7 @@ Style:
 """.strip()
 
 
-assistant_agent = Agent(
-    deps_type=AssistantDeps,
-    model_settings=ModelSettings(temperature=0.2),
-    system_prompt=_BASE_SYSTEM_PROMPT,
-)
+assistant_agent = Agent(deps_type=AssistantDeps, model_settings=ModelSettings(temperature=0.2))
 
 
 for _tool in (
@@ -116,11 +112,16 @@ for _tool in (
     assistant_agent.tool(_tool)
 
 
-@assistant_agent.system_prompt
-def _project_prompt(ctx: RunContext[AssistantDeps]) -> str:
-    """The project's own prompt prefix and the assistant's name."""
+# One `instructions` function, not `system_prompt`s: each instructions source
+# becomes its own system message, and chat templates such as Qwen's reject a
+# system message that isn't first. Instructions also stay out of the stored
+# history, so saved conversations pick up prompt changes.
+@assistant_agent.instructions
+def _instructions(ctx: RunContext[AssistantDeps]) -> str:
+    """The project's own prompt prefix, the assistant's name and the base prompt."""
     lines = []
     if project_prefix := getattr(settings, "CRUDKIT_ASSISTANT_SYSTEM_PROMPT", "") or "":
         lines.append(project_prefix)
     lines.append(f"Your name is {getattr(settings, 'CRUDKIT_ASSISTANT_NAME', 'Assistant')}.")
+    lines.append(_BASE_SYSTEM_PROMPT)
     return "\n\n".join(lines)

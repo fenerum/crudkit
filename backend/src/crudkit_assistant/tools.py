@@ -36,6 +36,27 @@ from crudkit_assistant.models import AssistantProposal
 logger = logging.getLogger(__name__)
 
 
+def describe_call(tool_name: str, args: dict) -> str:
+    """A short, human description of a tool call for the sidebar's activity list."""
+    target = args.get("id") or "the open record"
+    labels = {
+        "get_object": f"Reading {target}",
+        "describe_object": f"Checking the fields of {target}",
+        "get_changelog": f"Reading the history of {target}",
+        "get_feed": f"Reading the activity on {target}",
+        "get_related": f"Reading {args.get('relation_name')} of {target}",
+        "search": f"Searching for “{args.get('query')}”",
+        "describe_types": f"Looking up {args.get('type') or 'the record types'}",
+        "list_records": f"Listing {args.get('view') or args.get('type') or 'records'}",
+        "get_record": f"Reading {args.get('id')}",
+        "get_screen_rows": f"Reading the {args.get('which') or 'selected'} rows",
+        "propose_patch": f"Drafting a change to {target}",
+        "propose_action": f"Drafting {args.get('action_name')} on {target}",
+        "propose_create_note": f"Drafting a note on {target}",
+    }
+    return labels.get(tool_name, f"Running {tool_name}")
+
+
 # ---------------------------------------------------------------------------
 # Read tools
 

@@ -13,8 +13,8 @@ from channels.testing import WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase, TransactionTestCase
-from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, UserPromptPart
-from pydantic_ai.models.function import FunctionModel
+from pydantic_ai.messages import ModelResponse, SystemPromptPart, TextPart, ToolCallPart, UserPromptPart
+from pydantic_ai.models.function import DeltaThinkingPart, DeltaToolCall, FunctionModel
 from rest_framework_simplejwt.tokens import AccessToken
 
 from crudkit.models import View
@@ -179,12 +179,28 @@ class ConversationSocketTests(TransactionTestCase):
         self.user = User.objects.create_user(username="staff", password="x")
         grant(self.user, "view_customer", "change_customer")
         self.customer = make_customer(self.user, "Acme")
+        self.other = make_customer(self.user, "Beta")
         self.prompts: list[str] = []
+        # Set by a test to hold the model's answer after its tool calls.
+        self.release: asyncio.Event | None = None
 
     def model_fn(self, messages, info):
+        # One instructions part (sent as one system message), no system parts in the
+        # history: chat templates like Qwen's reject a system message after the first.
+        parts = info.model_request_parameters.instruction_parts
+        self.assertEqual(len(parts), 1)
+        self.assertIn("Your name is", parts[0].content)
+        self.assertFalse(any(isinstance(part, SystemPromptPart) for message in messages for part in message.parts))
         last = messages[-1].parts[-1]
         if isinstance(last, UserPromptPart):
             self.prompts.append(last.content)
+            if "rename both" in last.content:
+                return ModelResponse(
+                    parts=[
+                        ToolCallPart("propose_patch", {"fields": {"name": f"{c.name} Inc"}, "id": c.pk})
+                        for c in (self.customer, self.other)
+                    ]
+                )
             if "rename" in last.content:
                 return ModelResponse(
                     parts=[ToolCallPart("propose_patch", {"fields": {"name": "Acme Inc"}, "id": self.customer.pk})]
@@ -192,9 +208,29 @@ class ConversationSocketTests(TransactionTestCase):
             return ModelResponse(parts=[TextPart("Noted.")])
         return ModelResponse(parts=[TextPart("I proposed a rename.")])
 
+    async def stream_fn(self, messages, info):
+        """model_fn's response, streamed after a little reasoning."""
+        if self.release is not None and not isinstance(messages[-1].parts[-1], UserPromptPart):
+            await self.release.wait()
+        response = self.model_fn(messages, info)
+        yield {0: DeltaThinkingPart(content="Checking the screen.")}
+        for index, part in enumerate(response.parts, start=1):
+            if isinstance(part, TextPart):
+                yield part.content
+            else:
+                yield {index: DeltaToolCall(name=part.tool_name, json_args=part.args_as_json_str())}
+
     @asynccontextmanager
     async def fake_factory(self):
-        yield FunctionModel(self.model_fn)
+        yield FunctionModel(self.model_fn, stream_function=self.stream_fn)
+
+    async def receive_turn(self, ws) -> list[dict]:
+        """The events of one streamed turn, turn_start through turn_end."""
+        events = [await ws.receive_json_from()]
+        self.assertEqual(events[0]["type"], "turn_start")
+        while events[-1]["type"] != "turn_end":
+            events.append(await ws.receive_json_from())
+        return events
 
     async def connect(self):
         communicator = WebsocketCommunicator(URLRouter(websocket_urlpatterns), "/ws/assistant/")
@@ -215,15 +251,32 @@ class ConversationSocketTests(TransactionTestCase):
                 {"type": "screen", "screen": {"route": "list", "type_id": "CUS", "selected_ids": [self.customer.pk]}}
             )
             await ws.send_json_to({"type": "user_message", "text": "rename the selected one"})
-            pending = await ws.receive_json_from()
-            self.assertEqual((pending["type"], pending["target"]), ("tool_call_pending", self.customer.pk))
-            self.assertEqual((await ws.receive_json_from())["text"], "I proposed a rename.")
+            events = await self.receive_turn(ws)
             self.assertIn(f"Selected rows (1): {self.customer.pk}.", self.prompts[0])
+            # Reasoning, the tool step and the proposal stream before the final reply.
+            self.assertEqual(
+                [event["type"] for event in events if not event["type"].endswith("_delta")],
+                ["turn_start", "tool_start", "tool_end", "tool_call_pending", "assistant_message", "turn_end"],
+            )
+            by_type = {event["type"]: event for event in events}
+            self.assertEqual(by_type["thinking_delta"]["text"], "Checking the screen.")
+            self.assertEqual(by_type["tool_start"]["label"], f"Drafting a change to {self.customer.pk}")
+            self.assertTrue(by_type["tool_end"]["ok"])
+            self.assertEqual(by_type["tool_call_pending"]["target"], self.customer.pk)
+            self.assertEqual(by_type["assistant_message"]["text"], "I proposed a rename.")
+            streamed = "".join(event["text"] for event in events if event["type"] == "text_delta")
+            self.assertEqual(streamed, "I proposed a rename.")
 
-            await ws.send_json_to({"type": "confirm", "id": pending["id"], "ok": True})
+            await ws.send_json_to({"type": "confirm", "id": by_type["tool_call_pending"]["id"], "ok": True})
             outcome = await ws.receive_json_from()
             self.assertEqual((outcome["type"], outcome["ok"]), ("tool_outcome", True))
-            self.assertEqual((await ws.receive_json_from())["text"], "Noted.")
+            self.assertTrue(await ws.receive_nothing())  # no model turn to acknowledge it
+
+            # The outcome reaches the agent with the next message, once.
+            await ws.send_json_to({"type": "user_message", "text": "thanks"})
+            self.assertIn({"type": "assistant_message", "text": "Noted."}, await self.receive_turn(ws))
+            self.assertIn("[system] Outcome of proposal", self.prompts[-1])
+            self.assertTrue(self.prompts[-1].endswith("thanks"))
             await ws.disconnect()
 
             ws = await self.connect()
@@ -238,13 +291,46 @@ class ConversationSocketTests(TransactionTestCase):
             roles,
             [
                 ("user", "rename the selected one"),
+                ("activity", None),
                 ("proposal", "confirmed"),
                 ("assistant", "I proposed a rename."),
+                ("user", "thanks"),
                 ("assistant", "Noted."),
             ],
         )
+        self.assertEqual(reopened["transcript"][1]["steps"][0]["label"], f"Drafting a change to {self.customer.pk}")
         conversation = await AssistantConversation.objects.aget(pk=opened["id"])
         self.assertGreater(len(conversation.messages), 4)
+
+    async def test_confirm_all_applies_while_the_turn_is_still_running(self):
+        self.release = asyncio.Event()
+        with patch("tests.testapp.ai.create_model", self.fake_factory):
+            ws = await self.connect()
+            await ws.send_json_to({"type": "open_conversation", "id": None})
+            await ws.receive_json_from()
+            await ws.send_json_to({"type": "user_message", "text": "rename both"})
+            pending = []
+            while len(pending) < 2:
+                event = await ws.receive_json_from()
+                if event["type"] == "tool_call_pending":
+                    pending.append(event["id"])
+
+            # The model is still busy; confirming must not wait for it.
+            await ws.send_json_to({"type": "confirm", "ids": pending, "ok": True})
+            outcomes = [await ws.receive_json_from() for _ in pending]
+            self.assertEqual([(o["type"], o["ok"]) for o in outcomes], [("tool_outcome", True)] * 2)
+            self.assertEqual({c.name async for c in Customer.objects.all()}, {"Acme Inc", "Beta Inc"})
+
+            self.release.set()
+            while (await ws.receive_json_from())["type"] != "turn_end":
+                pass
+            await ws.send_json_to({"type": "user_message", "text": "ok"})
+            await self.receive_turn(ws)
+            await ws.disconnect()
+
+        with_outcomes = [prompt for prompt in self.prompts if "[system] Outcome" in prompt]
+        self.assertEqual(len(with_outcomes), 1)
+        self.assertEqual(with_outcomes[0].count("[system] Outcome"), 2)
 
     async def test_other_users_conversation_is_not_reopened(self):
         other = await User.objects.acreate(username="other")

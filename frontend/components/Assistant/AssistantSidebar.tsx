@@ -4,6 +4,7 @@ import SafeMarkdown from '../../shared/SafeMarkdown';
 import { Icon, useScreen } from '../ui';
 import { useAuth } from '../../context/AuthContext';
 import { invalidateObject } from '../../data/invalidate';
+import ActivityBlock from './ActivityBlock';
 import ConfirmCard from './ConfirmCard';
 import { useReconnectingSocket, wsUrl } from '../../hooks/useReconnectingSocket';
 import type { ChatItem, IncomingEvent, OutgoingEvent, Resolution, Screen, TranscriptItem } from './types';
@@ -24,7 +25,9 @@ function resolutionOf(status: string): Resolution | undefined {
 
 export function fromTranscript(transcript: TranscriptItem[]): ChatItem[] {
   return transcript.map((item) =>
-    item.role === 'proposal'
+    item.role === 'activity'
+      ? { kind: 'activity', id: nextItemId(), steps: item.steps, thinking: '', live: false, seconds: item.seconds }
+      : item.role === 'proposal'
       ? {
           kind: 'proposal',
           id: item.id,
@@ -84,21 +87,64 @@ export default function AssistantSidebar({ onClose }: Props) {
   const [items, setItems] = useState<ChatItem[]>([]);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
+  // The reply as it streams in, until the final assistant_message replaces it.
+  const [draft, setDraft] = useState('');
+  // Proposals whose Confirm/Skip was sent and whose outcome hasn't arrived yet.
+  const [deciding, setDeciding] = useState<Map<number | string, 'confirm' | 'skip'>>(new Map());
   const scrollRef = useRef<HTMLDivElement>(null);
   // Proposal id → target CK-ID, so a confirmed outcome can refresh that record.
   const targetsRef = useRef(new Map<number | string, string>());
 
+  // Apply `update` to the activity item of the turn in progress.
+  const updateLiveActivity = useCallback(
+    (update: (item: Extract<ChatItem, { kind: 'activity' }>) => Partial<Extract<ChatItem, { kind: 'activity' }>>) =>
+      setItems((prev) => prev.map((it) => (it.kind === 'activity' && it.live ? { ...it, ...update(it) } : it))),
+    [],
+  );
+
   const handleIncoming = useCallback(
     (evt: IncomingEvent) => {
-      if (evt.type === 'conversation') {
+      if (evt.type === 'turn_start') {
+        setBusy(true);
+        setDraft('');
+        setItems((prev) => [
+          ...prev,
+          { kind: 'activity', id: nextItemId(), steps: [], thinking: '', live: true, startedAt: Date.now() },
+        ]);
+      } else if (evt.type === 'thinking_delta') {
+        updateLiveActivity((it) => ({ thinking: it.thinking + evt.text }));
+      } else if (evt.type === 'text_delta') {
+        setDraft((prev) => prev + evt.text);
+      } else if (evt.type === 'tool_start') {
+        // Text written before a tool call is the model narrating; the step replaces it.
+        setDraft('');
+        updateLiveActivity((it) => ({ thinking: '', steps: [...it.steps, { id: evt.id, label: evt.label, ok: null }] }));
+      } else if (evt.type === 'tool_end') {
+        updateLiveActivity((it) => ({
+          steps: it.steps.map((step) => (step.id === evt.id ? { ...step, ok: evt.ok } : step)),
+        }));
+      } else if (evt.type === 'turn_end') {
+        setBusy(false);
+        setDraft('');
+        // Keep the finished turn's steps as a summary; a turn without tool calls leaves nothing.
+        setItems((prev) =>
+          prev.flatMap((it) =>
+            it.kind === 'activity' && it.live
+              ? it.steps.length
+                ? [{ ...it, live: false, thinking: '', seconds: evt.seconds }]
+                : []
+              : [it],
+          ),
+        );
+      } else if (evt.type === 'conversation') {
         localStorage.setItem(CONVERSATION_KEY, evt.id);
         const restored = fromTranscript(evt.transcript);
         restored.forEach((it) => it.kind === 'proposal' && it.target && targetsRef.current.set(it.id, it.target));
         setItems(restored);
         setBusy(false);
       } else if (evt.type === 'assistant_message') {
+        setDraft('');
         setItems((prev) => [...prev, { kind: 'assistant', id: nextItemId(), text: evt.text }]);
-        setBusy(false);
       } else if (evt.type === 'tool_call_pending') {
         if (evt.target) targetsRef.current.set(evt.id, evt.target);
         setItems((prev) => [
@@ -122,14 +168,16 @@ export default function AssistantSidebar({ onClose }: Props) {
               : it,
           ),
         );
+        setDeciding((prev) => new Map([...prev].filter(([id]) => id !== evt.id)));
         const target = targetsRef.current.get(evt.id);
         if (evt.ok && target) invalidateObject(queryClient, target);
       } else if (evt.type === 'error') {
         setItems((prev) => [...prev, { kind: 'system', id: nextItemId(), text: `Error: ${evt.message}` }]);
         setBusy(false);
+        setDeciding(new Map());
       }
     },
-    [queryClient],
+    [queryClient, updateLiveActivity],
   );
 
   const url = useMemo(() => wsUrl('/ws/assistant/'), []);
@@ -152,7 +200,7 @@ export default function AssistantSidebar({ onClose }: Props) {
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-  }, [items.length, busy]);
+  }, [items, draft]);
 
   const ask = useCallback(
     (text: string) => {
@@ -182,10 +230,15 @@ export default function AssistantSidebar({ onClose }: Props) {
     }
   };
 
-  const decide = (proposalId: number | string, ok: boolean) => {
-    send({ type: 'confirm', id: proposalId, ok });
-    if (ok) setBusy(true);
+  // Applied right away by the server, without a model turn — even mid-turn.
+  const decide = (proposalIds: (number | string)[], ok: boolean) => {
+    send({ type: 'confirm', ids: proposalIds, ok });
+    setDeciding((prev) => new Map([...prev, ...proposalIds.map((id) => [id, ok ? 'confirm' : 'skip'] as const)]));
   };
+
+  const pendingIds = items.flatMap((it) =>
+    it.kind === 'proposal' && !it.resolved && !deciding.has(it.id) ? [it.id] : [],
+  );
 
   return (
     <aside className="flex flex-col h-full bg-bg-1" aria-label={`${assistantName} chat`}>
@@ -203,7 +256,7 @@ export default function AssistantSidebar({ onClose }: Props) {
         <div className="flex-1 leading-tight min-w-0">
           <div className="text-sm font-semibold text-fg-1">{assistantName}</div>
           <div className="text-2xs text-fg-3">
-            {busy ? 'Thinking…' : state === 'open' ? 'Ready' : state === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
+            {busy ? 'Working…' : state === 'open' ? 'Ready' : state === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
           </div>
         </div>
         <button
@@ -263,6 +316,18 @@ export default function AssistantSidebar({ onClose }: Props) {
               </div>
             );
           }
+          if (it.kind === 'activity') {
+            return (
+              <ActivityBlock
+                key={it.id}
+                steps={it.steps}
+                thinking={it.thinking}
+                live={it.live}
+                startedAt={it.startedAt}
+                seconds={it.seconds}
+              />
+            );
+          }
           if (it.kind === 'system') {
             return (
               <div key={it.id} className="text-xs text-fg-3 italic text-center">
@@ -281,13 +346,32 @@ export default function AssistantSidebar({ onClose }: Props) {
               targetLabel={it.targetLabel}
               resolved={it.resolved}
               summary={it.summary}
-              onConfirm={() => decide(it.id, true)}
-              onSkip={() => decide(it.id, false)}
+              deciding={deciding.get(it.id)}
+              onConfirm={() => decide([it.id], true)}
+              onSkip={() => decide([it.id], false)}
             />
           );
         })}
-        {busy && <div className="text-xs text-fg-3 italic">Thinking…</div>}
+        {draft && (
+          <div className="flex justify-start">
+            <div className="ck-bubble ck-bubble-in max-w-[95%]" data-testid="assistant-draft">
+              <SafeMarkdown source={draft} />
+            </div>
+          </div>
+        )}
       </div>
+
+      {pendingIds.length > 1 && (
+        <div className="flex items-center gap-2 px-3 py-2 border-t border-border-1 text-xs text-fg-2">
+          <span className="flex-1">{pendingIds.length} changes waiting</span>
+          <button type="button" className="ck-btn ck-btn-primary ck-btn-sm" onClick={() => decide(pendingIds, true)}>
+            Confirm all
+          </button>
+          <button type="button" className="ck-btn ck-btn-secondary ck-btn-sm" onClick={() => decide(pendingIds, false)}>
+            Skip all
+          </button>
+        </div>
+      )}
 
       <div className="border-t border-border-1 p-2">
         <textarea

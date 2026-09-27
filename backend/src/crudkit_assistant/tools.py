@@ -86,7 +86,7 @@ async def get_object(ctx: RunContext[AssistantDeps], id: str | None = None) -> s
     def _run():
         instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return error
+            return f"ERROR: {error}"
         return f"{instance.__class__._meta.verbose_name} {instance.id}\n{instance.get_ai_context()}"
 
     return await sync_to_async(_run)()
@@ -121,7 +121,7 @@ async def get_changelog(
 
     def _run():
         instance, error = _load_instance(ctx.deps, id)
-        return services.get_changelog(instance, limit) if instance is not None else error
+        return services.get_changelog(instance, limit) if instance is not None else f"ERROR: {error}"
 
     return await sync_to_async(_run)()
 
@@ -134,7 +134,7 @@ async def get_feed(
 
     def _run():
         instance, error = _load_instance(ctx.deps, id)
-        return services.get_feed(instance, limit) if instance is not None else error
+        return services.get_feed(instance, limit) if instance is not None else f"ERROR: {error}"
 
     return await sync_to_async(_run)()
 
@@ -149,10 +149,10 @@ async def get_related(
     def _run():
         instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return error
+            return f"ERROR: {error}"
         manager = getattr(instance, relation_name, None)
         if manager is None or not hasattr(manager, "all"):
-            return [{"error": f"Unknown relation {relation_name!r}"}]
+            return f"ERROR: Unknown relation {relation_name!r}"
         out = []
         queryset = get_authorized_queryset(_load_user(ctx.deps), manager.all(), "view")
         for obj in queryset[:limit]:

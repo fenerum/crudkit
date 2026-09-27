@@ -263,7 +263,7 @@ export default function AssistantSidebar({ onClose }: Props) {
           type="button"
           className="ck-icon-btn ck-icon-btn-sm"
           onClick={newChat}
-          disabled={state !== 'open'}
+          disabled={state !== 'open' || busy}
           aria-label="New chat"
           title="New chat"
         >

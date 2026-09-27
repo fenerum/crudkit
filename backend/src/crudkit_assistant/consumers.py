@@ -63,7 +63,8 @@ class AssistantConsumer(AuthenticatedConsumer):
         self.session_key: str = uuid4().hex
         self.message_history: list = []
         # Turns run as tasks so confirms and screen updates aren't queued behind a
-        # slow model; the lock keeps turns (and the history they extend) in order.
+        # slow model; the lock keeps turns and conversation switches in order, so a
+        # turn always finishes in the conversation it started in.
         self._turn_lock = asyncio.Lock()
         self._turn_tasks: set[asyncio.Task] = set()
         await super().connect()
@@ -83,18 +84,27 @@ class AssistantConsumer(AuthenticatedConsumer):
     async def on_message(self, data: dict):
         msg_type = data.get("type")
         if msg_type == "open_conversation":
-            await self._open_conversation(data.get("id"))
+            self._queue(self._open_conversation, data.get("id"))
         elif msg_type == "screen":
             self.screen = parse_screen(data.get("screen"))
         elif msg_type == "user_message":
-            task = asyncio.create_task(self._handle_user_message(data.get("text", "")))
-            self._turn_tasks.add(task)
-            task.add_done_callback(self._turn_tasks.discard)
+            self._queue(self._run_turn, data.get("text", ""))
         elif msg_type == "confirm":
             ids = data.get("ids") if isinstance(data.get("ids"), list) else [data.get("id")]
             await self._handle_confirm(ids, bool(data.get("ok")))
         else:
             await self.send_json({"type": "error", "message": f"Unknown message type {msg_type!r}"})
+
+    def _queue(self, handler, *args):
+        """Run `handler` under the turn lock, after what is already queued."""
+
+        async def run():
+            async with self._turn_lock:
+                await handler(*args)
+
+        task = asyncio.create_task(run())
+        self._turn_tasks.add(task)
+        task.add_done_callback(self._turn_tasks.discard)
 
     async def _open_conversation(self, conversation_id):
         user = await self._get_user()
@@ -110,17 +120,13 @@ class AssistantConsumer(AuthenticatedConsumer):
             }
         )
 
-    async def _handle_user_message(self, text: str):
-        text = (text or "").strip()
-        if not text or self.user_id is None:
-            return
-        async with self._turn_lock:
-            await self._run_turn(text)
-
     async def _run_turn(self, text: str):
         """Stream one turn between `turn_start` and `turn_end`; its tool steps are
         kept in the transcript as one `activity` item. Proposal outcomes noted since
         the previous turn are prepended to the prompt."""
+        text = (text or "").strip()
+        if not text or self.user_id is None:
+            return
         if self.conversation is None:
             await self._open_conversation(None)
         notes = _unsent_notes(self.conversation.transcript)

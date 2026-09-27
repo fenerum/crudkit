@@ -140,7 +140,8 @@ class CrossRecordToolTests(TestCase):
         return async_to_sync(tool)(_FakeCtx(self.deps), *args, **kwargs)
 
     def test_record_tools_need_an_id_without_an_open_record(self):
-        self.assertIn("No record is open", self.run_tool(tools.get_object))
+        self.assertTrue(self.run_tool(tools.get_object).startswith("ERROR: No record is open"))
+        self.assertTrue(self.run_tool(tools.get_related, "notes", id=self.other.pk).startswith("ERROR: Unknown"))
         self.assertIn("Other", self.run_tool(tools.get_object, id=self.other.pk))
 
     def test_screen_rows_skip_hidden_records(self):
@@ -338,6 +339,30 @@ class ConversationSocketTests(TransactionTestCase):
         with_outcomes = [prompt for prompt in self.prompts if "[system] Outcome" in prompt]
         self.assertEqual(len(with_outcomes), 1)
         self.assertEqual(with_outcomes[0].count("[system] Outcome"), 2)
+
+    async def test_new_conversation_waits_for_the_running_turn(self):
+        self.release = asyncio.Event()
+        with patch("tests.testapp.ai.create_model", self.fake_factory):
+            ws = await self.connect()
+            await ws.send_json_to({"type": "open_conversation", "id": None})
+            first = await ws.receive_json_from()
+            await ws.send_json_to({"type": "user_message", "text": "rename it"})
+            while (await ws.receive_json_from())["type"] != "tool_call_pending":
+                pass
+
+            await ws.send_json_to({"type": "open_conversation", "id": None})
+            self.release.set()
+            events = [await ws.receive_json_from()]
+            while events[-1]["type"] != "conversation":
+                events.append(await ws.receive_json_from())
+            await ws.disconnect()
+
+        self.assertIn("turn_end", [event["type"] for event in events])
+        self.assertEqual(events[-1]["transcript"], [])
+        conversation = await AssistantConversation.objects.aget(pk=first["id"])
+        self.assertEqual(
+            [item["role"] for item in conversation.transcript], ["user", "activity", "proposal", "assistant"]
+        )
 
     async def test_other_users_conversation_is_not_reopened(self):
         other = await User.objects.acreate(username="other")

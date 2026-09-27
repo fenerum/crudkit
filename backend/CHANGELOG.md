@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-09-27)
 
 - `crudkit_assistant`: the assistant is now a sidebar available on every page (toggle in the
   topbar or ⌘J / Ctrl+J), replacing the per-record floating window. The SPA reports what is on
@@ -22,30 +22,30 @@
   `screen`; `object_type_id`/`object_pk` remain as read-only properties derived from the open
   record. The user profile's `assistant` gains `enabled` — true only when `crudkit_assistant`
   is installed and an AI model is configured (`CRUDKIT_AI_MODEL` /
-  `CRUDKIT_AI_MODEL_FACTORY`); the SPA hides the assistant otherwise.
+  `CRUDKIT_AI_MODEL_FACTORY`); the SPA hides the assistant otherwise. (#47)
 - `crudkit_api`: new `crudkit_api.records` with the type descriptions, listing, saved-view and
-  record reads the MCP tools used, now shared with the assistant.
+  record reads the MCP tools used, now shared with the assistant. (#47)
 - Demo: installs `crudkit_assistant` next to the realtime socket; set `DEMO_AI_MODEL` to a
-  pydantic-ai model name to try the assistant.
+  pydantic-ai model name to try the assistant. (#47)
 - `crudkit_mcp`: `list_records` takes a saved `view` (VIW CK-ID) and returns its rows with the
   view's filters, ordering and columns applied; `describe_types` lists a type's views. Access
   follows the REST API's `_view`: the view must be public or the user's own, and the user must
-  be able to view its type.
+  be able to view its type. (#42)
 - `crudkit_api`: saved-view ordering moved out of `BasicFilter` into `get_order_fields` and
-  `order_queryset` in `crudkit_api.filters`.
+  `order_queryset` in `crudkit_api.filters`. (#42)
 - `crudkit_frontend`: saved views get a visual filter editor instead of the raw JSON
   textarea — per-field value pickers (choices, yes/no, numbers, dates, related records),
   variables like "Current user" (`${user}`), and invalid filters highlighted in red and
-  editable instead of breaking the form.
+  editable instead of breaking the form. (#43)
 - `crudkit`: `View.clean()` rejects unknown filter comparators and entries that aren't
   exactly `[field, comparator, value]`, so they fail on save (400) instead of when the view
-  is applied (500).
+  is applied (500). (#43)
 - `crudkit_frontend`: the sidebar shows the installed crudkit version (`crudkit vX.Y.Z`)
-  at the bottom; exposed to the SPA as `crudkit_version` in the frontend config.
+  at the bottom; exposed to the SPA as `crudkit_version` in the frontend config. (#41)
 - `crudkit_frontend`: the command palette labels result groups with the type's name
   (`Companies (CMP)`) and adds a "Show all <type>" row when a type has more matches than
   shown, linking to its list filtered by the query. The search endpoint now returns one extra
-  row per type (6, or 21 for a `CMP:` scoped search) so the palette can tell.
+  row per type (6, or 21 for a `CMP:` scoped search) so the palette can tell. (#44)
 - Realtime change hints (new extra `crudkit[realtime]`; `crudkit[assistant]` now includes
   it): every save/delete of a TYPE_ID model sends `{model, id, action, by}` after commit to
   a new `ws/changes/` socket (saves only to users who may view that row; deletes without
@@ -54,11 +54,11 @@
   socket is down. **Upgrade:** add `crudkit_api.routing.websocket_urlpatterns` to the
   project's ASGI `URLRouter`; it needs a shared `CHANNEL_LAYERS` (e.g. Redis) when running
   more than one process. Without a channel layer the socket closes (4503), and without the
-  route the SPA gives up after three attempts; either way it keeps polling as before.
+  route the SPA gives up after three attempts; either way it keeps polling as before. (#45)
 - `crudkit_api`: `crudkit_api.ws_auth.AuthenticatedConsumer` — the session-or-JWT-first-frame
-  WebSocket auth, extracted from the assistant consumer.
+  WebSocket auth, extracted from the assistant consumer. (#45)
 - `crudkit_frontend`: the edit form no longer overwrites typed values when the record is
-  refetched; it shows a "changed elsewhere — Reload" banner instead.
+  refetched; it shows a "changed elsewhere — Reload" banner instead. (#45)
 
 ## 0.4.0 (2026-09-24)
 

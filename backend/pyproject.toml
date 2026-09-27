@@ -20,7 +20,7 @@ dependencies = [
     "Django>=5.1",
     "celery>=5.3",
     "pydantic>=2.11",
-    "pydantic-ai-slim>=1.39",
+    "pydantic-ai-slim>=2.51",
     "pyjwt>=2.9",
     "django-phonenumber-field[phonenumberslite]>=8.0",
 ]

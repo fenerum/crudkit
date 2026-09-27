@@ -4,6 +4,8 @@
 
 - `crudkit_assistant`: `describe_object` no longer fails on models with lazily translated
   `help_text`.
+- Packaging: require `pydantic-ai-slim>=2.51` (the tested version); 1.x is incompatible with the
+  assistant.
 
 ## 0.5.0 (2026-09-27)
 

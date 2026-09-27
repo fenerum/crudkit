@@ -8,6 +8,7 @@ from uuid import UUID
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
 
+from crudkit.models import WorkLog
 from crudkit_api.metadata import (
     FK_CHOICES_LIMIT,
     _coerce_current_value,
@@ -210,4 +211,10 @@ class BuildInstanceMetadataTests(TestCase):
         """The whole pipeline must produce something pydantic-ai can dump.
         json.dumps with default str is a strict-enough proxy."""
         md = build_instance_metadata(self._make_ticket(customer=self.customer_alice))
+        json.dumps(md)
+
+    def test_lazy_help_text_is_plain_str(self):
+        """WorkLog's help_text is gettext_lazy; pydantic-ai can't dump lazy proxies."""
+        md = build_instance_metadata(WorkLog())
+        self.assertIs(type(md["fields"]["notes"]["help_text"]), str)
         json.dumps(md)

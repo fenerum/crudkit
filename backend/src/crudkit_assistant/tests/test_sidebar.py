@@ -315,10 +315,17 @@ class ConversationSocketTests(TransactionTestCase):
                 if event["type"] == "tool_call_pending":
                     pending.append(event["id"])
 
-            # The model is still busy; confirming must not wait for it.
+            # The model is still busy; confirming must not wait for it. The two tool calls
+            # run concurrently, so the turn's own events (e.g. the second tool_end) may
+            # still interleave with the outcomes.
             await ws.send_json_to({"type": "confirm", "ids": pending, "ok": True})
-            outcomes = [await ws.receive_json_from() for _ in pending]
-            self.assertEqual([(o["type"], o["ok"]) for o in outcomes], [("tool_outcome", True)] * 2)
+            outcomes = []
+            while len(outcomes) < 2:
+                event = await ws.receive_json_from()
+                self.assertNotEqual(event["type"], "turn_end")
+                if event["type"] == "tool_outcome":
+                    outcomes.append(event)
+            self.assertEqual([o["ok"] for o in outcomes], [True, True])
             self.assertEqual({c.name async for c in Customer.objects.all()}, {"Acme Inc", "Beta Inc"})
 
             self.release.set()

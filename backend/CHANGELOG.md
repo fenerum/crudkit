@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `crudkit_assistant`: `describe_object` no longer fails on models with lazily translated
+  `help_text`.
+
 ## 0.5.0 (2026-09-27)
 
 - `crudkit_assistant`: the assistant is now a sidebar available on every page (toggle in the

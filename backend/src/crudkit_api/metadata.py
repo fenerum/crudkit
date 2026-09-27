@@ -229,7 +229,7 @@ def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
             "current": current,
         }
         if meta.get("help_text"):
-            entry["help_text"] = meta["help_text"]
+            entry["help_text"] = str(meta["help_text"])
         if meta.get("required"):
             entry["required"] = True
         choices = meta.get("choices")

@@ -3,7 +3,10 @@ Tools the assistant agent can call.
 
 Split into two physically-separate groups:
 
-- Read tools: run inline, return data.
+- Read tools: run inline, return data. Record tools take an optional `id`
+  (CK-ID) and default to the record open on the user's screen; the
+  cross-record tools (search, list_records, …) share their logic with MCP
+  via crudkit_api.records.
 - Proposal tools: do NOT mutate. They persist an AssistantProposal row,
   emit a tool_call_pending WS event, and return a "pending" string. The
   actual mutation only runs in AssistantConsumer.confirm_proposal() when
@@ -20,15 +23,38 @@ from typing import Any
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from pydantic_ai import RunContext
 
 from crudkit.authorization import get_authorized_instance, get_authorized_queryset, has_action_permission
-from crudkit_api import services
+from crudkit.models import parse_ck_id
+from crudkit_api import records, services
 from crudkit_api.metadata import build_instance_metadata
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
 
 logger = logging.getLogger(__name__)
+
+
+def describe_call(tool_name: str, args: dict) -> str:
+    """A short, human description of a tool call for the sidebar's activity list."""
+    target = args.get("id") or "the open record"
+    labels = {
+        "get_object": f"Reading {target}",
+        "describe_object": f"Checking the fields of {target}",
+        "get_changelog": f"Reading the history of {target}",
+        "get_feed": f"Reading the activity on {target}",
+        "get_related": f"Reading {args.get('relation_name')} of {target}",
+        "search": f"Searching for “{args.get('query')}”",
+        "describe_types": f"Looking up {args.get('type') or 'the record types'}",
+        "list_records": f"Listing {args.get('view') or args.get('type') or 'records'}",
+        "get_record": f"Reading {args.get('id')}",
+        "get_screen_rows": f"Reading the {args.get('which') or 'selected'} rows",
+        "propose_patch": f"Drafting a change to {target}",
+        "propose_action": f"Drafting {args.get('action_name')} on {target}",
+        "propose_create_note": f"Drafting a note on {target}",
+    }
+    return labels.get(tool_name, f"Running {tool_name}")
 
 
 # ---------------------------------------------------------------------------
@@ -39,24 +65,35 @@ def _load_user(deps: AssistantDeps):
     return get_user_model().objects.get(pk=deps.user_id)
 
 
-def _load_instance(deps: AssistantDeps, action: str = "view"):
-    return get_authorized_instance(_load_user(deps), deps.object_type_id, deps.object_pk, action)
+def _load_instance(deps: AssistantDeps, object_id: str | None, action: str = "view"):
+    """`(instance, error)` for `object_id`, else the record open on screen."""
+    object_id = object_id or deps.screen.record_id
+    if not object_id:
+        return None, "No record is open; pass `id` (e.g. CUS123)."
+    try:
+        type_id, pk = parse_ck_id(object_id)
+    except ValueError:
+        return None, f"Invalid id {object_id!r}; expected e.g. CUS123."
+    instance = get_authorized_instance(_load_user(deps), type_id, pk, action)
+    if instance is None:
+        return None, f"{object_id} not found, or not available for {action}."
+    return instance, None
 
 
-async def get_object(ctx: RunContext[AssistantDeps]) -> str:
-    """Return a textual summary of the currently-open CrudKit object."""
+async def get_object(ctx: RunContext[AssistantDeps], id: str | None = None) -> str:
+    """Return a textual summary of a record (default: the one open on screen)."""
 
     def _run():
-        instance = _load_instance(ctx.deps)
+        instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return "Object not found."
+            return f"ERROR: {error}"
         return f"{instance.__class__._meta.verbose_name} {instance.id}\n{instance.get_ai_context()}"
 
     return await sync_to_async(_run)()
 
 
-async def describe_object(ctx: RunContext[AssistantDeps]) -> dict[str, Any]:
-    """Return the schema of the open object: every writable field with its
+async def describe_object(ctx: RunContext[AssistantDeps], id: str | None = None) -> dict[str, Any]:
+    """Return the schema of a record (default: the one open on screen): every writable field with its
     type, current value, valid choices (for choice fields), and — for
     foreign keys — the list of related rows the model is allowed to pick
     from. Also lists the available @crm_actions.
@@ -66,54 +103,134 @@ async def describe_object(ctx: RunContext[AssistantDeps]) -> dict[str, Any]:
     this payload."""
 
     def _run():
-        instance = _load_instance(ctx.deps)
+        instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return {"error": "Object not found."}
+            return {"error": error}
         return build_instance_metadata(instance, user=_load_user(ctx.deps))
 
     return await sync_to_async(_run)()
 
 
-async def get_changelog(ctx: RunContext[AssistantDeps], limit: int = 20) -> list[dict[str, Any]]:
-    """Return up to `limit` recent ChangeLog entries for the open object.
+async def get_changelog(
+    ctx: RunContext[AssistantDeps], id: str | None = None, limit: int = 20
+) -> list[dict[str, Any]] | str:
+    """Return up to `limit` recent ChangeLog entries for a record (default: the one open on screen).
 
     Each entry has {at, by, field_changes: {field: [old, new]}}.
     """
 
     def _run():
-        instance = _load_instance(ctx.deps)
-        return services.get_changelog(instance, limit) if instance is not None else []
+        instance, error = _load_instance(ctx.deps, id)
+        return services.get_changelog(instance, limit) if instance is not None else f"ERROR: {error}"
 
     return await sync_to_async(_run)()
 
 
-async def get_feed(ctx: RunContext[AssistantDeps], limit: int = 20) -> list[dict[str, Any]]:
-    """Return up to `limit` recent FeedItems (notes, related-object events) on the open object."""
+async def get_feed(
+    ctx: RunContext[AssistantDeps], id: str | None = None, limit: int = 20
+) -> list[dict[str, Any]] | str:
+    """Return up to `limit` recent FeedItems (notes, related-object events) on a record
+    (default: the one open on screen)."""
 
     def _run():
-        instance = _load_instance(ctx.deps)
-        return services.get_feed(instance, limit) if instance is not None else []
+        instance, error = _load_instance(ctx.deps, id)
+        return services.get_feed(instance, limit) if instance is not None else f"ERROR: {error}"
 
     return await sync_to_async(_run)()
 
 
-async def get_related(ctx: RunContext[AssistantDeps], relation_name: str, limit: int = 20) -> list[dict[str, Any]]:
-    """Walk a reverse FK relation on the open object (e.g. 'activity_set',
-    'opportunityproduct_set', 'message_set'). Returns up to `limit` rows
-    summarised via get_ai_context()."""
+async def get_related(
+    ctx: RunContext[AssistantDeps], relation_name: str, id: str | None = None, limit: int = 20
+) -> list[dict[str, Any]] | str:
+    """Walk a reverse FK relation on a record (default: the one open on screen),
+    e.g. 'activity_set', 'opportunityproduct_set', 'message_set'. Returns up
+    to `limit` rows summarised via get_ai_context()."""
 
     def _run():
-        instance = _load_instance(ctx.deps)
+        instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return []
+            return f"ERROR: {error}"
         manager = getattr(instance, relation_name, None)
         if manager is None or not hasattr(manager, "all"):
-            return [{"error": f"Unknown relation {relation_name!r}"}]
+            return f"ERROR: Unknown relation {relation_name!r}"
         out = []
         queryset = get_authorized_queryset(_load_user(ctx.deps), manager.all(), "view")
         for obj in queryset[:limit]:
             ctx_text = obj.get_ai_context() if hasattr(obj, "get_ai_context") else str(obj)
             out.append({"id": str(getattr(obj, "id", obj.pk)), "context": ctx_text})
+        return out
+
+    return await sync_to_async(_run)()
+
+
+async def _records_call(ctx: RunContext[AssistantDeps], fn, *args, **kwargs):
+    def _run():
+        try:
+            return fn(_load_user(ctx.deps), *args, **kwargs)
+        except PermissionDenied:
+            return {"error": "Permission denied."}
+        except ValueError as exc:
+            return {"error": str(exc)}
+
+    return await sync_to_async(_run)()
+
+
+async def search(ctx: RunContext[AssistantDeps], query: str) -> list[dict[str, Any]] | dict:
+    """Search all record types by text. Returns matching records as {id, label}."""
+    return await _records_call(ctx, records.search, query)
+
+
+async def describe_types(ctx: RunContext[AssistantDeps], type: str | None = None) -> list | dict:
+    """Without `type`, list the record types (TYPE_IDs). With a TYPE_ID, that type's
+    filters, writable fields, actions and saved views (view ids like VIW3)."""
+    return await _records_call(ctx, records.describe_types, type)
+
+
+async def list_records(
+    ctx: RunContext[AssistantDeps],
+    type: str | None = None,
+    view: str | None = None,
+    filters: dict[str, Any] | None = None,
+    query: str | None = None,
+    order_by: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+) -> dict:
+    """List records of one type, or of a saved view (e.g. the view on screen).
+    Returns {total, results}. `filters` keys come from describe_types."""
+    return await _records_call(
+        ctx,
+        records.list_records,
+        type_id=type,
+        view=view,
+        filters=filters,
+        query=query,
+        order_by=order_by,
+        limit=limit,
+        offset=offset,
+    )
+
+
+async def get_record(ctx: RunContext[AssistantDeps], id: str) -> dict:
+    """One record by id, with its recent feed, change log and available actions."""
+    return await _records_call(ctx, records.get_record, id)
+
+
+async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected") -> list[dict[str, Any]]:
+    """The rows on the user's screen, summarised: `which` is "selected" (falls
+    back to the visible rows when nothing is selected) or "visible"."""
+    screen = ctx.deps.screen
+    ids = screen.selected_ids if which == "selected" and screen.selected_ids else screen.visible_ids
+
+    def _run():
+        user = _load_user(ctx.deps)
+        out = []
+        for object_id in ids:
+            try:
+                _, instance = records.get_instance(user, object_id, "view")
+            except (ValueError, PermissionDenied):
+                continue
+            out.append({"id": object_id, "context": instance.get_ai_context()})
         return out
 
     return await sync_to_async(_run)()
@@ -125,14 +242,15 @@ async def get_related(ctx: RunContext[AssistantDeps], relation_name: str, limit:
 
 def _make_proposal(
     deps: AssistantDeps,
+    object_id: str | None,
     kind: str,
     label: str,
     payload: dict,
     reasoning: str,
 ) -> AssistantProposal:
-    instance = _load_instance(deps, "change")
+    instance, error = _load_instance(deps, object_id, "change")
     if instance is None:
-        raise PermissionError("Object is not available for changes")
+        raise PermissionError(error)
     user = _load_user(deps)
     return AssistantProposal.objects.create(
         target_content_type=ContentType.objects.get_for_model(instance.__class__),
@@ -147,7 +265,8 @@ def _make_proposal(
     )
 
 
-def _pending_envelope(proposal: AssistantProposal) -> dict:
+def pending_envelope(proposal: AssistantProposal) -> dict:
+    target = proposal.target
     return {
         "type": "tool_call_pending",
         "id": proposal.id,
@@ -155,11 +274,14 @@ def _pending_envelope(proposal: AssistantProposal) -> dict:
         "label": proposal.label,
         "payload": proposal.payload,
         "reasoning": proposal.reasoning,
+        "target": str(target.id) if target is not None else None,
+        "target_label": str(target) if target is not None else None,
     }
 
 
 async def _propose(
     ctx: RunContext[AssistantDeps],
+    object_id: str | None,
     kind: str,
     label: str,
     payload: dict,
@@ -167,10 +289,14 @@ async def _propose(
 ) -> str:
     """Shared helper: persist a proposal, push the pending envelope to the
     consumer's outbox, and return a string the model treats as the tool result."""
-    proposal = await sync_to_async(_make_proposal)(ctx.deps, kind, label, payload, reasoning)
+    try:
+        proposal = await sync_to_async(_make_proposal)(ctx.deps, object_id, kind, label, payload, reasoning)
+    except PermissionError as exc:
+        return f"ERROR: {exc}"
+    envelope = await sync_to_async(pending_envelope)(proposal)
     outbox = getattr(ctx.deps, "_outbox", None)
     if outbox is not None:
-        await outbox.put(_pending_envelope(proposal))
+        await outbox.put(envelope)
     return (
         f"Proposal {proposal.id} ({kind}: {label}) is awaiting user confirmation. "
         "The action has NOT run yet. You will be told the outcome in a later turn."
@@ -181,48 +307,46 @@ async def propose_action(
     ctx: RunContext[AssistantDeps],
     action_name: str,
     reasoning: str = "",
+    id: str | None = None,
 ) -> str:
-    """Propose running a @crm_action on the open object. The action is NOT
-    executed until the user confirms. `action_name` must be one of the names
-    returned by describe_object().actions."""
+    """Propose running a @crm_action on a record (default: the one open on
+    screen). The action is NOT executed until the user confirms.
+    `action_name` must be one of the names returned by describe_object().actions."""
 
     def _validate():
-        instance = _load_instance(ctx.deps)
+        instance, error = _load_instance(ctx.deps, id)
         if instance is None:
-            return ["object not found"], []
+            return error, []
         valid = list(getattr(instance, "_actions", {}).keys())
-        valid = [name for name in valid if has_action_permission(_load_user(ctx.deps), instance, name)]
-        return ([] if action_name in valid else [action_name]), valid
+        return None, [name for name in valid if has_action_permission(_load_user(ctx.deps), instance, name)]
 
-    invalid, valid_actions = await sync_to_async(_validate)()
-    if invalid:
+    error, valid_actions = await sync_to_async(_validate)()
+    if error:
+        return f"ERROR: {error}"
+    if action_name not in valid_actions:
         return (
             f"ERROR: action {action_name!r} does not exist on this object. "
             f"Valid actions: {valid_actions}. Pick one of these or do not propose an action."
         )
     label = f"Run {action_name}"
-    return await _propose(ctx, AssistantProposal.Kind.ACTION, label, {"action": action_name}, reasoning)
+    return await _propose(ctx, id, AssistantProposal.Kind.ACTION, label, {"action": action_name}, reasoning)
 
 
 async def propose_patch(
     ctx: RunContext[AssistantDeps],
     fields: dict[str, Any],
     reasoning: str = "",
+    id: str | None = None,
 ) -> str:
-    """Propose updating one or more fields on the open object via PATCH. The
-    edit is NOT applied until the user confirms. `fields` is a {field_name: new_value} dict."""
+    """Propose updating one or more fields on a record (default: the one open
+    on screen) via PATCH. The edit is NOT applied until the user confirms.
+    `fields` is a {field_name: new_value} dict."""
     if not isinstance(fields, dict) or not fields:
         return "ERROR: `fields` must be a non-empty {field_name: new_value} dict."
 
-    def _validate():
-        instance = _load_instance(ctx.deps)
-        if instance is None:
-            return None
-        return instance
-
-    instance = await sync_to_async(_validate)()
+    instance, error = await sync_to_async(_load_instance)(ctx.deps, id)
     if instance is None:
-        return "ERROR: object not found."
+        return f"ERROR: {error}"
 
     field_map = {f.name: f for f in instance._meta.fields}
     unknown = [k for k in fields if k not in field_map]
@@ -249,16 +373,17 @@ async def propose_patch(
     except (TypeError, ValueError):
         preview = ", ".join(fields)
     label = f"Update {preview}"
-    return await _propose(ctx, AssistantProposal.Kind.PATCH, label, {"fields": fields}, reasoning)
+    return await _propose(ctx, id, AssistantProposal.Kind.PATCH, label, {"fields": fields}, reasoning)
 
 
 async def propose_create_note(
     ctx: RunContext[AssistantDeps],
     body: str,
     reasoning: str = "",
+    id: str | None = None,
 ) -> str:
-    """Propose adding a note (FeedItem) to the open object. The note is NOT
-    created until the user confirms."""
+    """Propose adding a note (FeedItem) to a record (default: the one open on
+    screen). The note is NOT created until the user confirms."""
     snippet = (body or "").strip().splitlines()[0] if body else ""
     label = f"Add note: {snippet[:80]}"
-    return await _propose(ctx, AssistantProposal.Kind.NOTE, label, {"body": body}, reasoning)
+    return await _propose(ctx, id, AssistantProposal.Kind.NOTE, label, {"body": body}, reasoning)

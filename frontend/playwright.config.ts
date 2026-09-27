@@ -34,7 +34,8 @@ export default defineConfig({
           `rm -f ${dbPath} && uv run manage.py migrate --noinput && uv run manage.py seed ` +
           `&& uv run manage.py runserver 127.0.0.1:${port} --noreload`,
         cwd: '../examples/demo',
-        env: { DEMO_DB_PATH: dbPath },
+        // pydantic-ai's offline test model: enables the assistant without an API key.
+        env: { DEMO_DB_PATH: dbPath, DEMO_AI_MODEL: 'test' },
         url: `${baseURL}/login`,
         reuseExistingServer: true,
         timeout: 120_000,

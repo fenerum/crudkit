@@ -5,12 +5,21 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Machine-local overrides (e.g. a local LLM, see the README) from the repo-root
+# .env, which Conductor copies into each workspace. Real environment variables win.
+ENV_FILE = BASE_DIR.parent.parent / ".env"
+if ENV_FILE.exists():
+    for line in ENV_FILE.read_text().splitlines():
+        key, sep, value = line.partition("=")
+        if sep and not key.strip().startswith("#"):
+            os.environ.setdefault(key.strip(), value.strip())
+
 SECRET_KEY = "demo-only-secret-key"
 DEBUG = True
 ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
-    # First, so `runserver` serves ASGI (HTTP + the ws/changes/ socket).
+    # First, so `runserver` serves ASGI (HTTP + the ws/changes/ and ws/assistant/ sockets).
     "daphne",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -22,6 +31,7 @@ INSTALLED_APPS = [
     "crudkit",
     "crudkit_frontend",
     "crudkit_mcp",
+    "crudkit_assistant",
     "library",
 ]
 
@@ -87,6 +97,10 @@ CRUDKIT_DEFAULT_CURRENCY = "EUR"
 # The MCP OAuth consent page needs a session login.
 LOGIN_URL = "/admin/login/"
 CRUDKIT_MCP_SERVER_NAME = "crudkit-demo"
+
+# A pydantic-ai model name (e.g. "anthropic:claude-sonnet-5") enables the
+# assistant sidebar and AI fields; without one the assistant is hidden.
+CRUDKIT_AI_MODEL = os.environ.get("DEMO_AI_MODEL")
 
 CRUDKIT_FRONTEND_CONFIG = {
     "app_name": "CrudKit Demo",

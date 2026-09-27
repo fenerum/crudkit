@@ -14,6 +14,7 @@ from django.test import TestCase
 from crudkit_assistant import tools
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
+from crudkit_assistant.screen import Screen
 from tests.testapp.models import Customer
 
 User = get_user_model()
@@ -41,9 +42,8 @@ class ProposalSafetyTests(TestCase):
         # Customer.pk is a formatted CK id ("CUS<n>"); TYPE_ID is "CUS".
         self.deps = AssistantDeps(
             user_id=self.user.pk,
-            object_type_id="CUS",
-            object_pk=self.customer.pk,
             session_key="testsession",
+            screen=Screen(route="detail", record_id=self.customer.pk),
         )
         # The runner normally attaches an asyncio.Queue here. The proposal
         # tools call `await outbox.put(...)`; we set a real queue so that

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from crudkit_assistant.models import AssistantProposal
+from crudkit_assistant.models import AssistantConversation, AssistantProposal
 
 
 @admin.register(AssistantProposal)
@@ -25,3 +25,10 @@ class AssistantProposalAdmin(admin.ModelAdmin):
         "updated_by",
         "status",
     )
+
+
+@admin.register(AssistantConversation)
+class AssistantConversationAdmin(admin.ModelAdmin):
+    list_display = ("id", "title", "created_by", "updated_at")
+    search_fields = ("title", "id")
+    readonly_fields = ("session_key", "messages", "transcript", "created_at", "created_by", "updated_at", "updated_by")

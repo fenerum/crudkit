@@ -47,8 +47,9 @@ class Book(BaseCrudKitModel):
 - `inline_create` — set to `False` to hide the "Create new…" option in
   related-object pickers that target this model (default `True`).
 - `ai_trigger_children` — related objects whose changes re-trigger AI fields.
-- `assistant_prompt` / `assistant_tools` — configure the per-object AI
-  assistant (`crudkit_assistant`).
+- `assistant_prompt` / `assistant_tools` — the playbook and extra tools the AI
+  assistant (`crudkit_assistant`) gets while a record or list of this model is
+  on screen.
 - `mcp_exclude` — set to `True` to leave the model out of the MCP server's
   generated tools (`crudkit_mcp`).
 

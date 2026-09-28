@@ -31,7 +31,7 @@ from crudkit.authorization import (
     has_action_permission,
     has_model_permission,
 )
-from crudkit.models import parse_ck_id
+from crudkit.models import ChangeLog, parse_ck_id
 from crudkit_api import records, services
 from crudkit_api.metadata import build_instance_metadata
 from crudkit_assistant.deps import AssistantDeps
@@ -134,7 +134,11 @@ async def get_changelog(
 
     def _run():
         instance, error = _load_instance(ctx.deps, id)
-        return services.get_changelog(instance, limit) if instance is not None else f"ERROR: {error}"
+        if instance is None:
+            return f"ERROR: {error}"
+        if not has_model_permission(_load_user(ctx.deps), ChangeLog, "view"):
+            return "ERROR: this user may not view change history."
+        return services.get_changelog(instance, limit)
 
     return await sync_to_async(_run)()
 
@@ -273,6 +277,16 @@ def _file_proposal(deps: AssistantDeps, user, model, instance, kind: str, label:
     return pending_envelope(proposal)
 
 
+def _load_changeable(deps: AssistantDeps, object_id: str | None):
+    """`(instance, error)` for a record the assistant may propose changes to:
+    one the user may change, of a type exposed to the assistant (not CrudKit's
+    own bookkeeping such as proposals, runs or the change log)."""
+    instance, error = _load_instance(deps, object_id, "change")
+    if instance is not None and instance.__class__ not in records.get_exposed_models(mcp_allowlist=False):
+        return None, f"{instance.id} can't be changed by the assistant."
+    return instance, error
+
+
 def _make_proposal(
     deps: AssistantDeps,
     object_id: str | None,
@@ -281,7 +295,11 @@ def _make_proposal(
     payload: dict,
     reasoning: str,
 ) -> dict:
-    instance, error = _load_instance(deps, object_id, "change")
+    if kind == AssistantProposal.Kind.REVERT:
+        # An undo's target is only where it is shown; revert_change_set checks every record it touches.
+        instance, error = _load_instance(deps, object_id, "change")
+    else:
+        instance, error = _load_changeable(deps, object_id)
     if instance is None:
         raise PermissionError(error)
     return _file_proposal(deps, _load_user(deps), instance.__class__, instance, kind, label, payload, reasoning)
@@ -338,22 +356,29 @@ async def _propose(
     return _pending_text(envelope)
 
 
-def _field_errors(model, fields: dict) -> str | None:
-    """Why `fields` can't be proposed on `model`: unknown field names, or
-    choice values the model invented."""
+def _field_errors(model, fields: dict, user) -> str | None:
+    """Why `fields` can't be proposed on `model`: unknown or read-only field
+    names, FK targets that don't exist or `user` can't see (the serializer
+    would silently store None), or choice values the model invented."""
+    writable = {
+        f.name: f
+        for f in model._meta.fields
+        if f.editable
+        and not f.primary_key
+        and f.name not in records.AUDIT_FIELDS | records.SKIPPED_FIELDS
+        and not getattr(f, "ai_field", False)
+    }
+    try:
+        records.check_values(user, writable, fields)
+    except ValueError as exc:
+        return f"{exc}. Call describe_types or describe_object first."
     field_map = {f.name: f for f in model._meta.fields}
-    unknown = [k for k in fields if k not in field_map]
-    if unknown:
-        return (
-            f"field(s) {unknown} do not exist on {model.__name__}. Valid fields: {sorted(field_map)}. "
-            "Call describe_types or describe_object first."
-        )
     choice_errors = []
     for name, value in fields.items():
         field = field_map[name]
-        if field.choices and value not in (None, "") and not isinstance(value, (int, bool)):
+        if field.choices and value not in (None, "") and not isinstance(value, bool):
             valid_values = [choice for choice, _ in field.flatchoices]
-            if value not in valid_values:
+            if value not in valid_values and str(value) not in map(str, valid_values):
                 choice_errors.append(f"{name}={value!r} is not a valid choice; valid: {valid_values}")
     return "; ".join(choice_errors) or None
 
@@ -399,10 +424,13 @@ async def propose_patch(
     if not isinstance(fields, dict) or not fields:
         return "ERROR: `fields` must be a non-empty {field_name: new_value} dict."
 
-    instance, error = await sync_to_async(_load_instance)(ctx.deps, id)
-    if instance is None:
-        return f"ERROR: {error}"
-    if error := _field_errors(instance.__class__, fields):
+    def _check():
+        instance, error = _load_changeable(ctx.deps, id)
+        if instance is None:
+            return error
+        return _field_errors(instance.__class__, fields, _load_user(ctx.deps))
+
+    if error := await sync_to_async(_check)():
         return f"ERROR: {error}"
     return await _propose(ctx, id, AssistantProposal.Kind.PATCH, patch_label(fields), {"fields": fields}, reasoning)
 
@@ -431,15 +459,15 @@ async def propose_bulk_patch(
         instances, refused = [], []
         for object_id in ids:
             # An empty id would fall back to the record open on screen.
-            instance, error = _load_instance(ctx.deps, object_id, "change") if object_id else (None, "Empty id.")
+            instance, error = _load_changeable(ctx.deps, object_id) if object_id else (None, "Empty id.")
             if instance is None:
                 refused.append(error)
             else:
                 instances.append(instance)
-        for model in {instance.__class__ for instance in instances}:
-            if error := _field_errors(model, fields):
-                raise ValueError(error)
         user = _load_user(ctx.deps)
+        for model in {instance.__class__ for instance in instances}:
+            if error := _field_errors(model, fields, user):
+                raise ValueError(error)
         envelopes, unchanged = [], []
         for instance in instances:
             if all(
@@ -518,7 +546,7 @@ async def propose_create(
         if not has_model_permission(user, model, "add"):
             raise PermissionDenied
         checked = records.checked_fields(model, user, fields)
-        if error := _field_errors(model, checked):
+        if error := _field_errors(model, checked, user):
             raise ValueError(error)
         services.check_create(model, checked, user)
         label = f"Create {model._meta.verbose_name}"

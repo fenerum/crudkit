@@ -114,7 +114,13 @@ class MCPServer:
         caller = f"token{self.token.pk}" if self.token else f"user{self.user.pk}"
         key = f"crudkit_mcp_write:{caller}:{int(time.time() // seconds)}"
         cache.add(key, 0, seconds)
-        if cache.incr(key) <= count:
+        try:
+            writes = cache.incr(key)
+        except ValueError:
+            # A cache that stores nothing (DummyCache) can't count; don't block writes.
+            logger.warning("CRUDKIT_MCP_WRITE_RATE needs a working cache; not limiting MCP writes")
+            return None
+        if writes <= count:
             return None
         return f"Write rate limit exceeded: at most {count} writes per {period}. Try again shortly."
 

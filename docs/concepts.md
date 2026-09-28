@@ -132,10 +132,15 @@ pages, history and undo at `/AIC`. Add a saved view to the menu to link it.
   those for the record's type.
 
 The documents are shown to every assistant user, whatever their permissions on
-`AIC`, so keep secrets out of them. When a user teaches the assistant something
-durable about the company, it proposes an edit to the relevant document
-(`propose_patch` with the `AIC` id), which waits for Confirm like any other
-proposal.
+`AIC`, so keep secrets out of them. Editing them is effectively privileged:
+their text reaches every user's assistant, every agent and every AI field.
+`model_types` must list known TYPE_IDs, and the rendered context is capped at
+`CRUDKIT_AI_CONTEXT_MAX_CHARS` (default 20,000) so it fits a small model's
+window. When a user teaches the sidebar something durable about the company,
+it proposes an edit to the relevant document (`propose_patch` with the `AIC`
+id), which waits for Confirm like any other proposal. Agents aren't asked to,
+and all of an `AIC`'s fields are `approval_fields`, so MCP clients and agents
+can only propose edits.
 
 ## History and undo
 
@@ -157,9 +162,17 @@ deleted ones, all in one transaction and itself logged as a new change set. It
 refuses merges and change sets already reverted, checks the user may change
 every record, and reports conflicts instead of overwriting values that were
 changed again since, unless forced. Undoing an action needs permission to run
-it, and only restores the fields the action changed on its record: side effects
-such as sent emails or external calls are not undone. Deleted records can also
-be restored directly (`POST /api/v1/<TYPE>/<pk>/restore/`).
+it (an action renamed or removed since can't be undone), and only restores the
+fields the action changed on its record: side effects such as sent emails or
+external calls are not undone. Reverts run the model's `clean()`, as a PATCH
+does. Deleted records can also be restored directly
+(`POST /api/v1/<TYPE>/<pk>/restore/`).
+
+A record's change history (`GET /api/v1/<TYPE>/<pk>/history/`, the History
+tab, MCP `get_record`'s `changelog`, the assistant's `get_changelog`) needs the
+`view_changelog` permission as well as seeing the record: it shows old values
+and who changed what. Syncs through `update_or_create_external` log only
+when something changed.
 
 ## Approvals
 
@@ -181,10 +194,13 @@ The rule binds MCP clients and agents only: people using the UI or the REST
 API are the approvers, so they run these actions and edit these fields
 directly (the UI marks such actions with a shield). Over MCP with the `write`
 scope, such a write is filed as a proposal instead of made; with the
-`propose` scope every write is. `describe_types` reports `requires_approval`
-per action and the type's `approval_fields`. The assistant sidebar already
-proposes every change. Agents running without a person (source `agent`) must
-call `requires_approval()` before writing and propose instead.
+`propose` scope every write is. Undoing a change set is held to the same rule:
+if it touches an approval field or the effects of an approval-required action,
+`undo` and agents only propose it
+(`crudkit_api.services.revert_requires_approval`). `describe_types` reports
+`requires_approval` per action and the type's `approval_fields`. The assistant
+sidebar already proposes every change. Agents running without a person (source
+`agent`) must call `requires_approval()` before writing and propose instead.
 
 A proposal is an `AssistantProposal` (TYPE_ID `ASP`, in `crudkit_assistant`):
 its `kind` (`action`, `patch`, `create`, `note`, `revert`), a `payload`, the
@@ -192,16 +208,22 @@ its `kind` (`action`, `patch`, `create`, `note`, `revert`), a `payload`, the
 (`assistant`, `mcp`, `agent`) and `client`, and `status` (`pending`,
 `confirmed`, `skipped`, `failed`). Users see and decide the proposals they
 created, whether or not they have the Django permissions on `ASP`
-(`owner_access`); superusers see all. The Inbox's Proposals tab lists the
+(`owner_access`); superusers see all. A proposal can't be edited once filed
+(its `clean()` refuses), and its target must be a record its creator can see. The Inbox's Proposals tab lists the
 pending ones, sidebar and MCP alike, and the Inbox menu item counts them.
 
 Confirm and Skip are the `confirm` and `skip` actions
 (`POST /api/v1/ASP/<pk>/action/`), and the sidebar's buttons call the same
-code, so a proposal decided in one place is decided everywhere. Confirming
-checks that the user may make the change (add permission for a create,
-change permission on the target otherwise), runs it through the same services
-as the REST API, and logs it as its own change set attributed to the
-proposal's `source` and `client`, so it can be undone like any other change.
+code, so a proposal decided in one place is decided everywhere; deciding is
+atomic, so two Confirms (two tabs, the Inbox and the sidebar) apply it once
+and the second gets 409. Confirming checks that both the confirming user and
+the proposal's creator may make the change (add permission for a create,
+change permission on the target otherwise), so a proposal never does more
+than whoever filed it could. It runs through the same services as the REST
+API and is logged as its own change set attributed to the proposal's `source`
+and `client`, so it can be undone like any other change. Proposals may only
+target types exposed to the assistant: not CrudKit's own proposals, runs,
+change log or notes.
 
 ## Agents
 
@@ -212,17 +234,23 @@ one of:
 - `record_created`: a record of `model_type` was created.
 - `record_changed`: a record was changed. When `watch_fields` is set, only
   changes to those fields count.
-- `schedule`: `hourly`, `daily` or `weekly`, over the records of its view.
+- `schedule`: `hourly`, `daily` or `weekly` after its last scheduled start (an
+  interval, not a day or time of day), over the records of its view. Capped
+  runs take the records the agent worked on longest ago first.
 - `manual`: only when started by hand.
 
 A `view` limits the agent to the records in that saved view, resolved as
 `run_as`, the user whose permissions the agent has.
 
 Triggers come from `ChangeLog` entries, so an agent reacts to every logged
-write: the REST API, MCP, the assistant and actions. Plain ORM saves in
-project code are not logged, and so do not trigger agents. Changes made by
-agents (source `agent`) never trigger agents, so agents can't set each other
-off. Scheduled agents need the host's Celery beat to run
+write: the REST API, MCP, the assistant, actions and external syncs. Plain ORM
+saves in project code are not logged, and so do not trigger agents. A record
+with a run already queued isn't queued again, and a failing trigger is logged
+without failing the write. Changes made by agents (source `agent`) never
+trigger agents, and starting runs ("Run now", "Dry run") and "Revert this run"
+are approval-required actions, so agents can't set each other off. Agents only
+work on types exposed to the assistant, and get CrudKit's own tools only, not
+a model's `assistant_tools`. Scheduled agents need the host's Celery beat to run
 `crudkit_assistant.tasks.run_scheduled_agents`; see `backend/README.md`.
 
 Each run is an `AgentRun` (`AGR`) on one record. The assistant reads the
@@ -238,13 +266,16 @@ agent's instructions, and acts only through proposals:
   preview lists what the agent would have proposed.
 
 Two guards cap the work: `max_records_per_run` and `max_runs_per_day`. After 3
-failed runs in a row, the agent disables itself and says so on its feed.
+failed runs in a row, the agent disables itself and says so on its feed;
+re-enabling it resets the count.
 
 Agents and runs belong to whoever created the agent: others don't see them,
 and superusers see all of them. `run_as` defaults to the creator, and only
-superusers may change it. The agent's behaviour fields are `approval_fields`,
+superusers may change it, or change what an agent that runs as someone else
+does (its owner may still disable it); edits, merges and reverts are all held
+to this. The agent's behaviour fields are `approval_fields`,
 so MCP clients and other agents can only propose them. Users can ask the
-sidebar for an agent ("every Monday, flag at-risk customers"): it proposes
+sidebar for an agent ("every week, flag at-risk customers"): it proposes
 creating one.
 
 ## The frontend config contract

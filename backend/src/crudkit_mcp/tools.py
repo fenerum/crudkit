@@ -287,7 +287,9 @@ def _add_note(user, arguments: dict, propose=False) -> dict:
 
 def _undo(user, arguments: dict, propose=False) -> dict:
     change_set = uuid.UUID(str(arguments.get("change_set")))
-    if propose:
+    # Undoing a change to an approval field (or an approval-required action) is
+    # itself that change, so it needs approval too.
+    if propose or services.revert_requires_approval(change_set):
         newest = services.check_revertible(change_set)[0]
         type_id = newest.related_content_type.model_class().TYPE_ID
         model, instance = records.get_instance(user, f"{type_id}{newest.related_object_id}", "change")

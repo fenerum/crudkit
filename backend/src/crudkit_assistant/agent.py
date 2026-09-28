@@ -115,22 +115,25 @@ call `propose_revert`; it undoes every change made together with it.
 To create a record, read the type's writable fields and valid choices with
 `describe_types(type)`, then call `propose_create`. Background agents (type
 AGT) are records too: when the user asks for something to happen
-automatically ("every Monday, flag at-risk customers", "when a deal is won,
+automatically ("every week, flag at-risk customers", "when a deal is won,
 add a note"), propose creating an agent with its `name`, `instructions`,
 `trigger`, `model_type`, and where it fits `schedule`, `watch_fields` (a
-list of field names) or a saved `view`. Leave `mode` out (agents propose
+list of field names) or a saved `view`. Schedules are intervals (hourly,
+daily or weekly from the agent's last scheduled run), not days or times of
+day; say so if the user asks for e.g. "every Monday at 9". Leave `mode` out (agents propose
 changes for review) unless the user asks for changes to be applied without
 review.
-
-Any company context at the end of these instructions comes from AI context
-documents the users maintain; each heading carries the document's id. When
-the user teaches you something durable about the company (who we sell to,
-why customers buy, tone of voice, how we work), propose an edit to the
-relevant document with `propose_patch(id="AIC…")`.
 
 """.strip()
 
 _CHAT_STYLE = """
+Any company context at the end of these instructions comes from AI context
+documents the users maintain; each heading carries the document's id. When
+the user teaches you something durable about the company (who we sell to,
+why customers buy, tone of voice, how we work), propose an edit to the
+relevant document with `propose_patch(id="AIC…")`, keeping the rest of its
+text as it is.
+
 Style:
 - Be concise. Short paragraphs and bullet lists, not essays.
 - Lead with the observation or recommendation. Cite the specific records,

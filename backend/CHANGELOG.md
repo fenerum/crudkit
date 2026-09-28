@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+- Hardening of proposals, undo and agents:
+  - A filed `AssistantProposal` can't be edited (its `clean()` refuses, so a REST PATCH
+    returns 400), and Confirm checks that both the confirming user and the proposal's creator
+    may make the change. Previously a user could rewrite their own pending proposal to target
+    any record and have a superuser confirm it.
+  - Confirm and Skip are atomic: two at once apply a proposal once; the second gets 409.
+  - Generic relation fields (`target`, `parent_object`, `related_object`) only accept records
+    the requesting user can view, and answer 400 (not 500) for unknown ids.
+  - Undoing a change set that touches an approval field or an approval-required action needs
+    approval: MCP `undo` with the `write` scope proposes it, and agents leave it pending
+    (`crudkit_api.services.revert_requires_approval`).
+  - Only superusers may change what an agent that runs as another user does (its owner may
+    still disable it); edits, merges and reverts all run the check. Agents may only be pointed
+    at types exposed to the assistant (not CrudKit's bookkeeping; `CRUDKIT_MCP_MODELS` limits
+    MCP only).
+  - "Run now", "Dry run" and "Revert this run" are `requires_approval`, so agents and MCP
+    clients can't start agents. Agent runs no longer load a model's `assistant_tools`.
+  - `AIContext` fields are `approval_fields` (and `AIC` is `ai_exposed`); only the sidebar,
+    not agents, is asked to propose edits to it. `model_types` must list known TYPE_IDs, and
+    the rendered context is capped at `CRUDKIT_AI_CONTEXT_MAX_CHARS` (default 20000).
+  - Proposal tools check foreign keys (the target must exist and be visible) and refuse
+    read-only fields, instead of the serializer silently storing None or ignoring them;
+    numeric choices are validated too. Proposals can't target CrudKit's own bookkeeping.
+  - A record's change history needs `view_changelog` as well as seeing the record: the History
+    tab, MCP `get_record`'s `changelog` and the assistant's `get_changelog`.
+- Robustness:
+  - The change log indexes from `crudkit 0004` are built by the new `crudkit 0006`, outside a
+    transaction and `CONCURRENTLY` on PostgreSQL, so large change logs aren't locked for writes.
+  - Agent triggers run as robust on-commit callbacks: a broken agent is logged and no longer
+    fails the write that triggered it. A record with a queued run isn't queued again (runs
+    stuck for over an hour don't count).
+  - Scheduled agents are claimed atomically (overlapping beat ticks start them once), capped
+    runs take the least recently worked-on records first, and the daily cap works with
+    `USE_TZ = False`. Re-enabling an agent resets its failure count.
+  - `update_or_create_external` logs only when something changed.
+  - The MCP write limit no longer fails every write on a cache that stores nothing, and system
+    checks report an invalid `CRUDKIT_MCP_WRITE_RATE` (`crudkit_mcp.E001`) and, with
+    `CRUDKIT_MCP_WRITE_ENABLED`, a per-process cache (`crudkit_mcp.W001`).
+  - Reverts run the model's `clean()` and report database errors as 400; concurrent reverts of
+    one change set can't both pass; an action that deleted its record is logged as a delete;
+    an action renamed since can't be undone (it can't be permission-checked).
+
 - Background agents (`crudkit_assistant`, migration `crudkit_assistant 0005`). An `Agent`
   (TYPE_ID `AGT`) is saved instructions the assistant carries out without a person: when a
   record of its `model_type` is created or changed (optionally only when `watch_fields`

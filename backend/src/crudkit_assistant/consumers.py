@@ -190,6 +190,17 @@ class AssistantConsumer(AuthenticatedConsumer):
         if notes:
             await self._save(notes)
 
+    async def _send_already_resolved(self, proposal):
+        await self.send_json(
+            {
+                "type": "tool_outcome",
+                "id": proposal.id,
+                "ok": proposal.status == AssistantProposal.Status.CONFIRMED,
+                "status": proposal.status,
+                "summary": "Already resolved.",
+            }
+        )
+
     async def _resolve_proposal(self, proposal_id, ok: bool) -> Optional[str]:
         """Apply or skip one proposal; returns the outcome line for the agent."""
         proposal = await self._load_proposal(proposal_id)
@@ -197,15 +208,7 @@ class AssistantConsumer(AuthenticatedConsumer):
             await self.send_json({"type": "error", "message": "Proposal not found."})
             return None
         if proposal.status != AssistantProposal.Status.PENDING:
-            await self.send_json(
-                {
-                    "type": "tool_outcome",
-                    "id": proposal.id,
-                    "ok": proposal.status == AssistantProposal.Status.CONFIRMED,
-                    "status": proposal.status,
-                    "summary": "Already resolved.",
-                }
-            )
+            await self._send_already_resolved(proposal)
             return None
 
         user = await self._get_user()
@@ -213,7 +216,10 @@ class AssistantConsumer(AuthenticatedConsumer):
             await self.send_json({"type": "error", "message": "Proposal not found."})
             return None
         if not ok:
-            await sync_to_async(proposal.mark_skipped)(user)
+            # Claimed atomically: it may have been resolved elsewhere (the Inbox) meanwhile.
+            if not await sync_to_async(proposal.mark_skipped)(user):
+                await self._send_already_resolved(proposal)
+                return None
             await self.send_json(
                 {
                     "type": "tool_outcome",
@@ -226,6 +232,9 @@ class AssistantConsumer(AuthenticatedConsumer):
             return f"[system] User skipped proposal {proposal.id} ({proposal.label})."
 
         outcome = await sync_to_async(proposal.apply)(user)
+        if outcome.get("already_resolved"):
+            await self._send_already_resolved(proposal)
+            return None
         applied = proposal.status == AssistantProposal.Status.CONFIRMED
         await self.send_json(
             {

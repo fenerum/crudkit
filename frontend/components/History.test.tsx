@@ -123,6 +123,13 @@ describe("History", () => {
     await vi.waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   });
 
+  test("says when the user may not see the history, without retrying", async () => {
+    api.history.mockRejectedValue(Object.assign(new Error("Forbidden"), { statusCode: 403 }));
+    renderHistory();
+    expect(await screen.findByText("You don't have access to the change history.")).toBeInTheDocument();
+    expect(api.history).toHaveBeenCalledTimes(1);
+  });
+
   test("says when nothing is recorded", async () => {
     api.history.mockResolvedValue([]);
     renderHistory();

@@ -8,6 +8,7 @@ from drf_extra_fields.fields import Base64FieldMixin, Base64ImageField
 from rest_framework import serializers
 from rest_framework.fields import CharField, FileField
 
+from crudkit.authorization import get_authorized_queryset
 from crudkit.fields import DEFAULT_CURRENCY
 from crudkit.fields import MoneyField as CrudKitMoneyField
 from crudkit.models import CrudKitIDField, CrudKitPositiveIntegerField, get_ck_id, parse_ck_id
@@ -291,15 +292,28 @@ _serializer_field_mapping.update(
 
 
 class GenericRelationField(serializers.Field):
+    """A generic relation written as a CK-ID. Only records the requesting user
+    may view can be linked, so the field can't reach (or probe for) others."""
+
     def to_representation(self, value):
         return value.pk
 
     def to_internal_value(self, data):
-        mdl, pk = parse_ck_id(data)
         try:
-            return get_model_types()[mdl].objects.get(pk=pk)
-        except KeyError as e:
-            raise serializers.ValidationError(f"Model {mdl} not found") from e
+            mdl, pk = parse_ck_id(data)
+        except ValueError as e:
+            raise serializers.ValidationError(str(e)) from e
+        model = get_model_types().get(mdl)
+        if model is None:
+            raise serializers.ValidationError(f"Model {mdl} not found")
+        queryset = model.objects.all()
+        request = self.context.get("request")
+        if request is not None:
+            queryset = get_authorized_queryset(request.user, queryset, "view")
+        instance = queryset.filter(pk=pk).first()
+        if instance is None:
+            raise serializers.ValidationError(f"{data} not found")
+        return instance
 
 
 class GenericSerializer(serializers.ModelSerializer):

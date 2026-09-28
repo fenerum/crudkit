@@ -20,7 +20,7 @@ from crudkit.authorization import (
     has_model_permission,
     requires_approval,
 )
-from crudkit.models import View, ck_id_regex, parse_ck_id
+from crudkit.models import ChangeLog, View, ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import services
 from crudkit_api.filters import get_order_fields, order_queryset
@@ -37,11 +37,12 @@ SKIPPED_FIELDS = {"deleted", "merged_into"}
 AUDIT_FIELDS = {"created_by", "updated_by", "created_at", "updated_at"}
 
 
-def get_exposed_models() -> list[type[models.Model]]:
+def get_exposed_models(mcp_allowlist: bool = True) -> list[type[models.Model]]:
     """Project models, minus CrudKit's and Django's own (unless they set
     `CrudKitSettings.ai_exposed`). CRUDKIT_MCP_MODELS (a list of TYPE_IDs)
-    narrows this to an explicit allowlist."""
-    allowlist = getattr(settings, "CRUDKIT_MCP_MODELS", None)
+    narrows this to an explicit allowlist, unless `mcp_allowlist` is False
+    (the in-app assistant and agents aren't MCP clients)."""
+    allowlist = getattr(settings, "CRUDKIT_MCP_MODELS", None) if mcp_allowlist else None
     return [
         model
         for type_id, model in get_model_types().items()
@@ -240,7 +241,8 @@ def get_record(user, object_id: str) -> dict:
     model, instance = get_instance(user, object_id, "view")
     data = serialize(model, [instance], depth=1)[0]
     data["feed"] = services.get_feed(instance, FEED_LIMIT)
-    data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT)
+    if has_model_permission(user, ChangeLog, "view"):
+        data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT)
     data["actions"] = [name for name in action_names(model) if has_action_permission(user, instance, name)]
     return data
 
@@ -294,12 +296,20 @@ def checked_fields(model, user, fields) -> dict:
     serializer silently turns an unknown FK id into None, so check first."""
     if not isinstance(fields, dict) or not fields:
         raise ValueError("`fields` must be a non-empty object of {field: value}")
-    writable = {f.name: f for f, _ in writable_fields(model)}
+    return check_values(user, {f.name: f for f, _ in writable_fields(model)}, fields)
+
+
+def check_values(user, writable: dict, fields: dict) -> dict:
+    """`fields` only names fields in `writable` ({name: field}), and its FK
+    values are rows that exist and `user` can see."""
     unknown = sorted(set(fields) - set(writable))
     if unknown:
         raise ValueError(f"Unknown or read-only field(s): {unknown}. Writable: {sorted(writable)}")
     for name, value in fields.items():
         f = writable[name]
+        if f.is_relation and isinstance(value, dict):
+            # The describe_object shape, {"id": ..., "display": ...}.
+            value = value.get("id")
         if f.is_relation and value not in (None, ""):
             related = f.related_model
             qs = (

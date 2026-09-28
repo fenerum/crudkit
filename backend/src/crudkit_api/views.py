@@ -22,6 +22,7 @@ from crudkit.authorization import (
     get_authorized_queryset,
     get_permission_action,
     has_action_permission,
+    has_model_permission,
 )
 from crudkit.models import BaseCrudKitModel, ChangeLog
 from crudkit.utils import get_model_types
@@ -217,6 +218,8 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
                 for field, value in merge_fields.items():
                     setattr(to_stay_obj, field, getattr(objects_by_id[value], field))
                 to_stay_obj.updated_by = request.user
+                # The same model validation a PATCH gets (e.g. who an agent may run as).
+                to_stay_obj.clean()
                 to_stay_obj.save()
                 ChangeLog.objects.create_from_objects(
                     before,
@@ -252,6 +255,10 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
 
     @action(detail=True)
     def history(self, request, pk=None):
+        # The change log keeps old values and who changed what, so it needs its
+        # own permission on top of seeing the record.
+        if not has_model_permission(request.user, ChangeLog, "view"):
+            raise PermissionDenied("You may not view change history.")
         return Response(get_history(self.get_object()))
 
     @action(["POST"], detail=True)

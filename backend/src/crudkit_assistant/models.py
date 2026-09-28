@@ -15,9 +15,12 @@ from crudkit.decorators import crm_action
 from crudkit.fields import ModelField
 from crudkit.models import BaseCrudKitModel, ChangeLog, CrudKitPositiveIntegerField, View
 from crudkit.utils import get_model_types
-from crudkit_api.services import revert_change_set
+from crudkit_api.records import get_exposed_models
+from crudkit_api.services import revert_change_set, revert_requires_approval
 
 logger = logging.getLogger(__name__)
+
+ALREADY_RESOLVED = "This proposal was already confirmed or skipped."
 
 
 def uuid4_hex() -> str:
@@ -102,7 +105,43 @@ class AssistantProposal(BaseCrudKitModel):
         def has_action_permission(user, instance, action_name):
             return instance.status == AssistantProposal.Status.PENDING
 
+    # What a proposal does is fixed once it is filed: Confirm applies exactly
+    # what was proposed. Status and outcome only change through apply()/skip.
+    LOCKED_FIELDS = [
+        "kind",
+        "status",
+        "label",
+        "reasoning",
+        "payload",
+        "outcome",
+        "session_key",
+        "source",
+        "client",
+        "target_content_type_id",
+        "target_object_id",
+        "confirmed_at",
+        "confirmed_by_id",
+    ]
+
+    def clean(self):
+        if self.pk is None:
+            return
+        stored = type(self).objects.filter(pk=self.pk).values(*self.LOCKED_FIELDS).first()
+        # Compared as the database sees them: an in-memory id may be a CK-ID
+        # ("CUS1") where the stored one is 1.
+        fields = {f.attname: f for f in self._meta.concrete_fields}
+        if stored and any(
+            fields[name].get_prep_value(stored[name]) != fields[name].get_prep_value(getattr(self, name))
+            for name in self.LOCKED_FIELDS
+        ):
+            raise ValidationError("A proposal can't be edited. Skip it and propose the change again.")
+
     def can_apply(self, user) -> bool:
+        """Whether `user` may confirm: they, and the proposal's creator, may make
+        the change. A proposal never does more than whoever filed it could."""
+        return self._permits(user) and (self.created_by_id == user.pk or self._permits(self.created_by))
+
+    def _permits(self, user) -> bool:
         if self.kind == self.Kind.CREATE:
             return has_model_permission(user, self.target_content_type.model_class(), "add")
         target = self.target
@@ -115,7 +154,21 @@ class AssistantProposal(BaseCrudKitModel):
             return requires_approval(model, fields=self.payload.get("fields"))
         if self.kind == self.Kind.ACTION:
             return requires_approval(model, action=self.payload.get("action"))
+        if self.kind == self.Kind.REVERT:
+            return revert_requires_approval(self.payload.get("change_set"))
         return False
+
+    def _claim(self, user, status) -> bool:
+        """Move PENDING to `status` atomically, so two Confirms (two tabs, the
+        Inbox and the sidebar) can't both apply. False if already resolved."""
+        now = timezone.now()
+        claimed = (
+            type(self)
+            .objects.filter(pk=self.pk, status=self.Status.PENDING)
+            .update(status=status, confirmed_at=now, confirmed_by=user, updated_by=user, updated_at=now)
+        )
+        self.refresh_from_db()
+        return bool(claimed)
 
     def apply(self, user, request=None, change_set=None):
         """Execute the proposed mutation as its own change set (or `change_set`),
@@ -123,40 +176,44 @@ class AssistantProposal(BaseCrudKitModel):
         app-loading cycles."""
         from crudkit_assistant.execution import execute_proposal
 
+        if not self._claim(user, self.Status.CONFIRMED):
+            return {"error": ALREADY_RESOLVED, "already_resolved": True}
         try:
             with audit(self.source, client=self.client, user=user, change_set=change_set or uuid4()) as context:
                 outcome = execute_proposal(self, user, request=request)
             if context.logged and isinstance(outcome, dict):
                 outcome = {**outcome, "change_set": str(context.change_set)}
             self.outcome = outcome
-            self.status = self.Status.CONFIRMED
         except Exception as exc:
             logger.exception("AssistantProposal %s apply failed", self.pk)
             self.outcome = {"error": str(exc)}
             self.status = self.Status.FAILED
-        self.confirmed_at = timezone.now()
-        self.confirmed_by = user
-        self.save(update_fields=["outcome", "status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+        self.save(update_fields=["outcome", "status", "updated_at"])
         return self.outcome
 
-    def mark_skipped(self, user):
-        self.status = self.Status.SKIPPED
-        self.confirmed_at = timezone.now()
-        self.confirmed_by = user
-        self.save(update_fields=["status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+    def mark_skipped(self, user) -> bool:
+        """Skip the proposal; False if it was already resolved."""
+        if not self._claim(user, self.Status.SKIPPED):
+            return False
+        # _claim's queryset update sends no post_save; this does (realtime notifications).
+        self.save(update_fields=["updated_at"])
+        return True
 
     @crm_action("Confirm")
     def confirm(self, request):
         if not self.can_apply(request.user):
             raise PermissionDenied
-        outcome = self.apply(request.user)
+        outcome = self.apply(request.user, request=request)
+        if outcome.get("already_resolved"):
+            return Response({"errors": [ALREADY_RESOLVED]}, status=409)
         if self.status == self.Status.FAILED:
             return Response({"errors": [outcome.get("error", "Failed")]}, status=400)
         return Response({"messages": [f"Confirmed: {self.label}"], "outcome": outcome})
 
     @crm_action("Skip")
     def skip(self, request):
-        self.mark_skipped(request.user)
+        if not self.mark_skipped(request.user):
+            return Response({"errors": [ALREADY_RESOLVED]}, status=409)
         return Response({"messages": [f"Skipped: {self.label}"]})
 
 
@@ -281,10 +338,28 @@ class Agent(BaseCrudKitModel):
     def get_model(self):
         return get_model_types().get(self.model_type)
 
+    # What an agent does; only superusers change these while it runs as someone else.
+    BEHAVIOUR_FIELDS = [
+        "name",
+        "instructions",
+        "trigger",
+        "model_type",
+        "view_id",
+        "watch_fields",
+        "schedule",
+        "mode",
+        "max_records_per_run",
+        "max_runs_per_day",
+    ]
+
     def clean(self):
         model = self.get_model()
         if model is None:
             raise ValidationError({"model_type": f"Unknown record type {self.model_type!r}."})
+        stored_type = Agent.objects.filter(pk=self.pk).values_list("model_type", flat=True).first() if self.pk else None
+        if self.model_type != stored_type and model not in get_exposed_models(mcp_allowlist=False):
+            # CrudKit's own bookkeeping (proposals, change log, notes, runs) is off limits.
+            raise ValidationError({"model_type": f"Agents can't work on {model._meta.verbose_name_plural}."})
         if self.view_id and self.view.model != self.model_type:
             raise ValidationError({"view": f"Pick a saved view of {model._meta.verbose_name_plural}."})
         if not isinstance(self.watch_fields, list):
@@ -297,20 +372,35 @@ class Agent(BaseCrudKitModel):
         self._check_run_as()
 
     def _check_run_as(self):
-        """Only superusers may make an agent act as somebody else."""
+        """Only superusers may make an agent act as somebody else, or change what
+        an agent that acts as somebody else does (else its owner could point a
+        superuser-assigned `run_as` at anything)."""
         editor = self.updated_by if self.updated_by_id else None
-        if not self.run_as_id or editor is None or editor.is_superuser:
+        if not self.run_as_id or editor is None or editor.is_superuser or self.run_as_id == editor.pk:
             return
-        stored = Agent.objects.filter(pk=self.pk).values_list("run_as_id", flat=True).first() if self.pk else None
-        if self.run_as_id not in (stored, editor.pk):
+        stored = (
+            Agent.objects.filter(pk=self.pk).values("run_as_id", *self.BEHAVIOUR_FIELDS).first() if self.pk else None
+        )
+        if stored is None or stored["run_as_id"] != self.run_as_id:
             raise ValidationError({"run_as": "Only superusers can make an agent run as another user."})
+        changed = [name for name in self.BEHAVIOUR_FIELDS if stored[name] != getattr(self, name)]
+        if changed:
+            raise ValidationError(
+                "Only superusers can change an agent that runs as another user "
+                f"({', '.join(name.removesuffix('_id') for name in changed)})."
+            )
 
     def save(self, *args, **kwargs):
         if not self.run_as_id:
             self.run_as_id = self.created_by_id
+        # Re-enabling gives an agent disabled after failures a fresh start.
+        if self.pk and self.enabled and Agent.objects.filter(pk=self.pk, enabled=False).exists():
+            self.consecutive_failures = 0
         super().save(*args, **kwargs)
 
-    @crm_action("Dry run on latest matching record")
+    # Starting runs is approval-required, so agents and MCP clients can't set
+    # agents off (or themselves again); people click these directly.
+    @crm_action("Dry run on latest matching record", requires_approval=True)
     def dry_run(self, request):
         from crudkit_assistant.background import start_dry_run  # background imports this module
 
@@ -319,7 +409,7 @@ class Agent(BaseCrudKitModel):
             return Response({"errors": ["No record matches this agent."]}, status=400)
         return run
 
-    @crm_action("Run now")
+    @crm_action("Run now", requires_approval=True)
     def run_now(self, request):
         from crudkit_assistant.background import enqueue_runs  # background imports this module
 
@@ -376,7 +466,7 @@ class AgentRun(BaseCrudKitModel):
         def get_authorized_queryset(user, queryset, action):
             return queryset.filter(agent__created_by=user)
 
-    @crm_action("Revert this run")
+    @crm_action("Revert this run", requires_approval=True)
     def revert(self, request):
         if not ChangeLog.objects.filter(change_set=self.change_set).exists():
             return Response({"errors": ["This run changed nothing."]}, status=400)

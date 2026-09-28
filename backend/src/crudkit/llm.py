@@ -15,6 +15,7 @@ With neither set, AI features are disabled: callers should check
 every LLM feature adds to its prompt.
 """
 
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -24,6 +25,12 @@ from django.utils.module_loading import import_string
 from pydantic_ai.models import Model, infer_model
 
 from crudkit.models import AIContext
+
+logger = logging.getLogger(__name__)
+
+# Every assistant step and AI-field run carries the context; keep it within a
+# small local model's window.
+AI_CONTEXT_MAX_CHARS = 20_000
 
 
 def is_configured() -> bool:
@@ -60,6 +67,14 @@ def ai_context(type_id: str | None = None, *, with_ids: bool = False) -> str:
         doc
         for doc in AIContext.objects.filter(deleted=False, active=True).order_by("order", "name")
         # Filtered in Python: JSON containment lookups differ between SQLite and Postgres.
-        if not doc.model_types or (type_id and type_id in doc.model_types)
+        # A non-list model_types (stored before validation) counts as matching nothing.
+        if not doc.model_types or (type_id and isinstance(doc.model_types, list) and type_id in doc.model_types)
     ]
-    return "\n\n".join(f"## {doc.name}{f' ({doc.pk})' if with_ids else ''}\n{doc.body.strip()}" for doc in docs)
+    text = "\n\n".join(f"## {doc.name}{f' ({doc.pk})' if with_ids else ''}\n{doc.body.strip()}" for doc in docs)
+    limit = getattr(settings, "CRUDKIT_AI_CONTEXT_MAX_CHARS", AI_CONTEXT_MAX_CHARS)
+    if limit and len(text) > limit:
+        logger.warning(
+            "AI context is %d characters; sending the first %d (CRUDKIT_AI_CONTEXT_MAX_CHARS)", len(text), limit
+        )
+        text = text[:limit] + "\n\n[AI context truncated]"
+    return text

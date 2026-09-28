@@ -185,7 +185,9 @@ class BaseCrudKitManager(models.Manager):
                 # .update() doesnt trigger signals, so we will do it manually
                 obj.refresh_from_db()
                 post_save.send(type(obj), instance=obj, created=True)
-                ChangeLog.objects.create_from_objects(before, obj, user=system, label=f"Updated from {system_name}")
+                ChangeLog.objects.create_from_objects(
+                    before, obj, user=system, label=f"Updated from {system_name}", skip_unchanged=True
+                )
         except ExternalObject.DoesNotExist:
             if kwargs:
                 before = self.filter(**kwargs).first()
@@ -195,7 +197,7 @@ class BaseCrudKitManager(models.Manager):
                 obj = self.create(**kwargs, **create_defaults or defaults)
                 created = True
             ChangeLog.objects.create_from_objects(
-                None if created else before, obj, user=system, label=f"Imported from {system_name}"
+                None if created else before, obj, user=system, label=f"Imported from {system_name}", skip_unchanged=True
             )
 
             create_kwargs = {"created_by": system, "updated_by": system}
@@ -791,9 +793,10 @@ def logged_fields(obj):
 
 
 class ChangeLogManager(models.Manager):
-    def create_from_objects(self, old, new, user=None, action=None, label=""):
+    def create_from_objects(self, old, new, user=None, action=None, label="", skip_unchanged=False):
         """Log the change from `old` to `new` (either may be None for a create or
-        delete) under the active `crudkit.audit` context."""
+        delete) under the active `crudkit.audit` context. With `skip_unchanged`,
+        an update that changed no field logs nothing and returns None."""
         if type(new) is ChangeLog:
             raise Exception("Cannot change a ChangeLog object")
         field_changes = {}
@@ -809,6 +812,8 @@ class ChangeLogManager(models.Manager):
                 if value is not None:
                     field_changes[field.name] = [value, None]
 
+        if skip_unchanged and old is not None and new is not None and not field_changes:
+            return None
         if action is None:
             if old is None:
                 action = ChangeLog.Action.CREATE
@@ -1073,3 +1078,14 @@ class AIContext(BaseCrudKitModel):
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name", "body"]
+        # The sidebar may propose edits ("remember that…"); MCP clients and
+        # agents can only propose them, since every LLM feature reads the text.
+        ai_exposed = True
+        approval_fields = ["name", "body", "model_types", "active", "order"]
+
+    def clean(self):
+        if not isinstance(self.model_types, list) or not all(isinstance(t, str) for t in self.model_types):
+            raise ValidationError({"model_types": 'Format: ["CUS", "OPP"]'})
+        unknown = sorted(set(self.model_types) - set(get_model_types()))
+        if unknown:
+            raise ValidationError({"model_types": f"Unknown record types: {unknown}"})

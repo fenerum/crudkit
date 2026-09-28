@@ -36,10 +36,13 @@ from crudkit_assistant.models import AssistantProposal
 
 logger = logging.getLogger(__name__)
 
+MAX_BULK_IDS = 100
+
 
 def describe_call(tool_name: str, args: dict) -> str:
     """A short, human description of a tool call for the sidebar's activity list."""
     target = args.get("id") or "the open record"
+    count = len(args.get("ids") or []) if isinstance(args.get("ids"), list) else 0
     labels = {
         "get_object": f"Reading {target}",
         "describe_object": f"Checking the fields of {target}",
@@ -52,6 +55,7 @@ def describe_call(tool_name: str, args: dict) -> str:
         "get_record": f"Reading {args.get('id')}",
         "get_screen_rows": f"Reading the {args.get('which') or 'selected'} rows",
         "propose_patch": f"Drafting a change to {target}",
+        "propose_bulk_patch": f"Drafting changes to {count} record{'' if count == 1 else 's'}",
         "propose_action": f"Drafting {args.get('action_name')} on {target}",
         "propose_create_note": f"Drafting a note on {target}",
         "propose_revert": "Drafting an undo",
@@ -244,6 +248,20 @@ async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected
 # Proposal tools (no mutation — only persist + emit)
 
 
+def _create_proposal(user, session_key: str, instance, kind: str, label: str, payload: dict, reasoning: str):
+    return AssistantProposal.objects.create(
+        target_content_type=ContentType.objects.get_for_model(instance.__class__),
+        target_object_id=instance.pk,
+        session_key=session_key,
+        kind=kind,
+        label=label[:255],
+        payload=payload,
+        reasoning=reasoning or "",
+        created_by=user,
+        updated_by=user,
+    )
+
+
 def _make_proposal(
     deps: AssistantDeps,
     object_id: str | None,
@@ -255,18 +273,7 @@ def _make_proposal(
     instance, error = _load_instance(deps, object_id, "change")
     if instance is None:
         raise PermissionError(error)
-    user = _load_user(deps)
-    return AssistantProposal.objects.create(
-        target_content_type=ContentType.objects.get_for_model(instance.__class__),
-        target_object_id=instance.pk,
-        session_key=deps.session_key,
-        kind=kind,
-        label=label[:255],
-        payload=payload,
-        reasoning=reasoning or "",
-        created_by=user,
-        updated_by=user,
-    )
+    return _create_proposal(_load_user(deps), deps.session_key, instance, kind, label, payload, reasoning)
 
 
 def pending_envelope(proposal: AssistantProposal) -> dict:
@@ -283,6 +290,12 @@ def pending_envelope(proposal: AssistantProposal) -> dict:
     }
 
 
+async def _emit(ctx: RunContext[AssistantDeps], envelope: dict) -> None:
+    outbox = getattr(ctx.deps, "_outbox", None)
+    if outbox is not None:
+        await outbox.put(envelope)
+
+
 async def _propose(
     ctx: RunContext[AssistantDeps],
     object_id: str | None,
@@ -297,14 +310,39 @@ async def _propose(
         proposal = await sync_to_async(_make_proposal)(ctx.deps, object_id, kind, label, payload, reasoning)
     except PermissionError as exc:
         return f"ERROR: {exc}"
-    envelope = await sync_to_async(pending_envelope)(proposal)
-    outbox = getattr(ctx.deps, "_outbox", None)
-    if outbox is not None:
-        await outbox.put(envelope)
+    await _emit(ctx, await sync_to_async(pending_envelope)(proposal))
     return (
         f"Proposal {proposal.id} ({kind}: {label}) is awaiting user confirmation. "
         "The action has NOT run yet. You will be told the outcome in a later turn."
     )
+
+
+def _field_errors(model, fields: dict) -> str | None:
+    """Why `fields` can't be proposed on `model`: unknown field names, or
+    choice values the model invented."""
+    field_map = {f.name: f for f in model._meta.fields}
+    unknown = [k for k in fields if k not in field_map]
+    if unknown:
+        return (
+            f"field(s) {unknown} do not exist on {model.__name__}. Valid fields: {sorted(field_map)}. "
+            "Call describe_types or describe_object first."
+        )
+    choice_errors = []
+    for name, value in fields.items():
+        field = field_map[name]
+        if field.choices and value not in (None, "") and not isinstance(value, (int, bool)):
+            valid_values = [choice for choice, _ in field.flatchoices]
+            if value not in valid_values:
+                choice_errors.append(f"{name}={value!r} is not a valid choice; valid: {valid_values}")
+    return "; ".join(choice_errors) or None
+
+
+def _patch_label(fields: dict) -> str:
+    try:
+        preview = ", ".join(f"{k}={json.dumps(v, default=str)}" for k, v in fields.items())
+    except (TypeError, ValueError):
+        preview = ", ".join(fields)
+    return f"Update {preview}"
 
 
 async def propose_action(
@@ -351,33 +389,78 @@ async def propose_patch(
     instance, error = await sync_to_async(_load_instance)(ctx.deps, id)
     if instance is None:
         return f"ERROR: {error}"
+    if error := _field_errors(instance.__class__, fields):
+        return f"ERROR: {error}"
+    return await _propose(ctx, id, AssistantProposal.Kind.PATCH, _patch_label(fields), {"fields": fields}, reasoning)
 
-    field_map = {f.name: f for f in instance._meta.fields}
-    unknown = [k for k in fields if k not in field_map]
-    if unknown:
-        valid = sorted(field_map)
-        return (
-            f"ERROR: field(s) {unknown} do not exist on "
-            f"{instance.__class__.__name__}. Valid fields: {valid}. "
-            "Call describe_object first."
-        )
-    # Reject choice values the model invented.
-    choice_errors: list[str] = []
-    for name, value in fields.items():
-        field = field_map[name]
-        if field.choices and value not in (None, "") and not isinstance(value, (int, bool)):
-            valid_values = [c[0] for c in field.choices]
-            if value not in valid_values:
-                choice_errors.append(f"{name}={value!r} is not a valid choice; valid: {valid_values}")
-    if choice_errors:
-        return "ERROR: " + "; ".join(choice_errors)
+
+async def propose_bulk_patch(
+    ctx: RunContext[AssistantDeps],
+    ids: list[str],
+    fields: dict[str, Any],
+    reasoning: str = "",
+) -> str:
+    """Propose the same field update on several records at once (e.g. the
+    rows on screen): one Confirm/Skip card per record, nothing applied until
+    the user confirms. `ids` are record ids (at most 100); `fields` is a
+    {field_name: new_value} dict whose names and choice values come from
+    describe_types(type). Records that already have these values are skipped."""
+    if not isinstance(fields, dict) or not fields:
+        return "ERROR: `fields` must be a non-empty {field_name: new_value} dict."
+    if not isinstance(ids, list) or not ids:
+        return 'ERROR: `ids` must be a non-empty list of record ids, e.g. ["CUS1", "CUS2"].'
+    ids = list(dict.fromkeys(ids))
+    if len(ids) > MAX_BULK_IDS:
+        return f"ERROR: at most {MAX_BULK_IDS} ids per call; split the records into batches."
+    label = _patch_label(fields)
+
+    def _run():
+        instances, refused = [], []
+        for object_id in ids:
+            # An empty id would fall back to the record open on screen.
+            instance, error = _load_instance(ctx.deps, object_id, "change") if object_id else (None, "Empty id.")
+            if instance is None:
+                refused.append(error)
+            else:
+                instances.append(instance)
+        for model in {instance.__class__ for instance in instances}:
+            if error := _field_errors(model, fields):
+                raise ValueError(error)
+        user = _load_user(ctx.deps)
+        envelopes, unchanged = [], []
+        for instance in instances:
+            if all(
+                instance._meta.get_field(name).value_from_object(instance) == value for name, value in fields.items()
+            ):
+                unchanged.append(str(instance.id))
+                continue
+            proposal = _create_proposal(
+                user, ctx.deps.session_key, instance, AssistantProposal.Kind.PATCH, label, {"fields": fields}, reasoning
+            )
+            envelopes.append(pending_envelope(proposal))
+        return envelopes, refused, unchanged
 
     try:
-        preview = ", ".join(f"{k}={json.dumps(v, default=str)}" for k, v in fields.items())
-    except (TypeError, ValueError):
-        preview = ", ".join(fields)
-    label = f"Update {preview}"
-    return await _propose(ctx, id, AssistantProposal.Kind.PATCH, label, {"fields": fields}, reasoning)
+        envelopes, refused, unchanged = await sync_to_async(_run)()
+    except ValueError as exc:
+        return f"ERROR: {exc}"
+    for envelope in envelopes:
+        await _emit(ctx, envelope)
+
+    lines = []
+    if envelopes:
+        drafted = ", ".join(f"{e['target']} (proposal {e['id']})" for e in envelopes)
+        lines.append(
+            f"{len(envelopes)} proposal(s) ({label}) are awaiting user confirmation, one per record: {drafted}. "
+            "Nothing has run yet. You will be told the outcomes in a later turn."
+        )
+    if unchanged:
+        lines.append(f"Already set, not proposed: {', '.join(unchanged)}.")
+    if refused:
+        lines.append("Not proposed: " + " ".join(refused))
+    if not envelopes and refused:
+        lines.insert(0, "ERROR: no proposals made.")
+    return "\n".join(lines)
 
 
 async def propose_create_note(

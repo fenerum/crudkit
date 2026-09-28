@@ -173,6 +173,73 @@ class CrossRecordToolTests(TestCase):
         self.assertFalse(AssistantProposal.objects.exists())
 
 
+class BulkPatchTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="staff", password="x")
+        grant(self.user, "view_customer", "change_customer")
+        self.customers = [make_customer(self.user, name) for name in ("Acme", "Beta", "Gamma")]
+        self.ids = [c.pk for c in self.customers]
+        self.deps = AssistantDeps(user_id=self.user.pk, session_key="s1", screen=Screen(route="list", type_id="CUS"))
+        self.deps._outbox = asyncio.Queue()  # type: ignore[attr-defined]
+
+    def run_tool(self, *args, **kwargs):
+        return async_to_sync(tools.propose_bulk_patch)(_FakeCtx(self.deps), *args, **kwargs)
+
+    def envelopes(self):
+        out = []
+        while not self.deps._outbox.empty():  # type: ignore[attr-defined]
+            out.append(self.deps._outbox.get_nowait())  # type: ignore[attr-defined]
+        return out
+
+    def test_one_pending_proposal_per_record(self):
+        result = self.run_tool(self.ids, {"status": "churned"}, reasoning="Lost them")
+        proposals = AssistantProposal.objects.filter(session_key="s1").order_by("pk")
+        self.assertEqual([p.target for p in proposals], self.customers)
+        self.assertTrue(all(p.status == AssistantProposal.Status.PENDING for p in proposals))
+        self.assertEqual({p.kind for p in proposals}, {AssistantProposal.Kind.PATCH})
+        self.assertEqual(proposals[0].payload, {"fields": {"status": "churned"}})
+        self.assertEqual(proposals[0].reasoning, "Lost them")
+        self.assertEqual([e["target"] for e in self.envelopes()], self.ids)
+        self.assertIn("3 proposal(s)", result)
+        self.assertEqual(set(Customer.objects.values_list("status", flat=True)), {"active"})
+
+    def test_rejects_unknown_fields_and_invalid_choices(self):
+        for fields in ({"nope": 1}, {"status": "gone"}):
+            result = self.run_tool(self.ids, fields)
+            self.assertTrue(result.startswith("ERROR"), result)
+        self.assertIn("valid: ['active', 'churned']", result)
+        self.assertFalse(AssistantProposal.objects.exists())
+        self.assertEqual(self.envelopes(), [])
+
+    def test_refused_ids_are_reported_and_the_rest_proposed(self):
+        hidden = self.customers[1]
+        with hide(hidden):
+            result = self.run_tool([*self.ids, "bad"], {"status": "churned"})
+        self.assertEqual([e["target"] for e in self.envelopes()], [self.ids[0], self.ids[2]])
+        self.assertIn(f"{hidden.pk} not found, or not available for change.", result)
+        self.assertIn("Invalid id 'bad'", result)
+        self.assertFalse(result.startswith("ERROR"))
+
+    def test_nothing_proposed_without_change_permission(self):
+        self.user.user_permissions.remove(Permission.objects.get(codename="change_customer"))
+        result = self.run_tool(self.ids, {"status": "churned"})
+        self.assertTrue(result.startswith("ERROR"))
+        self.assertFalse(AssistantProposal.objects.exists())
+
+    def test_records_already_set_are_skipped(self):
+        Customer.objects.filter(pk=self.ids[0]).update(status="churned")
+        result = self.run_tool(self.ids, {"status": "churned"})
+        self.assertEqual([e["target"] for e in self.envelopes()], self.ids[1:])
+        self.assertIn(f"Already set, not proposed: {self.ids[0]}.", result)
+
+    def test_caps_the_number_of_ids(self):
+        result = self.run_tool([f"CUS{i}" for i in range(1, tools.MAX_BULK_IDS + 2)], {"status": "churned"})
+        self.assertTrue(result.startswith("ERROR: at most"))
+
+    def test_label(self):
+        self.assertEqual(tools.describe_call("propose_bulk_patch", {"ids": self.ids}), "Drafting changes to 3 records")
+
+
 class ConversationSocketTests(TransactionTestCase):
     """open_conversation → screen → user_message → proposal → confirm → reopen."""
 
@@ -195,6 +262,11 @@ class ConversationSocketTests(TransactionTestCase):
         last = messages[-1].parts[-1]
         if isinstance(last, UserPromptPart):
             self.prompts.append(last.content)
+            if "churn all" in last.content:
+                ids = [self.customer.pk, self.other.pk]
+                return ModelResponse(
+                    parts=[ToolCallPart("propose_bulk_patch", {"ids": ids, "fields": {"status": "churned"}})]
+                )
             if "rename both" in last.content:
                 return ModelResponse(
                     parts=[
@@ -339,6 +411,25 @@ class ConversationSocketTests(TransactionTestCase):
         with_outcomes = [prompt for prompt in self.prompts if "[system] Outcome" in prompt]
         self.assertEqual(len(with_outcomes), 1)
         self.assertEqual(with_outcomes[0].count("[system] Outcome"), 2)
+
+    async def test_bulk_patch_streams_a_card_per_record(self):
+        with patch("tests.testapp.ai.create_model", self.fake_factory):
+            ws = await self.connect()
+            await ws.send_json_to({"type": "open_conversation", "id": None})
+            await ws.receive_json_from()
+            await ws.send_json_to({"type": "user_message", "text": "churn all of them"})
+            events = await self.receive_turn(ws)
+            starts = [event for event in events if event["type"] == "tool_start"]
+            self.assertEqual([event["label"] for event in starts], ["Drafting changes to 2 records"])
+            pending = [event for event in events if event["type"] == "tool_call_pending"]
+            self.assertEqual([event["target"] for event in pending], [self.customer.pk, self.other.pk])
+
+            await ws.send_json_to({"type": "confirm", "ids": [event["id"] for event in pending], "ok": True})
+            outcomes = [await ws.receive_json_from() for _ in pending]
+            await ws.disconnect()
+
+        self.assertEqual([(o["type"], o["ok"]) for o in outcomes], [("tool_outcome", True)] * 2)
+        self.assertEqual({c.status async for c in Customer.objects.all()}, {"churned"})
 
     async def test_new_conversation_waits_for_the_running_turn(self):
         self.release = asyncio.Event()

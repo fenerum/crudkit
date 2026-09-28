@@ -14,7 +14,7 @@ from functools import partial
 from asgiref.sync import async_to_sync
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
-from django.db import close_old_connections, transaction
+from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
 
@@ -179,7 +179,9 @@ def _dispatch(run_id) -> None:
 
 
 def execute_run(run_id) -> None:
-    close_old_connections()
+    # No close_old_connections() here: Celery's Django fixup does that around
+    # worker tasks, and an eager run shares the caller's connection (and, in
+    # tests, its transaction), which closing would break.
     run = AgentRun.objects.select_related("agent__run_as").filter(pk=run_id, status=AgentRun.Status.QUEUED).first()
     if run is None:
         return

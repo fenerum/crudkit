@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission, User
 from django.test import TestCase, override_settings
 from rest_framework.test import APIClient
 
@@ -28,6 +28,13 @@ class DefaultAdapterUserProfileViewTests(TestCase):
         with override_settings(CRUDKIT_AI_MODEL_FACTORY=None, CRUDKIT_AI_MODEL=None):
             response = self.client.get("/api/v1/user/me/")
         self.assertFalse(response.data["assistant"]["enabled"])
+
+    def test_can_view_ai_context(self):
+        self.assertFalse(self.client.get("/api/v1/user/me/").data["can_view_ai_context"])
+        self.user.user_permissions.add(Permission.objects.get(codename="view_aicontext"))
+        self.user = User.objects.get(pk=self.user.pk)  # drop the cached permissions
+        self.client.force_authenticate(self.user)
+        self.assertTrue(self.client.get("/api/v1/user/me/").data["can_view_ai_context"])
 
     def test_patch_is_noop(self):
         response = self.client.patch("/api/v1/user/me/", {"preferred_language": "da"}, format="json")

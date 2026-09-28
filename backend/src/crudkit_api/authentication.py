@@ -75,6 +75,7 @@ class UserProfileView(APIView):
             "name": getattr(dj_settings, "CRUDKIT_ASSISTANT_NAME", "Assistant"),
             "avatar_url": getattr(dj_settings, "CRUDKIT_ASSISTANT_AVATAR_URL", ""),
         }
+        data["can_view_ai_context"] = request.user.has_perm("crudkit.view_aicontext")
         return Response(data)
 
     def patch(self, request):

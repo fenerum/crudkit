@@ -17,7 +17,7 @@ from pydantic_ai.messages import ModelResponse, SystemPromptPart, TextPart, Tool
 from pydantic_ai.models.function import DeltaThinkingPart, DeltaToolCall, FunctionModel
 from rest_framework_simplejwt.tokens import AccessToken
 
-from crudkit.models import View
+from crudkit.models import AIContext, View
 from crudkit_assistant import tools
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantConversation, AssistantProposal
@@ -34,6 +34,12 @@ def grant(user, *codenames):
 
 def make_customer(user, name):
     return Customer.objects.create(name=name, created_by=user, updated_by=user)
+
+
+def make_ai_context(user, name, body, model_types=()):
+    return AIContext.objects.create(
+        name=name, body=body, model_types=list(model_types), created_by=user, updated_by=user
+    )
 
 
 def hide(customer):
@@ -116,6 +122,16 @@ class DescribeScreenTests(TestCase):
         )
         self.assertIn(f"List of customers (CUS), saved view 'Churn risk' ({view.pk}), search 'ac', page 2.", block)
         self.assertIn(f"Selected rows (1): {self.customer.pk}.", block)
+
+    def test_type_ai_context(self):
+        make_ai_context(self.user, "Tone of voice", "Plain and friendly.")
+        make_ai_context(self.user, "Ticket triage", "Billing first.", model_types=["TIC"])
+        churn = make_ai_context(self.user, "Churn playbook", "Call before renewal.", model_types=["CUS"])
+        block = describe_screen(self.user, Screen(route="detail", record_id=self.customer.pk))
+        self.assertIn(f"Company context for customers:\n## Churn playbook ({churn.pk})\nCall before renewal.", block)
+        # Global documents are in the instructions, not repeated per turn.
+        self.assertNotIn("Plain and friendly.", block)
+        self.assertNotIn("Billing first.", block)
 
     def test_hidden_record_is_not_described(self):
         with hide(self.customer):
@@ -248,6 +264,8 @@ class ConversationSocketTests(TransactionTestCase):
         grant(self.user, "view_customer", "change_customer")
         self.customer = make_customer(self.user, "Acme")
         self.other = make_customer(self.user, "Beta")
+        make_ai_context(self.user, "Ideal customer", "Small agencies.")
+        make_ai_context(self.user, "Churn playbook", "Call before renewal.", model_types=["CUS"])
         self.prompts: list[str] = []
         # Set by a test to hold the model's answer after its tool calls.
         self.release: asyncio.Event | None = None
@@ -258,6 +276,8 @@ class ConversationSocketTests(TransactionTestCase):
         parts = info.model_request_parameters.instruction_parts
         self.assertEqual(len(parts), 1)
         self.assertIn("Your name is", parts[0].content)
+        self.assertIn("# Company context\n\n## Ideal customer (AIC", parts[0].content)
+        self.assertNotIn("Call before renewal.", parts[0].content)
         self.assertFalse(any(isinstance(part, SystemPromptPart) for message in messages for part in message.parts))
         last = messages[-1].parts[-1]
         if isinstance(last, UserPromptPart):
@@ -326,6 +346,7 @@ class ConversationSocketTests(TransactionTestCase):
             await ws.send_json_to({"type": "user_message", "text": "rename the selected one"})
             events = await self.receive_turn(ws)
             self.assertIn(f"Selected rows (1): {self.customer.pk}.", self.prompts[0])
+            self.assertIn("Call before renewal.", self.prompts[0])
             # Reasoning, the tool step and the proposal stream before the final reply.
             self.assertEqual(
                 [event["type"] for event in events if not event["type"].endswith("_delta")],

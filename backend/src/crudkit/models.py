@@ -1040,3 +1040,30 @@ class Snippet(BaseCrudKitModel):
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name"]
+
+
+class AIContext(BaseCrudKitModel):
+    """A document every LLM feature reads: global, or scoped to some model types."""
+
+    TYPE_ID = "AIC"
+
+    name = models.CharField(max_length=128)
+    body = models.TextField(blank=True, help_text="Markdown. Shown to the assistant and AI fields as written.")
+    model_types = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of model TYPE_IDs this context applies to, e.g. ["CAS", "OPP"]. Empty means everywhere.',
+    )
+    active = models.BooleanField(default=True)
+    order = models.IntegerField(default=0, help_text="Lower comes first.")
+
+    class Meta:
+        ordering = ["order", "name"]
+        verbose_name = "AI context"
+        verbose_name_plural = "AI context"
+
+    def __str__(self):
+        return self.name
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        search_fields = ["name", "body"]

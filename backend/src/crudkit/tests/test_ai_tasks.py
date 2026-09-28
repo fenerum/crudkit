@@ -84,6 +84,7 @@ class ProcessAIFieldsTaskTests(TestCase):
         process_ai_fields("testapp", "Ticket", ticket.pk)
         ticket.refresh_from_db()
         self.assertEqual(ticket.summary, "AI generated summary")
+        self.assertEqual(mock_process.call_args.args[2], Ticket.TYPE_ID)
 
     @patch("crudkit.tasks.process")
     def test_fk_field_resolved_by_pk(self, mock_process, _mock_close):

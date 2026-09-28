@@ -32,11 +32,13 @@ def _build_pydantic_model(field_specs: dict[str, Any]) -> type:
     return create_pydantic_model("AIFieldsOutput", **field_definitions)
 
 
-def _build_prompt(context: str, field_specs: dict[str, Any]) -> str:
+def _build_prompt(context: str, field_specs: dict[str, Any], company_context: str = "") -> str:
     schema = json.dumps(field_specs, indent=2)
+    company = f"## Company context\n{company_context}\n\n" if company_context else ""
     return (
         "Based on the context below, populate the requested fields.\n"
         "Return ONLY valid JSON matching the schema — no markdown, no explanation.\n\n"
+        f"{company}"
         f"## Context\n{context}\n\n"
         f"## Required JSON schema\n{schema}\n\n"
         "Respond with JSON only."
@@ -49,12 +51,13 @@ async def _run(prompt: str, output_type: type) -> Any:
         return await agent.run(prompt)
 
 
-def process(context: str, field_specs: dict[str, Any]) -> dict[str, Any]:
+def process(context: str, field_specs: dict[str, Any], type_id: str | None = None) -> dict[str, Any]:
     """Process AI fields using pydantic-ai with the shared Mistral model.
 
     Args:
         context: Plain-text context from ``instance.get_ai_context()``.
         field_specs: ``{field_name: {type, description, ...}}`` JSON-Schema-like dict.
+        type_id: the instance's TYPE_ID, selecting which AI context documents apply.
 
     Returns:
         ``{field_name: value}`` dict with the AI-generated values.
@@ -64,7 +67,8 @@ def process(context: str, field_specs: dict[str, Any]) -> dict[str, Any]:
         return {}
 
     pydantic_model = _build_pydantic_model(field_specs)
-    prompt = _build_prompt(context, field_specs)
+    # Read the AI context before asyncio.run: the ORM can't be used inside the event loop.
+    prompt = _build_prompt(context, field_specs, llm.ai_context(type_id))
 
     try:
         result = asyncio.run(_run(prompt, pydantic_model))

@@ -7,6 +7,7 @@ it reaches the model, so a forged screen can't reveal anything.
 from dataclasses import dataclass, field
 
 from crudkit.authorization import get_authorized_instance
+from crudkit.llm import ai_context
 from crudkit.models import ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import records
@@ -120,4 +121,6 @@ def describe_screen(user, screen: Screen) -> str:
         lines.append(f"Selected rows ({len(screen.selected_ids)}): {_id_list(screen.selected_ids)}.")
     if model is not None and (playbook := get_assistant_prompt(model)):
         lines.append(f"Playbook for {model._meta.verbose_name_plural}:\n{playbook}")
+    if model is not None and (company_context := ai_context(model.TYPE_ID, include_global=False, with_ids=True)):
+        lines.append(f"Company context for {model._meta.verbose_name_plural}:\n{company_context}")
     return "[Screen]\n" + "\n".join(lines)

@@ -6,10 +6,12 @@ top of each user turn, so one Agent serves every page.
 
 import logging
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
 
+from crudkit import llm
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.tools import (
     describe_object,
@@ -95,6 +97,13 @@ When choosing between proposal types, prefer in this order:
 To undo an earlier change, find its `change_set` with `get_changelog` and
 call `propose_revert`; it undoes every change made together with it.
 
+Any company context (at the end of these instructions or in the `[Screen]`
+block) comes from AI context documents the users maintain; each heading
+carries the document's id. When
+the user teaches you something durable about the company (who we sell to,
+why customers buy, tone of voice, how we work), propose an edit to the
+relevant document with `propose_patch(id="AIC…")`.
+
 Style:
 - Be concise. Short paragraphs and bullet lists, not essays.
 - Lead with the observation or recommendation. Cite the specific records,
@@ -134,11 +143,14 @@ for _tool in (
 # system message that isn't first. Instructions also stay out of the stored
 # history, so saved conversations pick up prompt changes.
 @assistant_agent.instructions
-def _instructions(ctx: RunContext[AssistantDeps]) -> str:
-    """The project's own prompt prefix, the assistant's name and the base prompt."""
+async def _instructions(ctx: RunContext[AssistantDeps]) -> str:
+    """The project's own prompt prefix, the assistant's name, the base prompt and
+    the global AI context documents."""
     lines = []
     if project_prefix := getattr(settings, "CRUDKIT_ASSISTANT_SYSTEM_PROMPT", "") or "":
         lines.append(project_prefix)
     lines.append(f"Your name is {getattr(settings, 'CRUDKIT_ASSISTANT_NAME', 'Assistant')}.")
     lines.append(_BASE_SYSTEM_PROMPT)
+    if company_context := await sync_to_async(llm.ai_context)(with_ids=True):
+        lines.append(f"# Company context\n\n{company_context}")
     return "\n\n".join(lines)

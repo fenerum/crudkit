@@ -77,7 +77,7 @@ def process_ai_fields(app_label: str, model_name: str, pk: int) -> None:
     field_specs = _build_field_specs(ai_fields)
 
     try:
-        result = process(context, field_specs)
+        result = process(context, field_specs, model_cls.TYPE_ID)
     except Exception:
         logger.exception(f"AI backend call failed for {instance}")
         return

@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ProfileScreen() {
@@ -30,7 +30,12 @@ export default function ProfileScreen() {
         <div className="text-sm text-fg-3 mt-1">{user?.email || 'No email'}</div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-col gap-3">
+        {user?.can_view_ai_context && (
+          <Link to="/AIC" className="ck-btn ck-btn-secondary w-full">
+            AI context
+          </Link>
+        )}
         <button
           type="button"
           onClick={handleLogout}

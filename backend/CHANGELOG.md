@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Approvals. Models declare which changes need a person's approval:
+  `@crm_action(..., requires_approval=True)` (the new keyword is optional) and
+  `CrudKitSettings.approval_fields`; `crudkit.authorization.requires_approval(model, action, fields)`
+  checks them. The rule binds MCP clients and agents; people in the UI and REST API are the
+  approvers. REST metadata actions carry `requires_approval`, and the SPA shows a shield on them.
+  - `crudkit_mcp`: a new `propose` OAuth scope (offered when `crudkit_assistant` is installed).
+    The consent page is now a choice of Read only / Propose changes / Write directly (the last
+    only with `CRUDKIT_MCP_WRITE_ENABLED`); the form field is `access` instead of the `write`
+    checkbox, and tokens are granted `read`, `read propose` or `read write`. With `propose`, the
+    write tools validate as before, then file a proposal and return
+    `{"status": "pending_approval", "proposal": "ASP12"}`; `undo` proposes a revert. With `write`,
+    approval-required actions and writes touching `approval_fields` are proposed too.
+    `CRUDKIT_MCP_EXTRA_TOOLS` write tools need `write`. `describe_types` now reports `actions` as
+    `{name: {"label", "requires_approval"}}` plus the type's `approval_fields`.
+  - `crudkit_assistant`: `AssistantProposal` gets kind `create` (payload `{type, fields}`; the
+    target is set once created), `source` (assistant, mcp, agent) and `client`; `session_key` may
+    be blank (migration `crudkit_assistant 0004`). Confirm and Skip are `@crm_action`s
+    (`POST /api/v1/ASP/<pk>/action/`), shared with the sidebar. A confirmed proposal is its own
+    change set, logged with the proposal's source and client. Users see only their own proposals
+    (superusers see all). `AssistantProposal.skip(user)` is now `mark_skipped(user)`. New
+    `crudkit_assistant.proposals.create_proposal()`.
+  - New `CrudKitSettings.owner_access`: signed-in users may view and change the rows they
+    created without the Django model permission. `AssistantProposal` uses it.
+  - `GET /api/v1/user/me/` reports `assistant.proposals`. New service `check_action()`.
+  - SPA: a Proposals tab in the Inbox lists pending proposals from the sidebar and MCP clients,
+    with Confirm and Skip; the Inbox menu item shows the pending count.
 - AI context. New `AIContext` model (TYPE_ID `AIC`, migration `crudkit 0005`): markdown
   documents users maintain in the UI (ideal customer, why customers buy, tone of voice,
   playbooks), global or scoped to model types via `model_types`, with `active` and `order`.

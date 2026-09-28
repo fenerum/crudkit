@@ -5,11 +5,13 @@ from crudkit_assistant.models import AssistantConversation, AssistantProposal
 
 @admin.register(AssistantProposal)
 class AssistantProposalAdmin(admin.ModelAdmin):
-    list_display = ("id", "session_key", "kind", "status", "label", "created_at", "confirmed_at")
-    list_filter = ("kind", "status")
+    list_display = ("id", "source", "client", "kind", "status", "label", "created_at", "confirmed_at")
+    list_filter = ("source", "kind", "status")
     search_fields = ("session_key", "label", "id")
     readonly_fields = (
         "session_key",
+        "source",
+        "client",
         "target_content_type",
         "target_object_id",
         "kind",

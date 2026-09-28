@@ -3,7 +3,7 @@ import Icon from "./Icon";
 import Kbd from "./Kbd";
 import { useHotkeys } from "react-hotkeys-hook";
 
-// items: [{ label, icon?, onSelect, tone?: 'default'|'danger', href?, shortcut? }]
+// items: [{ label, icon?, onSelect, tone?: 'default'|'danger', href?, shortcut?, title? }]
 // `shortcut` is the single-key trigger shown as a Kbd hint. If omitted, the
 // item is auto-assigned the next available digit (1–9). Pass an empty string
 // to opt out of any shortcut.
@@ -162,6 +162,7 @@ export default function OverflowMenu({
                 role="menuitem"
                 type="button"
                 tabIndex={-1}
+                title={it.title}
                 onMouseEnter={() => setActiveIndex(i)}
                 onClick={() => {
                   setOpen(false);

@@ -27,13 +27,19 @@
             <input type="hidden" name="state" value="{{ state }}">
             <input type="hidden" name="scope" value="{{ scope }}">
             <label class="scope">
-                <input type="checkbox" checked disabled>
-                <span>Read<small>View records you have access to</small></span>
+                <input type="radio" name="access" value="read" checked>
+                <span>Read only<small>View records you have access to</small></span>
             </label>
-            {% if write_available %}
+            {% if offer_propose %}
             <label class="scope">
-                <input type="checkbox" name="write">
-                <span>Write<small>Create and change records, add notes and run actions</small></span>
+                <input type="radio" name="access" value="propose">
+                <span>Propose changes<small>Read, and suggest new records, edits, notes and actions. You approve each one in your Inbox before it happens</small></span>
+            </label>
+            {% endif %}
+            {% if offer_write %}
+            <label class="scope">
+                <input type="radio" name="access" value="write">
+                <span>Write directly<small>Read, create and change records, add notes and run actions. Changes marked as needing approval still wait for you</small></span>
             </label>
             {% endif %}
             <div class="actions">

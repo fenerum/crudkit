@@ -14,7 +14,7 @@ import {
   Menu, MessageCircle, MessageSquare, MessagesSquare, Minus, Moon, MoreHorizontal, MoreVertical,
   PanelLeft, Paperclip, Pause, Phone, PhoneIncoming, PhoneOutgoing,
   PieChart, Play, Plus, PlusCircle, RefreshCcw, RefreshCw, RotateCcw, Search, Send, Settings,
-  Sparkles, Square, Star, StickyNote, Sun, Tag, Tags, Trash, Trash2,
+  ShieldCheck, Sparkles, Square, Star, StickyNote, Sun, Tag, Tags, Trash, Trash2,
   Unlock, Upload, User, UserPlus, Users, X,
   XCircle, Zap,
 } from 'lucide-react';
@@ -162,6 +162,7 @@ const ICONS = {
   'search': Search,
   'bell': Bell,
   'zap': Zap,
+  'shield': ShieldCheck,
   'activity': Activity,
   'list': List,
   'kanban': Kanban,

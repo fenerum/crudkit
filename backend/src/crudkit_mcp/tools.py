@@ -4,9 +4,15 @@ and CK-ID, so the same tools serve any CrudKit project:
 
     describe_types, search, list_records, get_record
 
-and, with the `write` scope and CRUDKIT_MCP_WRITE_ENABLED:
+and, with the `write` scope and CRUDKIT_MCP_WRITE_ENABLED, or the `propose`
+scope and crudkit_assistant installed:
 
     create_record, update_record, run_action, add_note, undo
+
+With `propose` the write tools only file an AssistantProposal for the token's
+user to confirm in their Inbox. With `write` they change records directly,
+except for approval-required actions and fields
+(crudkit.authorization.requires_approval), which are proposed as well.
 
 `describe_types` is the schema tool: it reports each type's filters, writable
 fields and actions, which `list_records`/`create_record`/… then take as a
@@ -22,16 +28,18 @@ Projects add or override tools with CRUDKIT_MCP_EXTRA_TOOLS: dotted paths to
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any
 
 from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.utils.module_loading import import_string
 
-from crudkit.authorization import has_model_permission
+from crudkit.audit import current as current_audit
+from crudkit.authorization import has_model_permission, requires_approval
 from crudkit_api import records, services
 from crudkit_api.records import DEFAULT_LIMIT, MAX_LIMIT
-from crudkit_mcp.conf import write_enabled
+from crudkit_mcp.conf import proposals_enabled, write_mode
 
 ID_DESCRIPTION = "Record ID, TYPE_ID-prefixed (e.g. CUS123)"
 
@@ -102,32 +110,47 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
             _schema({"id": {"type": "string", "description": ID_DESCRIPTION}}, ["id"]),
         ),
     ]
-    if write_enabled() and "write" in scopes:
-        tools += _write_tools(types)
-    by_name = {tool.name: tool for tool in tools}
-    by_name.update({tool.name: tool for tool in map(import_string, getattr(settings, "CRUDKIT_MCP_EXTRA_TOOLS", []))})
-    return {
-        name: tool
-        for name, tool in by_name.items()
-        if tool.scope in scopes and (tool.scope != "write" or write_enabled())
-    }
+    mode = write_mode(scopes)
+    if mode:
+        tools += _write_tools(types, propose=mode == "propose")
+    # Extra write tools write directly, so they need the `write` scope.
+    extras = [
+        tool
+        for tool in map(import_string, getattr(settings, "CRUDKIT_MCP_EXTRA_TOOLS", []))
+        if tool.scope != "write" or mode == "write"
+    ]
+    by_name = {tool.name: tool for tool in [*tools, *extras]}
+    return {name: tool for name, tool in by_name.items() if tool.scope in scopes or (tool.scope == "write" and mode)}
 
 
-def _write_tools(types: dict) -> list[Tool]:
-    changing = {"readOnlyHint": False, "destructiveHint": True}
+PROPOSE_NOTE = (
+    " Nothing changes yet: returns {status: pending_approval, proposal} and the user confirms or skips "
+    "the proposal in their Inbox."
+)
+APPROVAL_NOTE = (
+    " Changes to a type's approval_fields, and actions with requires_approval (see describe_types), "
+    "are not made: they return {status: pending_approval, proposal} for the user to confirm in their Inbox."
+)
+
+
+def _write_tools(types: dict, propose: bool) -> list[Tool]:
+    changing = {"readOnlyHint": False, "destructiveHint": not propose}
+    adding = {"readOnlyHint": False, "destructiveHint": False}
+    note = PROPOSE_NOTE if propose else ""
+    approval_note = PROPOSE_NOTE if propose else APPROVAL_NOTE
     return [
         Tool(
             "create_record",
-            "Create a record. `fields` keys come from describe_types. Returns the created record.",
-            _create_record,
+            "Create a record. `fields` keys come from describe_types. Returns the created record." + approval_note,
+            partial(_create_record, propose=propose),
             _schema({"type": types, "fields": {"type": "object"}}, ["type", "fields"]),
             scope="write",
-            annotations={"readOnlyHint": False, "destructiveHint": False},
+            annotations=adding,
         ),
         Tool(
             "update_record",
-            "Update fields on a record. Only the given fields change. Returns the updated record.",
-            _update_record,
+            "Update fields on a record. Only the given fields change. Returns the updated record." + approval_note,
+            partial(_update_record, propose=propose),
             _schema(
                 {"id": {"type": "string", "description": ID_DESCRIPTION}, "fields": {"type": "object"}},
                 ["id", "fields"],
@@ -137,8 +160,8 @@ def _write_tools(types: dict) -> list[Tool]:
         ),
         Tool(
             "run_action",
-            "Run one of a record's actions, as listed by describe_types or get_record.",
-            _run_action,
+            "Run one of a record's actions, as listed by describe_types or get_record." + approval_note,
+            partial(_run_action, propose=propose),
             _schema(
                 {"id": {"type": "string", "description": ID_DESCRIPTION}, "action": {"type": "string"}},
                 ["id", "action"],
@@ -148,21 +171,21 @@ def _write_tools(types: dict) -> list[Tool]:
         ),
         Tool(
             "add_note",
-            "Add a note to a record's activity feed.",
-            _add_note,
+            "Add a note to a record's activity feed." + note,
+            partial(_add_note, propose=propose),
             _schema(
                 {"id": {"type": "string", "description": ID_DESCRIPTION}, "body": {"type": "string"}},
                 ["id", "body"],
             ),
             scope="write",
-            annotations={"readOnlyHint": False, "destructiveHint": False},
+            annotations=adding,
         ),
         Tool(
             "undo",
             "Revert a change set: every change one earlier write made, as returned in its `change_set` "
             "or listed in get_record's changelog. Returns `conflicts` and changes nothing if the records "
-            "were changed since, unless `force` is true.",
-            _undo,
+            "were changed since, unless `force` is true." + note,
+            partial(_undo, propose=propose),
             _schema(
                 {"change_set": {"type": "string", "description": "Change set UUID"}, "force": {"type": "boolean"}},
                 ["change_set"],
@@ -220,33 +243,79 @@ def _get_record(user, arguments: dict) -> dict:
     return records.get_record(user, arguments.get("id"))
 
 
-def _create_record(user, arguments: dict) -> dict:
+def _create_record(user, arguments: dict, propose=False) -> dict:
     model = records.resolve_type(user, arguments.get("type"))
     if not has_model_permission(user, model, "add"):
         raise PermissionDenied
     fields = records.checked_fields(model, user, arguments.get("fields"))
+    if propose or requires_approval(model, fields=fields):
+        label = f"Create {model._meta.verbose_name}"
+        return _propose(user, model, None, "create", {"type": model.TYPE_ID, "fields": fields}, label)
     instance = services.create_object(model, fields, user)
     return records.serialize(model, [instance], depth=0)[0]
 
 
-def _update_record(user, arguments: dict) -> dict:
+def _update_record(user, arguments: dict, propose=False) -> dict:
     model, instance = records.get_instance(user, arguments.get("id"), "change")
     fields = records.checked_fields(model, user, arguments.get("fields"))
+    if propose or requires_approval(model, fields=fields):
+        return _propose(user, model, instance, "patch", {"fields": fields})
     services.patch_fields(instance, fields, user)
     instance.refresh_from_db()
     return records.serialize(model, [instance], depth=0)[0]
 
 
-def _run_action(user, arguments: dict) -> dict:
-    _, instance = records.get_instance(user, arguments.get("id"), "change")
-    return services.run_action(instance, arguments.get("action"), user)
+def _run_action(user, arguments: dict, propose=False) -> dict:
+    model, instance = records.get_instance(user, arguments.get("id"), "change")
+    action = arguments.get("action")
+    if propose or requires_approval(model, action=action):
+        services.check_action(instance, action, user)
+        label = f"Run {records.action_names(model)[action]}"
+        return _propose(user, model, instance, "action", {"action": action}, label)
+    return services.run_action(instance, action, user)
 
 
-def _add_note(user, arguments: dict) -> dict:
-    _, instance = records.get_instance(user, arguments.get("id"), "change")
+def _add_note(user, arguments: dict, propose=False) -> dict:
+    model, instance = records.get_instance(user, arguments.get("id"), "change")
+    if propose:
+        body = (arguments.get("body") or "").strip()
+        if not body:
+            raise ValueError("Note body is empty")
+        return _propose(user, model, instance, "note", {"body": body}, f"Add note: {body.splitlines()[0][:80]}")
     return services.create_note(instance, arguments.get("body"), user)
 
 
-def _undo(user, arguments: dict) -> dict:
+def _undo(user, arguments: dict, propose=False) -> dict:
     change_set = uuid.UUID(str(arguments.get("change_set")))
+    if propose:
+        newest = services.check_revertible(change_set)[0]
+        type_id = newest.related_content_type.model_class().TYPE_ID
+        model, instance = records.get_instance(user, f"{type_id}{newest.related_object_id}", "change")
+        label = f"Undo change {str(change_set)[:8]}"
+        return _propose(user, model, instance, "revert", {"change_set": str(change_set)}, label)
     return services.revert_change_set(change_set, user, force=bool(arguments.get("force")))
+
+
+def _propose(user, model, instance, kind: str, payload: dict, label: str = "") -> dict:
+    """File the change as an AssistantProposal for `user` to confirm, instead of making it."""
+    if not proposals_enabled():
+        raise ValueError("This change needs approval, and approvals need crudkit_assistant installed")
+    # Importable only when crudkit_assistant is installed, which proposals_enabled() checked.
+    from crudkit_assistant.proposals import create_proposal, patch_label
+
+    proposal = create_proposal(
+        user,
+        model,
+        instance,
+        kind,
+        label or patch_label(payload["fields"]),
+        payload,
+        source="mcp",
+        client=current_audit().client,
+    )
+    return {
+        "status": "pending_approval",
+        "proposal": proposal.id,
+        "label": proposal.label,
+        "message": "Nothing has changed yet. The user confirms or skips this proposal in their Inbox.",
+    }

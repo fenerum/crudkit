@@ -16,14 +16,12 @@ The proposal tools talk to the consumer via an asyncio.Queue exposed on
 the RunContext.deps shim attached by the runner.
 """
 
-import json
 import logging
 import uuid
 from typing import Any
 
 from asgiref.sync import sync_to_async
 from django.contrib.auth import get_user_model
-from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from pydantic_ai import RunContext
 
@@ -33,6 +31,7 @@ from crudkit_api import records, services
 from crudkit_api.metadata import build_instance_metadata
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
+from crudkit_assistant.proposals import create_proposal, patch_label
 
 logger = logging.getLogger(__name__)
 
@@ -248,20 +247,6 @@ async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected
 # Proposal tools (no mutation — only persist + emit)
 
 
-def _create_proposal(user, session_key: str, instance, kind: str, label: str, payload: dict, reasoning: str):
-    return AssistantProposal.objects.create(
-        target_content_type=ContentType.objects.get_for_model(instance.__class__),
-        target_object_id=instance.pk,
-        session_key=session_key,
-        kind=kind,
-        label=label[:255],
-        payload=payload,
-        reasoning=reasoning or "",
-        created_by=user,
-        updated_by=user,
-    )
-
-
 def _make_proposal(
     deps: AssistantDeps,
     object_id: str | None,
@@ -273,7 +258,16 @@ def _make_proposal(
     instance, error = _load_instance(deps, object_id, "change")
     if instance is None:
         raise PermissionError(error)
-    return _create_proposal(_load_user(deps), deps.session_key, instance, kind, label, payload, reasoning)
+    return create_proposal(
+        _load_user(deps),
+        instance.__class__,
+        instance,
+        kind,
+        label,
+        payload,
+        reasoning=reasoning,
+        session_key=deps.session_key,
+    )
 
 
 def pending_envelope(proposal: AssistantProposal) -> dict:
@@ -337,14 +331,6 @@ def _field_errors(model, fields: dict) -> str | None:
     return "; ".join(choice_errors) or None
 
 
-def _patch_label(fields: dict) -> str:
-    try:
-        preview = ", ".join(f"{k}={json.dumps(v, default=str)}" for k, v in fields.items())
-    except (TypeError, ValueError):
-        preview = ", ".join(fields)
-    return f"Update {preview}"
-
-
 async def propose_action(
     ctx: RunContext[AssistantDeps],
     action_name: str,
@@ -391,7 +377,7 @@ async def propose_patch(
         return f"ERROR: {error}"
     if error := _field_errors(instance.__class__, fields):
         return f"ERROR: {error}"
-    return await _propose(ctx, id, AssistantProposal.Kind.PATCH, _patch_label(fields), {"fields": fields}, reasoning)
+    return await _propose(ctx, id, AssistantProposal.Kind.PATCH, patch_label(fields), {"fields": fields}, reasoning)
 
 
 async def propose_bulk_patch(
@@ -412,7 +398,7 @@ async def propose_bulk_patch(
     ids = list(dict.fromkeys(ids))
     if len(ids) > MAX_BULK_IDS:
         return f"ERROR: at most {MAX_BULK_IDS} ids per call; split the records into batches."
-    label = _patch_label(fields)
+    label = patch_label(fields)
 
     def _run():
         instances, refused = [], []
@@ -434,8 +420,15 @@ async def propose_bulk_patch(
             ):
                 unchanged.append(str(instance.id))
                 continue
-            proposal = _create_proposal(
-                user, ctx.deps.session_key, instance, AssistantProposal.Kind.PATCH, label, {"fields": fields}, reasoning
+            proposal = create_proposal(
+                user,
+                instance.__class__,
+                instance,
+                AssistantProposal.Kind.PATCH,
+                label,
+                {"fields": fields},
+                reasoning=reasoning,
+                session_key=ctx.deps.session_key,
             )
             envelopes.append(pending_envelope(proposal))
         return envelopes, refused, unchanged

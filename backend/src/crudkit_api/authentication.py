@@ -74,6 +74,8 @@ class UserProfileView(APIView):
             "enabled": apps.is_installed("crudkit_assistant") and llm.is_configured(),
             "name": getattr(dj_settings, "CRUDKIT_ASSISTANT_NAME", "Assistant"),
             "avatar_url": getattr(dj_settings, "CRUDKIT_ASSISTANT_AVATAR_URL", ""),
+            # MCP clients propose changes even when no model is configured.
+            "proposals": apps.is_installed("crudkit_assistant"),
         }
         return Response(data)
 

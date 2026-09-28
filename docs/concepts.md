@@ -52,6 +52,11 @@ class Book(BaseCrudKitModel):
   on screen.
 - `mcp_exclude` — set to `True` to leave the model out of the MCP server's
   generated tools (`crudkit_mcp`).
+- `approval_fields` — fields MCP clients and agents may only propose changes
+  to (see [Approvals](#approvals)).
+- `owner_access` — set to `True` to let any signed-in user view and change the
+  rows they created without the Django model permission (others' rows stay
+  hidden unless the user has the permission; delete still needs it).
 
 Project-wide configuration lives in ordinary Django settings with the
 `CRUDKIT_` prefix (`CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_AI_MODEL`,
@@ -67,7 +72,8 @@ for the requesting user `can_create` (add permission) plus `inline_create`.
 
 Actions are model methods decorated with `@crm_action("Verbose name")`
 (`crudkit.decorators`); they show up as buttons in the UI and are invoked via
-`POST /api/v1/<TYPE_ID>/<pk>/action/`.
+`POST /api/v1/<TYPE_ID>/<pk>/action/`. Each action in the metadata carries
+`requires_approval` (see [Approvals](#approvals)).
 
 The SPA is built entirely on this endpoint — every list, detail view, and form
 is rendered from metadata at runtime. That is what makes the frontend generic:
@@ -150,6 +156,48 @@ changed again since, unless forced. Undoing an action needs permission to run
 it, and only restores the fields the action changed on its record: side effects
 such as sent emails or external calls are not undone. Deleted records can also
 be restored directly (`POST /api/v1/<TYPE>/<pk>/restore/`).
+
+## Approvals
+
+Some changes should only happen once a person has agreed to them. A model
+declares which:
+
+```python
+class Invoice(BaseCrudKitModel):
+    @crm_action("Send reminder", requires_approval=True)
+    def send_reminder(self, request): ...
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        approval_fields = ["amount", "due_date"]
+```
+
+`crudkit.authorization.requires_approval(model, action=None, fields=None)`
+answers whether running `action`, or writing any of `fields`, needs approval.
+The rule binds MCP clients and agents only: people using the UI or the REST
+API are the approvers, so they run these actions and edit these fields
+directly (the UI marks such actions with a shield). Over MCP with the `write`
+scope, such a write is filed as a proposal instead of made; with the
+`propose` scope every write is. `describe_types` reports `requires_approval`
+per action and the type's `approval_fields`. The assistant sidebar already
+proposes every change. Agents running without a person (source `agent`) must
+call `requires_approval()` before writing and propose instead.
+
+A proposal is an `AssistantProposal` (TYPE_ID `ASP`, in `crudkit_assistant`):
+its `kind` (`action`, `patch`, `create`, `note`, `revert`), a `payload`, the
+`target` record (for a create, the new record once confirmed), `source`
+(`assistant`, `mcp`, `agent`) and `client`, and `status` (`pending`,
+`confirmed`, `skipped`, `failed`). Users see and decide the proposals they
+created, whether or not they have the Django permissions on `ASP`
+(`owner_access`); superusers see all. The Inbox's Proposals tab lists the
+pending ones, sidebar and MCP alike, and the Inbox menu item counts them.
+
+Confirm and Skip are the `confirm` and `skip` actions
+(`POST /api/v1/ASP/<pk>/action/`), and the sidebar's buttons call the same
+code, so a proposal decided in one place is decided everywhere. Confirming
+checks that the user may make the change (add permission for a create,
+change permission on the target otherwise), runs it through the same services
+as the REST API, and logs it as its own change set attributed to the
+proposal's `source` and `client`, so it can be undone like any other change.
 
 ## The frontend config contract
 

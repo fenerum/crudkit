@@ -393,6 +393,12 @@ class BaseCrudKitModel(models.Model):
         assistant_tools = []
         # Leave this model out of the MCP server's generated tools.
         mcp_exclude = False
+        # Fields MCP clients and agents may only propose changes to; a person
+        # confirms them. See crudkit.authorization.requires_approval.
+        approval_fields = []
+        # Let any signed-in user view and change the rows they created, without
+        # the Django model permission.
+        owner_access = False
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

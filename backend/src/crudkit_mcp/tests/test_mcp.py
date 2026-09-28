@@ -8,12 +8,14 @@ from django.test import TestCase, override_settings
 from django.utils import timezone, translation
 
 from crudkit.models import ChangeLog, FeedItem, View, parse_ck_id
+from crudkit_assistant.models import AssistantProposal
 from crudkit_mcp.models import AccessToken, OAuthClient
 from crudkit_mcp.server import PROTOCOL_VERSION, MCPServer
 from crudkit_mcp.tools import Tool
 from tests.testapp.models import Customer, Topic
 
 EXTRA_TOOL = Tool("list_records", "Overridden", lambda user, arguments: "custom")
+EXTRA_WRITE_TOOL = Tool("sync_now", "Sync", lambda user, arguments: "synced", scope="write")
 
 
 def grant(user, model, *actions):
@@ -253,7 +255,9 @@ class SavedViewTest(MCPTestCase):
 
     def test_view_of_type_user_cannot_view(self):
         grant(self.other, View, "view")
-        self.assertEqual(self.call("list_records", {"view": self.view.id}, user=self.other)["error"], "Permission denied")
+        self.assertEqual(
+            self.call("list_records", {"view": self.view.id}, user=self.other)["error"], "Permission denied"
+        )
 
     def test_invalid_view_ids(self):
         self.assertIn("Invalid view ID", self.call("list_records", {"view": self.customer.id})["error"])
@@ -290,7 +294,8 @@ class WriteToolsTest(MCPTestCase):
         data = self.call("describe_types", {"type": "CUS"}, scopes=self.WRITE)
         self.assertTrue(data["can_create"])
         self.assertTrue(data["can_update"])
-        self.assertEqual(data["actions"], {"mark_churned": "Mark churned"})
+        self.assertEqual(data["actions"], {"mark_churned": {"label": "Mark churned", "requires_approval": False}})
+        self.assertEqual(data["approval_fields"], [])
         self.assertEqual(data["required_on_create"], ["name"])
 
         topic = self.call("describe_types", {"type": "TOP"}, scopes=self.WRITE)
@@ -315,9 +320,7 @@ class WriteToolsTest(MCPTestCase):
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_update_writes_changelog(self):
-        data = self.call(
-            "update_record", {"id": self.customer.id, "fields": {"name": "Acme Inc"}}, scopes=self.WRITE
-        )
+        data = self.call("update_record", {"id": self.customer.id, "fields": {"name": "Acme Inc"}}, scopes=self.WRITE)
         self.assertEqual(data["name"], "Acme Inc")
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.name, "Acme Inc")
@@ -563,3 +566,146 @@ class ExposedModelsTest(MCPTestCase):
     def test_type_names_do_not_follow_the_active_language(self):
         with translation.override("da"):
             self.assertEqual(self.call("describe_types", {"type": "CUS"})["name"], "customer")
+
+
+class ProposeScopeTest(MCPTestCase):
+    PROPOSE = ("read", "propose")
+
+    def setUp(self):
+        super().setUp()
+        grant(self.user, Customer, "add", "change")
+        cache.clear()
+        oauth_client = OAuthClient.objects.create(client_name="Research Bot", redirect_uris=["http://localhost/cb"])
+        self.token = AccessToken.objects.create(
+            client=oauth_client, user=self.user, scopes="read propose", expires_at=timezone.now() + timedelta(hours=1)
+        )
+
+    def server(self, scopes=PROPOSE, user=None):
+        return MCPServer(User.objects.get(pk=(user or self.user).pk), oauth_scopes=list(scopes), token=self.token)
+
+    def assert_proposed(self, result, kind, payload):
+        self.assertEqual(result["status"], "pending_approval")
+        proposal = AssistantProposal.objects.get(pk=result["proposal"])
+        self.assertEqual(
+            (proposal.kind, proposal.payload, proposal.status, proposal.source, proposal.client),
+            (kind, payload, "pending", "mcp", "Research Bot"),
+        )
+        self.assertEqual(proposal.created_by, self.user)
+        return proposal
+
+    def test_write_tools_listed_without_write_setting(self):
+        self.assertEqual(self.tool_names()[4:], ["create_record", "update_record", "run_action", "add_note", "undo"])
+
+    @override_settings(CRUDKIT_MCP_EXTRA_TOOLS=["crudkit_mcp.tests.test_mcp.EXTRA_WRITE_TOOL"])
+    def test_extra_write_tools_need_write(self):
+        self.assertNotIn("sync_now", self.tool_names())
+
+    def test_propose_scope_needs_the_assistant_app(self):
+        with patch("crudkit_mcp.conf.apps.is_installed", return_value=False):
+            self.assertEqual(self.tool_names(), ["describe_types", "search", "list_records", "get_record"])
+
+    def test_update_is_proposed(self):
+        result = self.call("update_record", {"id": self.customer.id, "fields": {"name": "Acme Inc"}})
+        proposal = self.assert_proposed(result, "patch", {"fields": {"name": "Acme Inc"}})
+        self.assertEqual(proposal.target, self.customer)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Acme Corp")
+        self.assertFalse(ChangeLog.objects.exists())
+
+    def test_create_is_proposed(self):
+        result = self.call("create_record", {"type": "CUS", "fields": {"name": "Globex"}})
+        proposal = self.assert_proposed(result, "create", {"type": "CUS", "fields": {"name": "Globex"}})
+        self.assertIsNone(proposal.target)
+        self.assertFalse(Customer.objects.filter(name="Globex").exists())
+
+    def test_action_is_proposed(self):
+        result = self.call("run_action", {"id": self.customer.id, "action": "mark_churned"})
+        self.assert_proposed(result, "action", {"action": "mark_churned"})
+        self.assertEqual(result["label"], "Run Mark churned")
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.status, "active")
+
+    def test_note_is_proposed(self):
+        result = self.call("add_note", {"id": self.customer.id, "body": "Called them"})
+        self.assert_proposed(result, "note", {"body": "Called them"})
+        self.assertFalse(FeedItem.objects.exists())
+
+    def test_undo_is_proposed(self):
+        with self.settings(CRUDKIT_MCP_WRITE_ENABLED=True):
+            change_set = self.call(
+                "update_record", {"id": self.customer.id, "fields": {"name": "B"}}, scopes=("read", "write")
+            )["change_set"]
+        result = self.call("undo", {"change_set": change_set})
+        self.assert_proposed(result, "revert", {"change_set": change_set})
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "B")
+
+    def test_invalid_writes_are_not_proposed(self):
+        self.assertIn(
+            "Unknown or read-only", self.call("update_record", {"id": self.customer.id, "fields": {"x": 1}})["error"]
+        )
+        self.assertIn("not available", self.call("run_action", {"id": self.customer.id, "action": "nope"})["error"])
+        self.assertIn("empty", self.call("add_note", {"id": self.customer.id, "body": " "})["error"])
+        self.assertFalse(AssistantProposal.objects.exists())
+
+    def test_proposals_need_permission(self):
+        other = User.objects.create_user("other")
+        grant(other, Customer, "view")
+        result = self.call("update_record", {"id": self.customer.id, "fields": {"name": "X"}}, user=other)
+        self.assertIn("not available for change", result["error"])
+        self.assertFalse(AssistantProposal.objects.exists())
+
+
+@override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
+class ApprovalRulesTest(MCPTestCase):
+    WRITE = ("read", "write")
+
+    def setUp(self):
+        super().setUp()
+        grant(self.user, Customer, "add", "change")
+        cache.clear()
+        for patcher in (
+            patch.object(Customer.CrudKitSettings, "approval_fields", ["status"], create=True),
+            patch.object(Customer.mark_churned, "requires_approval", True, create=True),
+        ):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_describe_types_reports_approval_rules(self):
+        data = self.call("describe_types", {"type": "CUS"}, scopes=self.WRITE)
+        self.assertEqual(data["actions"], {"mark_churned": {"label": "Mark churned", "requires_approval": True}})
+        self.assertEqual(data["approval_fields"], ["status"])
+
+    def test_approval_action_is_proposed(self):
+        result = self.call("run_action", {"id": self.customer.id, "action": "mark_churned"}, scopes=self.WRITE)
+        self.assertEqual(result["status"], "pending_approval")
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.status, "active")
+
+    def test_patch_touching_an_approval_field_is_proposed_whole(self):
+        fields = {"name": "Acme Inc", "status": "churned"}
+        result = self.call("update_record", {"id": self.customer.id, "fields": fields}, scopes=self.WRITE)
+        self.assertEqual(AssistantProposal.objects.get(pk=result["proposal"]).payload, {"fields": fields})
+        self.customer.refresh_from_db()
+        self.assertEqual((self.customer.name, self.customer.status), ("Acme Corp", "active"))
+
+    def test_create_setting_an_approval_field_is_proposed(self):
+        result = self.call(
+            "create_record", {"type": "CUS", "fields": {"name": "Globex", "status": "churned"}}, scopes=self.WRITE
+        )
+        self.assertEqual(result["status"], "pending_approval")
+        self.assertFalse(Customer.objects.filter(name="Globex").exists())
+
+    def test_other_writes_run(self):
+        result = self.call("update_record", {"id": self.customer.id, "fields": {"name": "Acme Inc"}}, scopes=self.WRITE)
+        self.assertEqual(result["name"], "Acme Inc")
+        created = self.call("create_record", {"type": "CUS", "fields": {"name": "Globex"}}, scopes=self.WRITE)
+        self.assertEqual(created["name"], "Globex")
+        self.assertFalse(AssistantProposal.objects.exists())
+
+    def test_approval_needs_the_assistant_app(self):
+        with patch("crudkit_mcp.tools.proposals_enabled", return_value=False):
+            result = self.call("run_action", {"id": self.customer.id, "action": "mark_churned"}, scopes=self.WRITE)
+        self.assertIn("needs approval", result["error"])
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.status, "active")

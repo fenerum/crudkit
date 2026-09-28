@@ -14,6 +14,7 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
 import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { isFrontendPath } from './is-frontend-path';
+import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 
 function truncateLabel(s: string, max = 18) {
   if (typeof s !== 'string') return '';
@@ -378,7 +379,8 @@ export default function Detail() {
     (metadata.actions || []).forEach((action: any) => {
       items.push({
         label: action.verbose_name,
-        icon: 'zap',
+        icon: action.requires_approval ? 'shield' : 'zap',
+        title: action.requires_approval ? APPROVAL_HINT : undefined,
         onSelect: () => {
           if (window.confirm(`Are you sure you want to ${action.verbose_name.toLowerCase()}?`)) {
             actionMutation.mutate(action.action);

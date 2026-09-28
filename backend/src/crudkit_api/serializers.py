@@ -310,7 +310,7 @@ class GenericSerializer(serializers.ModelSerializer):
         # TODO: Look up all generic relations dynamically
         # Resolved via _meta: on Django >= 6, class-level access to a
         # GenericForeignKey returns a descriptor without `blank`.
-        for gfk_name in ("parent_object", "related_object"):
+        for gfk_name in ("parent_object", "related_object", "target"):
             if hasattr(self.Meta.model, gfk_name):
                 try:
                     gfk = self.Meta.model._meta.get_field(gfk_name)

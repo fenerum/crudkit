@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Icon } from '../ui';
 import { url } from '../../utils/urls';
+import ProposalPayload, { PROPOSAL_ICON } from '../../shared/ProposalPayload';
 
 type Props = {
   label: string;
@@ -20,29 +21,6 @@ type Props = {
   undone?: boolean;
 };
 
-function prettyPayload(kind: string, payload: any): string {
-  if (!payload) return '';
-  if (kind === 'action') return payload.action || '';
-  if (kind === 'patch') {
-    try {
-      return Object.entries(payload.fields || {})
-        .map(([k, v]) => `${k} = ${JSON.stringify(v)}`)
-        .join('\n');
-    } catch {
-      return JSON.stringify(payload.fields || {});
-    }
-  }
-  if (kind === 'note') return payload.body || '';
-  return JSON.stringify(payload);
-}
-
-const KIND_ICON: Record<string, string> = {
-  action: 'zap',
-  patch: 'edit-3',
-  note: 'message-square',
-  revert: 'rotate-ccw',
-};
-
 export default function ConfirmCard({
   label,
   kind,
@@ -58,11 +36,10 @@ export default function ConfirmCard({
   onUndo,
   undone,
 }: Props) {
-  const body = prettyPayload(kind, payload);
   return (
     <div className="bg-bg-2 border border-bg-4 rounded-md p-3 text-sm space-y-2">
       <div className="flex items-center gap-2 text-fg-1 font-medium">
-        <Icon name={KIND_ICON[kind] || 'help-circle'} size={14} color="currentColor" />
+        <Icon name={PROPOSAL_ICON[kind] || 'help-circle'} size={14} color="currentColor" />
         <span>{label}</span>
       </div>
       {target && (
@@ -71,11 +48,7 @@ export default function ConfirmCard({
           {targetLabel && ` · ${targetLabel}`}
         </Link>
       )}
-      {body && (
-        <pre className="text-xs text-fg-2 whitespace-pre-wrap break-words font-mono bg-bg-1 rounded px-2 py-1">
-          {body}
-        </pre>
-      )}
+      <ProposalPayload kind={kind} payload={payload} />
       {reasoning && <div className="text-xs text-fg-3 italic">{reasoning}</div>}
       {resolved ? (
         <div className="flex items-center gap-2">

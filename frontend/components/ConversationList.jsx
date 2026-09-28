@@ -14,6 +14,7 @@ import {useAuth} from "../context/AuthContext";
 import {Avatar, Icon, IconButton} from "./ui";
 import SafeMarkdown from "../shared/SafeMarkdown";
 import MarkdownComposer from "../shared/MarkdownComposer";
+import {APPROVAL_HINT} from "../shared/ProposalPayload";
 
 function MessageTranslation({message, preferredLanguage}) {
   if (!message.detected_language || !message.translation) return null;
@@ -614,8 +615,9 @@ export default function ConversationList({objectList, view, model, metadata, ref
                 type="button"
                 onClick={() => runAction(action)}
                 className="ck-btn ck-btn-secondary ck-btn-sm"
+                title={action.requires_approval ? APPROVAL_HINT : undefined}
               >
-                <Icon name="zap" size={12} color="currentColor" />
+                <Icon name={action.requires_approval ? "shield" : "zap"} size={12} color="currentColor" />
                 {action.verbose_name}
               </button>
             ))}

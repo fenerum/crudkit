@@ -39,7 +39,6 @@ from django.contrib.auth import get_user_model
 from pydantic import ValidationError
 from pydantic_ai.messages import ModelMessagesTypeAdapter
 
-from crudkit.authorization import has_object_permission
 from crudkit.models import get_ck_id, parse_ck_id
 from crudkit_api.ws_auth import AuthenticatedConsumer
 from crudkit_assistant.deps import AssistantDeps
@@ -210,11 +209,11 @@ class AssistantConsumer(AuthenticatedConsumer):
             return None
 
         user = await self._get_user()
-        if not await self._can_change_proposal_target(proposal, user):
+        if not await self._can_apply(proposal, user):
             await self.send_json({"type": "error", "message": "Proposal not found."})
             return None
         if not ok:
-            await sync_to_async(proposal.skip)(user)
+            await sync_to_async(proposal.mark_skipped)(user)
             await self.send_json(
                 {
                     "type": "tool_outcome",
@@ -258,9 +257,8 @@ class AssistantConsumer(AuthenticatedConsumer):
         return get_user_model().objects.get(pk=self.user_id)
 
     @database_sync_to_async
-    def _can_change_proposal_target(self, proposal, user):
-        target = proposal.target
-        return target is not None and has_object_permission(user, target, "change")
+    def _can_apply(self, proposal, user):
+        return proposal.can_apply(user)
 
 
 def _load_or_create_conversation(user, conversation_id) -> AssistantConversation:

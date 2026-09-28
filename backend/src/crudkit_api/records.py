@@ -14,7 +14,12 @@ from django.core.exceptions import PermissionDenied
 from django.db import models
 from django.utils import translation
 
-from crudkit.authorization import get_authorized_queryset, has_action_permission, has_model_permission
+from crudkit.authorization import (
+    get_authorized_queryset,
+    has_action_permission,
+    has_model_permission,
+    requires_approval,
+)
 from crudkit.models import View, ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import services
@@ -168,7 +173,13 @@ def _type_detail(user, model) -> dict:
         "searchable": bool(services.get_search_fields(model)),
         "fields": {f.name: schema for f, schema in writable_fields(model)},
         "required_on_create": [f.name for f, _ in writable_fields(model) if not f.blank and not f.has_default()],
-        "actions": action_names(model) if can_change else {},
+        "actions": {
+            name: {"label": label, "requires_approval": requires_approval(model, action=name)}
+            for name, label in action_names(model).items()
+        }
+        if can_change
+        else {},
+        "approval_fields": list(getattr(model.CrudKitSettings, "approval_fields", [])),
         "can_create": has_model_permission(user, model, "add"),
         "can_update": can_change,
         "views": {view.id: view.name for view in _views(user).filter(model=model.TYPE_ID)},

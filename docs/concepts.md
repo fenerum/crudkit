@@ -110,8 +110,7 @@ UI: who the ideal customer is, why customers buy, tone of voice, playbooks.
 Each has a `name`, a markdown `body`, `model_types` (a list of TYPE_IDs; empty
 means global, as for snippets), `active` and an `order`. They are ordinary
 CrudKit records, so they get the REST API (`/api/v1/AIC/`), list and detail
-pages, history and undo; the profile page links to `/AIC` for users with
-`crudkit.view_aicontext`.
+pages, history and undo at `/AIC`. Add a saved view to the menu to link it.
 
 `crudkit.llm.ai_context(type_id=None)` renders the active documents that apply
 (the global ones plus those listing `type_id`), ordered by `order` then

@@ -10,9 +10,8 @@
   the type on screen, and AI fields get a "Company context" section in their prompt
   (`crudkit.ai_backend.process()` takes an optional `type_id`). The assistant proposes edits to
   these documents when the user teaches it something durable about the company.
-  `/api/v1/user/me/` returns `can_view_ai_context`, and the SPA's profile page links to `/AIC`
-  for users who have it. After a password login the SPA now loads the full profile, so the
-  assistant settings no longer wait for a reload.
+- SPA: after a password login the SPA loads the full user profile, so the assistant appears
+  without a reload.
 - Undo and history. Every ChangeLog entry now records who made it and how: `action`
   (create/update/delete/restore/action/merge/revert), `source` (ui, api, mcp, assistant,
   agent, revert or system), `client` (the API `Client-Id` or MCP OAuth client), a `change_set`

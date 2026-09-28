@@ -75,11 +75,12 @@ def on_change_logged(entry: ChangeLog) -> None:
     """Start the agents watching the record `entry` logged, once it commits."""
     if entry.source == "agent" or entry.related_content_type_id is None:
         return
-    if entry.action not in (ChangeLog.Action.CREATE, ChangeLog.Action.UPDATE):
+    # Actions are logged as ACTION with the fields they changed.
+    if entry.action not in (ChangeLog.Action.CREATE, ChangeLog.Action.UPDATE, ChangeLog.Action.ACTION):
         return
     type_id = getattr(entry.related_content_type.model_class(), "TYPE_ID", None)
     agents = record_agents(type_id) if type_id else []
-    changed = sorted(entry.field_changes or {}) if entry.action == ChangeLog.Action.UPDATE else []
+    changed = sorted(entry.field_changes or {}) if entry.action != ChangeLog.Action.CREATE else []
     for agent in agents:
         if entry.action == ChangeLog.Action.CREATE:
             if agent["trigger"] != Agent.Trigger.RECORD_CREATED:

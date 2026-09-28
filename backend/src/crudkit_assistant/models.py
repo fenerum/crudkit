@@ -259,7 +259,19 @@ class Agent(BaseCrudKitModel):
         search_fields = ["name"]
         owner_access = True
         ai_exposed = True
-        approval_fields = ["instructions", "enabled", "trigger", "model_type", "view", "mode", "run_as"]
+        approval_fields = [
+            "instructions",
+            "enabled",
+            "trigger",
+            "model_type",
+            "view",
+            "watch_fields",
+            "schedule",
+            "mode",
+            "run_as",
+            "max_records_per_run",
+            "max_runs_per_day",
+        ]
         default_inlines = [["AGR", ["status", "dry_run", "output", "finished_at"]]]
 
         @staticmethod

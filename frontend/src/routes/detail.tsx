@@ -51,7 +51,7 @@ function InlineTab({ inline, parent_object_id }: any) {
         <h3 className="text-sm font-semibold text-fg-1 capitalize tracking-tight">
           {inlineMetadata.verbose_name_plural}
         </h3>
-        {inlineMetadata.can_create && (
+        {inlineMetadata.can_create && inlineMetadata.inline_create && (
           <Link
             to={
               url(model, 'create') +

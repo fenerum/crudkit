@@ -121,6 +121,13 @@ class TriggerTests(AgentTestCase):
         self.assertEqual((run.status, run.target, run.trigger_info["fields"]), ("succeeded", self.acme, ["status"]))
         self.assertIn("which just changed (status)", self.prompts[0])
 
+    def test_action_changing_a_watched_field_triggers(self):
+        self.make_agent()
+        with self.model(), self.captureOnCommitCallbacks(execute=True), audit("ui", user=self.user):
+            services.perform_action(self.acme, "mark_churned", self.user)
+        run = AgentRun.objects.get()
+        self.assertEqual((run.target, run.trigger_info["fields"]), (self.acme, ["status"]))
+
     def test_empty_watch_fields_match_any_change(self):
         self.make_agent(watch_fields=[])
         self.patch_customer(self.acme, {"name": "Acme 2"})

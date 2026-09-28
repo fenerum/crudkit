@@ -299,18 +299,34 @@ def create_object(model, fields: dict[str, Any], user, request=None):
     return instance
 
 
+def check_create(model, fields: dict[str, Any], user) -> None:
+    """Validate a create as create_object would, model `clean()` included,
+    without saving. Raises ValueError."""
+    serializer = _validated_serializer(model, None, fields, user, None, partial=False)
+    instance = model.from_query_params({}, {"created_by": user, "updated_by": user})
+    for field, value in serializer.validated_data.items():
+        setattr(instance, field, value)
+    try:
+        serializer._validate_model(instance)
+    except DRFValidationError as exc:
+        raise ValueError(f"Validation failed: {exc.detail}") from exc
+
+
 def create_note(instance, body: str, user) -> dict[str, Any]:
     """Create a FeedItem note on the target object."""
     body = (body or "").strip()
     if not body:
         raise ValueError("Note body is empty")
-    fei = FeedItem.objects.create(
-        parent_content_type=ContentType.objects.get_for_model(instance.__class__),
-        parent_object_id=instance.pk,
-        body=body,
-        created_by=user,
-        updated_by=user,
-    )
+    with transaction.atomic():
+        fei = FeedItem.objects.create(
+            parent_content_type=ContentType.objects.get_for_model(instance.__class__),
+            parent_object_id=instance.pk,
+            body=body,
+            created_by=user,
+            updated_by=user,
+        )
+        # Logged (as stored, ids normalised) so the change set that added the note can be undone.
+        ChangeLog.objects.create_from_objects(None, _refetch(fei), user=user)
     logger.info("Created FeedItem %s on %s.%s", fei.pk, instance.__class__.__name__, instance.pk)
     return {"kind": "note", "feeditem_id": fei.id}
 

@@ -15,6 +15,7 @@ import { url } from '../../utils/urls';
 import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { isFrontendPath } from './is-frontend-path';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
+import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
 
 function truncateLabel(s: string, max = 18) {
   if (typeof s !== 'string') return '';
@@ -50,16 +51,18 @@ function InlineTab({ inline, parent_object_id }: any) {
         <h3 className="text-sm font-semibold text-fg-1 capitalize tracking-tight">
           {inlineMetadata.verbose_name_plural}
         </h3>
-        <Link
-          to={
-            url(model, 'create') +
-            (createParams ? '?' + new URLSearchParams(createParams).toString() : '')
-          }
-          className="ck-btn ck-btn-secondary ck-btn-sm"
-        >
-          <Icon name="plus" size={12} color="currentColor" />
-          New
-        </Link>
+        {inlineMetadata.can_create && (
+          <Link
+            to={
+              url(model, 'create') +
+              (createParams ? '?' + new URLSearchParams(createParams).toString() : '')
+            }
+            className="ck-btn ck-btn-secondary ck-btn-sm"
+          >
+            <Icon name="plus" size={12} color="currentColor" />
+            New
+          </Link>
+        )}
       </div>
       <InlineList
         fields={fields}
@@ -76,14 +79,16 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useMemo(() => new CrudKitAPIClient(), []);
 
-  const hasInlines = !!(layout && layout.inlines && layout.inlines.length > 0);
+  // A saved Layout's inlines, else the model's CrudKitSettings.default_inlines.
+  const inlineSpecs = layout?.inlines?.length ? layout.inlines : metadata?.default_inlines || [];
+  const hasInlines = inlineSpecs.length > 0;
 
   const inlinesQuery = useQuery({
     queryKey: ['inlines-metadata', type, id],
     enabled: hasInlines && !!metadata,
     queryFn: async () => {
       return Promise.all(
-        layout.inlines.map(async ([mdl, fields]: any) => {
+        inlineSpecs.map(async ([mdl, fields]: any) => {
           const related_field_name = metadata.relations.find(
             (r: any) => r.related_model_type === mdl,
           )?.field_name;
@@ -186,11 +191,18 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
         {tab === 'properties' && (
           <>
             <DetailPane
-              field_pairs={fieldPairs}
+              field_pairs={
+                type === 'AGR'
+                  ? fieldPairs
+                      .map((pair: string[]) => pair.filter((f) => !AGENT_RUN_BLOCK_FIELDS.includes(f)))
+                      .filter((pair: string[]) => pair.length > 0)
+                  : fieldPairs
+              }
               object={object}
               metadata={metadata.fields}
               form={null}
             />
+            {type === 'AGR' && <AgentRunOutput run={object} />}
             {feedInline && (() => {
               const [mdl, fields, , inlineMetadata, , parent_object_id, related_field_name] = feedInline;
               return (

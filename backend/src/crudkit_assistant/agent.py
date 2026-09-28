@@ -26,6 +26,7 @@ from crudkit_assistant.tools import (
     list_records,
     propose_action,
     propose_bulk_patch,
+    propose_create,
     propose_create_note,
     propose_patch,
     propose_revert,
@@ -35,11 +36,24 @@ from crudkit_assistant.tools import (
 logger = logging.getLogger(__name__)
 
 
-_BASE_SYSTEM_PROMPT = """
+_CHAT_PREAMBLE = """
 You are an AI assistant in a sidebar next to a CRM. You help a staff user
 reason about whatever they have on screen: a single record, a list or saved
 view, a dashboard or their inbox.
+""".strip()
 
+_AGENT_PREAMBLE = """
+You are a background agent in a CRM. Nobody is chatting with you: you were
+started because a record changed, on a schedule, or by hand, and you carry out
+the agent instructions at the end of these instructions on the record open in
+the `[Screen]` block. Read what you need with the tools, then act only through
+the propose tools; depending on the agent's settings your proposals are applied
+right away or wait for a person. Never ask questions. If the instructions do
+not apply to this record, propose nothing. Finish with a single line
+summarising what you proposed, or why you proposed nothing.
+""".strip()
+
+_BASE_SYSTEM_PROMPT = """
 Each user message starts with a `[Screen]` block describing what the user is
 looking at right now: the open record, the list/view with its search and
 filters, the ids of the visible and selected rows, and the playbook for that
@@ -51,7 +65,7 @@ The ONLY tools you may call are exactly these — never invent another name:
   Record tools:  get_object, describe_object, get_changelog, get_feed, get_related
   Search tools:  search, describe_types, list_records, get_record, get_screen_rows
   Propose tools: propose_patch, propose_bulk_patch, propose_action, propose_create_note,
-                 propose_revert
+                 propose_create, propose_revert
 
 Record and propose tools take an optional `id` (e.g. CUS123); without it they
 use the record open on screen. Use `get_screen_rows` to read the selected or
@@ -98,12 +112,25 @@ When choosing between proposal types, prefer in this order:
 To undo an earlier change, find its `change_set` with `get_changelog` and
 call `propose_revert`; it undoes every change made together with it.
 
+To create a record, read the type's writable fields and valid choices with
+`describe_types(type)`, then call `propose_create`. Background agents (type
+AGT) are records too: when the user asks for something to happen
+automatically ("every Monday, flag at-risk customers", "when a deal is won,
+add a note"), propose creating an agent with its `name`, `instructions`,
+`trigger`, `model_type`, and where it fits `schedule`, `watch_fields` (a
+list of field names) or a saved `view`. Leave `mode` out (agents propose
+changes for review) unless the user asks for changes to be applied without
+review.
+
 Any company context at the end of these instructions comes from AI context
 documents the users maintain; each heading carries the document's id. When
 the user teaches you something durable about the company (who we sell to,
 why customers buy, tone of voice, how we work), propose an edit to the
 relevant document with `propose_patch(id="AIC…")`.
 
+""".strip()
+
+_CHAT_STYLE = """
 Style:
 - Be concise. Short paragraphs and bullet lists, not essays.
 - Lead with the observation or recommendation. Cite the specific records,
@@ -132,6 +159,7 @@ for _tool in (
     propose_action,
     propose_patch,
     propose_bulk_patch,
+    propose_create,
     propose_create_note,
     propose_revert,
 ):
@@ -147,14 +175,21 @@ async def _instructions(ctx: RunContext[AssistantDeps]) -> str:
     """The project's own prompt prefix, the assistant's name, the base prompt and
     the AI context documents: the global ones plus those for the type on screen.
     Scoped documents live here rather than in the `[Screen]` block, which is
-    stored with each user turn and would repeat them, stale, on every later turn."""
+    stored with each user turn and would repeat them, stale, on every later turn.
+    A background agent gets its own preamble and, last, its instructions."""
+    is_agent = ctx.deps.source == "agent"
     lines = []
     if project_prefix := getattr(settings, "CRUDKIT_ASSISTANT_SYSTEM_PROMPT", "") or "":
         lines.append(project_prefix)
     lines.append(f"Your name is {getattr(settings, 'CRUDKIT_ASSISTANT_NAME', 'Assistant')}.")
+    lines.append(_AGENT_PREAMBLE if is_agent else _CHAT_PREAMBLE)
     lines.append(_BASE_SYSTEM_PROMPT)
+    if not is_agent:
+        lines.append(_CHAT_STYLE)
     model = screen_model(ctx.deps.screen)
     type_id = model.TYPE_ID if model is not None else None
     if company_context := await sync_to_async(llm.ai_context)(type_id, with_ids=True):
         lines.append(f"# Company context\n\n{company_context}")
+    if is_agent:
+        lines.append(f"# Agent instructions\n\n{ctx.deps.agent_instructions}")
     return "\n\n".join(lines)

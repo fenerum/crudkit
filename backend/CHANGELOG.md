@@ -2,6 +2,32 @@
 
 ## Unreleased
 
+- Background agents (`crudkit_assistant`, migration `crudkit_assistant 0005`). An `Agent`
+  (TYPE_ID `AGT`) is saved instructions the assistant carries out without a person: when a
+  record of its `model_type` is created or changed (optionally only when `watch_fields`
+  changed, and only for records in its saved `view`), on an hourly/daily/weekly schedule, or on
+  "Run now". By default it proposes changes for the Inbox; in auto mode it applies those that
+  need no approval, as `run_as`. Each run is an `AgentRun` (`AGR`) with the summary, the
+  proposals (the preview) and the change set it applied, which "Revert this run" undoes.
+  "Dry run on latest matching record" shows what it would propose without saving anything.
+  Guards: `max_records_per_run`, `max_runs_per_day`, and auto-disable after 3 failed runs in a
+  row (noted on the agent's feed). Agents are triggered by ChangeLog entries, so plain ORM saves
+  and changes made by agents don't trigger agents. Users see and edit their own agents and runs;
+  `run_as` defaults to the creator and only superusers can change it.
+  - Hosts add `crudkit_assistant.tasks.run_scheduled_agents` to `CELERY_BEAT_SCHEDULE` (every 5
+    minutes) for scheduled agents.
+  - The assistant has a new `propose_create` tool, so the sidebar can create records, agents
+    included ("every Monday, flag at-risk customers"). `AssistantDeps` gains `source`, `client`,
+    `agent_instructions` and `dry_run`; `AssistantProposal.apply()` takes an optional
+    `change_set`, and `needs_approval()` tells whether a proposal needs a person.
+  - New `CrudKitSettings.default_inlines`: inlines the detail page shows when no Layout exists
+    (REST metadata `default_inlines`). New `CrudKitSettings.ai_exposed` lists one of CrudKit's own
+    models in the MCP and assistant type listings (`Agent` sets it).
+  - Notes added through the services layer (the assistant, MCP `add_note`, agents) are now logged
+    as a ChangeLog create on the note, so undoing their change set removes the note.
+  - SPA: agent runs show their summary and proposals; proposals and history entries from agents
+    read "Agent: <name>".
+
 - Approvals. Models declare which changes need a person's approval:
   `@crm_action(..., requires_approval=True)` (the new keyword is optional) and
   `CrudKitSettings.approval_fields`; `crudkit.authorization.requires_approval(model, action, fields)`

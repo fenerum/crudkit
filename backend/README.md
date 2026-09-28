@@ -165,9 +165,33 @@ client, and limited by `CRUDKIT_MCP_WRITE_RATE`.
 
 Every call is filtered through the token user's model, row and action
 permissions, so a type the user can't view isn't listed and can't be read.
-CrudKit's own models and Django's (including `User`) are never exposed;
-narrow the rest with `CRUDKIT_MCP_MODELS = ["CMP", "PER", ...]` or opt a
+CrudKit's own models and Django's (including `User`) are not exposed, except
+background agents (`AGT`), which clients can propose; narrow the rest with `CRUDKIT_MCP_MODELS = ["CMP", "PER", ...]` or opt a
 single model out with `CrudKitSettings.mcp_exclude = True`.
+
+## Background agents
+
+With `crudkit_assistant` installed, users can save **agents** (TYPE_ID `AGT`):
+instructions the assistant carries out on its own, on a record that was just
+created or changed, on the records of a saved view on a schedule, or when
+someone clicks Run now. Each go is an `AgentRun` (`AGR`) with the agent's
+summary and the proposals it made. See `docs/concepts.md` for the details.
+
+Runs are Celery tasks (`crudkit_assistant.tasks.run_agent`). For scheduled
+agents, add the scheduler task to Celery beat:
+
+```python
+CELERY_BEAT_SCHEDULE = {
+    "crudkit-scheduled-agents": {
+        "task": "crudkit_assistant.tasks.run_scheduled_agents",
+        "schedule": 300,  # every 5 minutes; each agent runs when its interval has passed
+    },
+}
+```
+
+Agents start from logged changes (the REST API, MCP, the assistant, actions),
+so plain ORM saves in project code do not trigger them. The enabled agents per
+type are cached in the Django cache for up to a minute.
 
 ## Bundled frontend
 

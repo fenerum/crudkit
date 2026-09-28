@@ -193,7 +193,7 @@ async def _records_call(ctx: RunContext[AssistantDeps], fn, *args, **kwargs):
 
 
 async def search(ctx: RunContext[AssistantDeps], query: str) -> list[dict[str, Any]] | dict:
-    """Search all record types by text. Returns matching records as {id, label}."""
+    """Search all record types by text or record ID (e.g. CUS123). Returns matching records as {id, label}."""
     return await _records_call(ctx, records.search, query)
 
 

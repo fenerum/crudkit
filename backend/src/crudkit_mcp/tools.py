@@ -75,7 +75,7 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
         ),
         Tool(
             "search",
-            "Search across all record types by text. Returns matching records as {id, label}.",
+            "Search across all record types by text or record ID (e.g. CUS123). Returns matching records as {id, label}.",
             _search,
             _schema({"query": {"type": "string"}}, ["query"]),
         ),
@@ -93,7 +93,10 @@ def get_tools(user, scopes: list[str]) -> dict[str, Tool]:
                         "filters, ordering and columns",
                     },
                     "filters": {"type": "object", "description": "Field filters, see describe_types"},
-                    "query": {"type": "string", "description": "Free-text search over the type's search fields"},
+                    "query": {
+                        "type": "string",
+                        "description": "Free-text search over the type's search fields, or a record ID",
+                    },
                     "order_by": {"type": "string", "description": "Field to sort by; prefix with '-' for descending"},
                     "limit": {
                         "type": "integer",

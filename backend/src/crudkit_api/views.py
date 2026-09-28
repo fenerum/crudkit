@@ -359,19 +359,10 @@ class SearchViewSet(viewsets.ViewSet):
         if not query:
             return Response({"results": []})
 
+        possible_searches = list(get_model_types().values())
         if len(query) > 3 and CRM_TYPE_REGEX.match(query) and ":" in query:
-            search_type, query = query.split(":")
-            possible_searches = [
-                mdl
-                for mdl in get_model_types().values()
-                if hasattr(mdl, "CrudKitSettings") and mdl.CrudKitSettings.search_fields and mdl.TYPE_ID == search_type
-            ]
-        else:
-            possible_searches = [
-                mdl
-                for mdl in get_model_types().values()
-                if hasattr(mdl, "CrudKitSettings") and mdl.CrudKitSettings.search_fields
-            ]
+            search_type, query = query.split(":", 1)
+            possible_searches = [mdl for mdl in possible_searches if mdl.TYPE_ID == search_type]
 
         # One more than the palette shows per type, so it knows when to offer "Show all".
         results = search_objects(request.user, query, possible_searches, 21 if len(possible_searches) == 1 else 6)

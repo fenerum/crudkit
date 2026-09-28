@@ -117,13 +117,14 @@ export default function CommandPalette({ open, onClose }) {
 
   const resultGroups = useMemo(() => {
     const groups = new Map();
-    searchResults.forEach((obj) => {
+    // An exact ID hit is already offered under "Quick access".
+    searchResults.filter((obj) => obj.id !== directMatch?.id).forEach((obj) => {
       const prefix = getIdPrefix(obj.id) || "Results";
       if (!groups.has(prefix)) groups.set(prefix, []);
       groups.get(prefix).push(obj);
     });
     return groups;
-  }, [searchResults]);
+  }, [searchResults, directMatch]);
 
   const perType = TYPE_SCOPED_QUERY.test(query) ? RESULTS_PER_TYPE_SCOPED : RESULTS_PER_TYPE;
   const resultTypes = useMemo(() => [...resultGroups.keys()].filter(isObjectTypeCode), [resultGroups]);

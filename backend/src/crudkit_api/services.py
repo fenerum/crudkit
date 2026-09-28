@@ -24,7 +24,15 @@ from crudkit.authorization import (
     require_object_permission,
     requires_approval,
 )
-from crudkit.models import ChangeLog, FeedItem, field_value, same_value
+from crudkit.models import (
+    ChangeLog,
+    FeedItem,
+    ck_id_regex,
+    field_value,
+    get_accepted_type_ids,
+    parse_ck_id,
+    same_value,
+)
 from crudkit.utils import get_model_types
 from crudkit_api.serializers import get_serializer
 
@@ -58,10 +66,15 @@ def get_search_fields(model) -> list[str]:
 
 
 def search_filter(model, query: str) -> Q:
-    """Case-insensitive match of `query` against the model's `CrudKitSettings.search_fields`."""
-    q = Q()
+    """Case-insensitive match of `query` against the model's CRM ID (exact) and its
+    `CrudKitSettings.search_fields` (substring). Matches nothing if neither applies."""
+    query = query.strip()
+    q = Q(pk__in=[])
+    ck_id = query.upper()
+    if ck_id_regex.fullmatch(ck_id) and ck_id[:3] in get_accepted_type_ids(model):
+        q |= Q(pk=parse_ck_id(ck_id)[1])
     for field in get_search_fields(model):
-        q |= Q(**{f"{field}__icontains": query.strip()})
+        q |= Q(**{f"{field}__icontains": query})
     return q
 
 
@@ -71,7 +84,7 @@ def search_objects(user, query: str, models_to_search=None, limit_per_model: int
         models_to_search = get_model_types().values()
     results = []
     for mdl in models_to_search:
-        if not get_search_fields(mdl) or not has_model_permission(user, mdl, "view"):
+        if not has_model_permission(user, mdl, "view"):
             continue
         serializer_cls = get_serializer(mdl, depth=0, fields=["id", "label", "object_images"])
         qs = get_authorized_queryset(user, mdl.objects.all(), "view").filter(search_filter(mdl, query))

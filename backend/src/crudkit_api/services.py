@@ -174,9 +174,8 @@ def get_history(instance, limit: int = 200) -> list[dict[str, Any]]:
 # Writes
 
 
-def perform_action(instance, action_name: str, user, request=None):
-    """Invoke a @crm_action method bound to the instance, log what it changed,
-    and return whatever the action returned."""
+def check_action(instance, action_name: str, user) -> None:
+    """Raise unless `action_name` is one of the instance's @crm_actions and `user` may run it."""
     if not action_name or action_name not in instance._actions:
         available = list(instance._actions.keys())
         logger.warning(
@@ -187,6 +186,12 @@ def perform_action(instance, action_name: str, user, request=None):
         )
         raise ValueError(f"Action {action_name!r} not available on {instance}")
     require_action_permission(user, instance, action_name)
+
+
+def perform_action(instance, action_name: str, user, request=None):
+    """Invoke a @crm_action method bound to the instance, log what it changed,
+    and return whatever the action returned."""
+    check_action(instance, action_name, user)
     if request is None:
         request = RequestShim(user)
     logger.info("Running action %s on %s.%s", action_name, instance.__class__.__name__, instance.pk)

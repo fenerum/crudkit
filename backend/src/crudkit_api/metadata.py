@@ -137,7 +137,14 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
         "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
         "fields": fields,
         "relations": relations,
-        "actions": [{"verbose_name": func.verbose_name, "action": action} for action, func in model()._actions.items()],
+        "actions": [
+            {
+                "verbose_name": func.verbose_name,
+                "action": action,
+                "requires_approval": getattr(func, "requires_approval", False),
+            }
+            for action, func in model()._actions.items()
+        ],
     }
 
 

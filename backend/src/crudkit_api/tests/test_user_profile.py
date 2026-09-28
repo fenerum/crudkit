@@ -28,6 +28,7 @@ class DefaultAdapterUserProfileViewTests(TestCase):
         with override_settings(CRUDKIT_AI_MODEL_FACTORY=None, CRUDKIT_AI_MODEL=None):
             response = self.client.get("/api/v1/user/me/")
         self.assertFalse(response.data["assistant"]["enabled"])
+        self.assertTrue(response.data["assistant"]["proposals"])  # The Inbox lists MCP proposals regardless.
 
     def test_patch_is_noop(self):
         response = self.client.patch("/api/v1/user/me/", {"preferred_language": "da"}, format="json")

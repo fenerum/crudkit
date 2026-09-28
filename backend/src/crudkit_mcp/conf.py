@@ -1,3 +1,4 @@
+from django.apps import apps
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from django.urls import reverse
@@ -23,8 +24,23 @@ def write_rate() -> tuple[int, str] | None:
     return int(count), period
 
 
+def proposals_enabled() -> bool:
+    """The `propose` scope files writes as AssistantProposals for a person to confirm."""
+    return apps.is_installed("crudkit_assistant")
+
+
 def supported_scopes() -> list[str]:
-    return ["read", "write"] if write_enabled() else ["read"]
+    return ["read"] + (["propose"] if proposals_enabled() else []) + (["write"] if write_enabled() else [])
+
+
+def write_mode(scopes) -> str | None:
+    """How a token granted `scopes` may write: "write" directly (approval-required
+    changes still become proposals), "propose" only, or None."""
+    if "write" in scopes and write_enabled():
+        return "write"
+    if "propose" in scopes and proposals_enabled():
+        return "propose"
+    return None
 
 
 def base_url(request) -> str:

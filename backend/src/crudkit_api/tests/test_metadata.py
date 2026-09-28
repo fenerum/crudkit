@@ -97,7 +97,9 @@ class BuildModelMetadataTests(TestCase):
         md = build_model_metadata(Customer)
         action_names = [a["action"] for a in md["actions"]]
         self.assertEqual(action_names, list(Customer()._actions.keys()))
-        self.assertEqual(md["actions"], [{"verbose_name": "Mark churned", "action": "mark_churned"}])
+        self.assertEqual(
+            md["actions"], [{"verbose_name": "Mark churned", "action": "mark_churned", "requires_approval": False}]
+        )
 
     def test_generic_relations_include_feeditem_and_externalobject(self):
         md = build_model_metadata(Ticket)

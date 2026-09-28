@@ -16,6 +16,7 @@ import TimeTracker from "../components/TimeTracker";
 import Breadcrumbs from "../components/Breadcrumbs";
 import CommandPalette from "../components/CommandPalette";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
+import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
 import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
@@ -273,6 +274,7 @@ function BaseLayoutInner() {
     })),
   });
   const badgeCounts = Object.fromEntries(viewsWithBadges.map((view, i) => [view.id, badgeQueries[i]?.data?.count]));
+  const pendingProposals = usePendingProposals();
 
   const handleNavClick = useCallback(() => {
     if (window.innerWidth < 1024) {
@@ -349,6 +351,7 @@ function BaseLayoutInner() {
               href="/inbox"
               icon="inbox"
               label="Inbox"
+              count={pendingProposals.data?.count}
               active={pathname === '/inbox'}
               onClick={handleNavClick}
             />

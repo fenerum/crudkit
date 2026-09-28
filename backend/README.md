@@ -111,7 +111,7 @@ permission and can be narrowed further with
 | `CRUDKIT_FRONTEND_CONFIG` | dict injected into the bundled SPA at runtime (`app_name`, `logo_url`, ...) |
 | `CRUDKIT_FRONTEND_LOGIN_REQUIRED` | redirect anonymous users of the SPA view to `LOGIN_URL` |
 | `CRUDKIT_MCP_SERVER_NAME` | `serverInfo.name` reported by the MCP server (default `"crudkit"`) |
-| `CRUDKIT_MCP_WRITE_ENABLED` | offer the `write` OAuth scope and the create/update/action/note/undo tools (default `False`) |
+| `CRUDKIT_MCP_WRITE_ENABLED` | offer the `write` OAuth scope: the create/update/action/note/undo tools write directly (default `False`) |
 | `CRUDKIT_MCP_WRITE_RATE` | write tool calls allowed per token, as `"<count>/<second\|minute\|hour\|day>"` (default `"60/min"`; `None` for no limit). Counted in the Django cache |
 | `CRUDKIT_MCP_MODELS` | list of TYPE_IDs to expose over MCP (default: every project model) |
 | `CRUDKIT_MCP_EXTRA_TOOLS` | dotted paths to `crudkit_mcp.tools.Tool` instances; added to, or replacing, the generated tools |
@@ -145,11 +145,23 @@ same tools serve any project:
 | `list_records` | one `type` or saved `view` (its filters, ordering and columns), a `filters` object (keys from `describe_types`), `query`, `order_by`, `limit`, `offset` |
 | `get_record` | one record by ID, with its feed, change log and available actions |
 
-With `CRUDKIT_MCP_WRITE_ENABLED` and a token granted the `write` scope, five
-more: `create_record`, `update_record`, `run_action`, `add_note` and `undo`.
-Each write returns the `change_set` it made; `undo` reverts one. Writes are
-recorded in the change log as made over MCP by the token's OAuth client, and
-limited by `CRUDKIT_MCP_WRITE_RATE`.
+Five more tools change data: `create_record`, `update_record`, `run_action`,
+`add_note` and `undo`. On the consent page the user picks what the client may
+do:
+
+- **Read only** — the `read` scope; no write tools.
+- **Propose changes** — the `propose` scope, offered when `crudkit_assistant`
+  is installed. The write tools validate their input as usual but change
+  nothing: each files a proposal and returns
+  `{"status": "pending_approval", "proposal": "ASP12"}`. The user confirms or
+  skips it in the Inbox's Proposals tab.
+- **Write directly** — the `write` scope, only with
+  `CRUDKIT_MCP_WRITE_ENABLED`. Each write returns the `change_set` it made;
+  `undo` reverts one. Actions and fields that require approval (see
+  `docs/concepts.md`) are still only proposed.
+
+Writes and proposals are recorded as made over MCP by the token's OAuth
+client, and limited by `CRUDKIT_MCP_WRITE_RATE`.
 
 Every call is filtered through the token user's model, row and action
 permissions, so a type the user can't view isn't listed and can't be read.

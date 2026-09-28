@@ -14,11 +14,21 @@ def get_permission_action(method: str, view_action: str | None = None) -> str:
     return "view"
 
 
+OWNER_ACTIONS = {"view", "change"}
+
+
+def _has_django_permission(user, model: type[Model], action: str) -> bool:
+    return user.has_perm(f"{model._meta.app_label}.{action}_{model._meta.model_name}")
+
+
+def _owner_access(model: type[Model], action: str) -> bool:
+    return action in OWNER_ACTIONS and getattr(getattr(model, "CrudKitSettings", None), "owner_access", False)
+
+
 def has_model_permission(user, model: type[Model], action: str) -> bool:
     if not getattr(user, "is_authenticated", False):
         return False
-    permission = f"{model._meta.app_label}.{action}_{model._meta.model_name}"
-    return user.has_perm(permission)
+    return _has_django_permission(user, model, action) or _owner_access(model, action)
 
 
 def get_authorized_queryset(user, queryset: QuerySet, action: str = "view") -> QuerySet:
@@ -27,6 +37,8 @@ def get_authorized_queryset(user, queryset: QuerySet, action: str = "view") -> Q
         return queryset.none()
     if getattr(user, "is_superuser", False):
         return queryset
+    if _owner_access(model, action) and not _has_django_permission(user, model, action):
+        queryset = queryset.filter(created_by=user)
 
     settings = getattr(model, "CrudKitSettings", None)
     authorize = getattr(settings, "get_authorized_queryset", None)
@@ -64,3 +76,13 @@ def has_action_permission(user, instance: Model, action_name: str) -> bool:
 def require_action_permission(user, instance: Model, action_name: str) -> None:
     if not has_action_permission(user, instance, action_name):
         raise PermissionDenied
+
+
+def requires_approval(model: type[Model], action: str | None = None, fields=None) -> bool:
+    """Whether MCP clients and agents may only propose running `action` or
+    writing `fields` on `model`: the action is a `@crm_action(requires_approval=True)`
+    or a field is in `CrudKitSettings.approval_fields`."""
+    if action and getattr(getattr(model, action, None), "requires_approval", False):
+        return True
+    approval_fields = getattr(getattr(model, "CrudKitSettings", None), "approval_fields", [])
+    return bool(fields and set(approval_fields) & set(fields))

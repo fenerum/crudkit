@@ -5,14 +5,17 @@ import moment from "moment-timezone";
 import CrudKitAPIClient from "../data/api";
 import { Avatar, Icon, useTopbarSlots } from "./ui";
 import { detail as detailRegex } from "../utils/urls";
+import { usePendingProposals } from "../hooks/usePendingProposals";
+import ProposalList from "./ProposalList";
 
-const VALID_TABS = new Set(["all", "unread", "mentions", "assigned"]);
+const VALID_TABS = new Set(["all", "unread", "mentions", "assigned", "proposals"]);
 
 const TABS = [
   { id: "all", label: "All", icon: "inbox" },
   { id: "unread", label: "Unread", icon: "circle" },
   { id: "mentions", label: "Mentions", icon: "at-sign" },
   { id: "assigned", label: "Assigned", icon: "user" },
+  { id: "proposals", label: "Proposals", icon: "shield" },
 ];
 
 function deriveIcon(item) {
@@ -38,7 +41,9 @@ export default function Inbox() {
   const { pathname } = useLocation();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
-  const tab = VALID_TABS.has(tabParam) ? tabParam : "all";
+  const proposals = usePendingProposals();
+  const tabs = proposals.enabled ? TABS : TABS.filter((t) => t.id !== "proposals");
+  const tab = VALID_TABS.has(tabParam) && tabs.some((t) => t.id === tabParam) ? tabParam : "all";
 
   const setTab = useCallback((next) => {
     if (next === tab) return;
@@ -57,19 +62,22 @@ export default function Inbox() {
   });
 
   const items = data?.isPaginated ? data.results : (data || []);
+  const showingProposals = tab === "proposals";
+  const rows = showingProposals ? (proposals.data?.results || []) : items;
 
   const counts = {
     all: items.length || null,
     unread: 0,
     mentions: 0,
     assigned: 0,
+    proposals: proposals.data?.count || null,
   };
 
   useTopbarSlots(() => ({
     title: { label: "Inbox" },
     middle: (
       <div className="flex items-center gap-1">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -90,7 +98,7 @@ export default function Inbox() {
         ))}
       </div>
     ),
-  }), [tab, counts.all]);
+  }), [tab, counts.all, counts.proposals, tabs.length]);
 
   const onOpen = (item) => {
     const raw = item.parent_object_id;
@@ -113,24 +121,27 @@ export default function Inbox() {
 
   return (
     <div className="flex flex-col h-full">
-      {isPending ? (
+      {(showingProposals ? proposals.isPending : isPending) ? (
         <div className="px-6 py-12 text-center text-fg-3 text-sm">Loading…</div>
-      ) : isError ? (
+      ) : (showingProposals ? proposals.isError : isError) ? (
         <div className="px-6 py-12 text-center text-danger text-sm">
           Couldn&apos;t load inbox — try refreshing the page.
         </div>
-      ) : items.length === 0 ? (
+      ) : rows.length === 0 ? (
         <div className="px-6 py-12 text-center">
           <div className="text-fg-1 text-base font-medium">
-            {tab === "all" ? "Inbox zero" : "Nothing here yet"}
+            {tab === "all" ? "Inbox zero" : showingProposals ? "Nothing to approve" : "Nothing here yet"}
           </div>
           <div className="text-fg-3 text-sm mt-1">
             {tab === "all" && "When new activity arrives, you'll see it here."}
             {tab === "unread" && "You're caught up on unread items."}
             {tab === "mentions" && "Nobody has mentioned you yet."}
             {tab === "assigned" && "Nothing is assigned to you right now."}
+            {showingProposals && "Changes the assistant or a connected app proposes wait here for you to confirm."}
           </div>
         </div>
+      ) : showingProposals ? (
+        <ProposalList proposals={rows} />
       ) : (
         <div className="rounded-lg border border-border-1 bg-bg-1 overflow-hidden">
           {items.map((item) => {

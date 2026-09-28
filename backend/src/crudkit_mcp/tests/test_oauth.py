@@ -1,11 +1,13 @@
 import base64
 import hashlib
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import Client, TestCase, override_settings
 from django.utils import timezone
 
+from crudkit_mcp.conf import supported_scopes
 from crudkit_mcp.models import AccessToken, AuthorizationCode, OAuthClient, RefreshToken
 
 
@@ -665,7 +667,7 @@ class MetadataUrlsTest(TestCase):
         self.assertEqual(data["authorization_endpoint"], "http://testserver/api/v1/oauth/authorize/")
         self.assertEqual(data["token_endpoint"], "http://testserver/api/v1/oauth/token/")
         self.assertEqual(data["registration_endpoint"], "http://testserver/api/v1/oauth/register/")
-        self.assertEqual(data["scopes_supported"], ["read"])
+        self.assertEqual(data["scopes_supported"], ["read", "propose"])
 
         data = self.client.get("/.well-known/oauth-protected-resource").json()
         self.assertEqual(data["resource"], "http://testserver/api/v1/mcp/")
@@ -686,7 +688,11 @@ class MetadataUrlsTest(TestCase):
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_write_scope_advertised_when_enabled(self):
         data = self.client.get("/.well-known/oauth-authorization-server").json()
-        self.assertEqual(data["scopes_supported"], ["read", "write"])
+        self.assertEqual(data["scopes_supported"], ["read", "propose", "write"])
+
+    def test_propose_scope_needs_the_assistant_app(self):
+        with patch("crudkit_mcp.conf.apps.is_installed", return_value=False):
+            self.assertEqual(supported_scopes(), ["read"])
 
 
 class AuthorizeScopeTest(TestCase):
@@ -719,24 +725,45 @@ class AuthorizeScopeTest(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertFalse(AuthorizationCode.objects.exists())
 
+    def test_propose_granted_when_picked(self):
+        self._authorize(access="propose")
+        self.assertEqual(AuthorizationCode.objects.get().scopes, "read propose")
+
+    def test_write_not_granted_when_disabled(self):
+        self._authorize(access="write")
+        self.assertEqual(AuthorizationCode.objects.get().scopes, "read")
+
+    def test_propose_not_granted_unless_requested(self):
+        self._authorize(scope="read", access="propose")
+        self.assertEqual(AuthorizationCode.objects.get().scopes, "read")
+
+    def test_unknown_choice_grants_read(self):
+        self._authorize(access="admin")
+        self.assertEqual(AuthorizationCode.objects.get().scopes, "read")
+
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
-    def test_write_needs_checkbox(self):
+    def test_write_needs_choice(self):
         self._authorize()
         self.assertEqual(AuthorizationCode.objects.get().scopes, "read")
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
-    def test_write_granted_when_ticked(self):
-        self._authorize(write="on")
+    def test_write_granted_when_picked(self):
+        self._authorize(access="write")
         self.assertEqual(AuthorizationCode.objects.get().scopes, "read write")
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_read_always_granted(self):
-        self._authorize(scope="write", write="on")
+        self._authorize(scope="write", access="write")
         self.assertEqual(AuthorizationCode.objects.get().scopes, "read write")
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
+    def test_propose_offered_to_clients_asking_to_write(self):
+        self._authorize(scope="read write", access="propose")
+        self.assertEqual(AuthorizationCode.objects.get().scopes, "read propose")
+
+    @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_write_not_granted_unless_requested(self):
-        self._authorize(scope="read", write="on")
+        self._authorize(scope="read", access="write")
         self.assertEqual(AuthorizationCode.objects.get().scopes, "read")
 
     def _consent_page(self, **extra):
@@ -751,11 +778,22 @@ class AuthorizeScopeTest(TestCase):
         )
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
-    def test_consent_page_offers_write_checkbox(self):
-        self.assertContains(self._consent_page(), 'name="write"')
-        self.assertNotContains(self._consent_page(scope="read"), 'name="write"')
+    def test_consent_page_offers_all_choices(self):
+        response = self._consent_page()
+        self.assertContains(response, 'name="access" value="read" checked')
+        self.assertContains(response, 'value="propose"')
+        self.assertContains(response, 'value="write"')
+
+    @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
+    def test_consent_page_offers_only_requested_choices(self):
+        response = self._consent_page(scope="read propose")
+        self.assertContains(response, 'value="propose"')
+        self.assertNotContains(response, 'value="write"')
+        response = self._consent_page(scope="read")
+        self.assertNotContains(response, 'value="propose"')
 
     def test_consent_page_hides_write_when_disabled(self):
         response = self._consent_page()
         self.assertContains(response, "View records")
-        self.assertNotContains(response, 'name="write"')
+        self.assertContains(response, 'value="propose"')
+        self.assertNotContains(response, 'value="write"')

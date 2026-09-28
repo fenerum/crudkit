@@ -54,7 +54,7 @@ class Reading(BaseCrudKitModel):
     def __str__(self):
         return self.name
 
-    @crm_action(verbose_name="Mark finished")
+    @crm_action(verbose_name="Mark finished", requires_approval=True)
     def mark_finished(self, request):
         self.status = self.Status.FINISHED
         self.save(update_fields=["status", "updated_at"])

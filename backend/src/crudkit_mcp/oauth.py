@@ -15,7 +15,7 @@ from django.views.decorators.csrf import csrf_exempt
 from rest_framework.throttling import AnonRateThrottle
 from rest_framework.views import APIView
 
-from crudkit_mcp.conf import absolute_url, base_url, supported_scopes
+from crudkit_mcp.conf import absolute_url, base_url, proposals_enabled, supported_scopes
 from crudkit_mcp.models import AccessToken, AuthorizationCode, OAuthClient, RefreshToken
 
 AUTH_CODE_LIFETIME = timedelta(minutes=10)
@@ -74,7 +74,7 @@ class AuthorizeView(LoginRequiredMixin, View):
                 "code_challenge": code_challenge,
                 "state": state,
                 "scope": scope,
-                "write_available": "write" in scope.split(),
+                **_offered(scope),
                 "site_name": getattr(settings, "CRUDKIT_FRONTEND_CONFIG", {}).get("app_name", "CrudKit"),
             },
         )
@@ -91,14 +91,17 @@ class AuthorizeView(LoginRequiredMixin, View):
         if request.POST.get("action") == "deny":
             return http_redirect(_build_redirect_url(redirect_uri, error="access_denied", state=state))
 
-        # `read` is always granted; `write` only when requested and ticked on the consent page.
-        write = "write" in scope.split() and request.POST.get("write") == "on"
+        # `read` is always granted; `propose` or `write` only when requested and picked on the consent page.
+        access = request.POST.get("access")
+        granted = "read"
+        if _offered(scope).get(f"offer_{access}"):
+            granted = f"read {access}"
         auth_code = AuthorizationCode.objects.create(
             client=client,
             user=request.user,
             redirect_uri=redirect_uri,
             code_challenge=code_challenge,
-            scopes="read write" if write else "read",
+            scopes=granted,
             expires_at=timezone.now() + AUTH_CODE_LIFETIME,
         )
 
@@ -139,6 +142,16 @@ class AuthorizeView(LoginRequiredMixin, View):
             return None, None, f"Unsupported scope: {' '.join(sorted(unsupported))}"
 
         return client, scope, None
+
+
+def _offered(scope: str) -> dict[str, bool]:
+    """The write access the consent page offers for a requested `scope`.
+    Proposing is offered to clients that asked to write, too: it is less."""
+    requested = set(scope.split())
+    return {
+        "offer_propose": proposals_enabled() and bool(requested & {"propose", "write"}),
+        "offer_write": "write" in requested,
+    }
 
 
 def _issue_token_pair(client: OAuthClient, user, scopes: str, family_id=None) -> tuple[AccessToken, RefreshToken]:

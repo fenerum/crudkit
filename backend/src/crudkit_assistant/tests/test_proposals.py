@@ -322,7 +322,7 @@ class ProposalApplyTests(TestCase):
             label="Rename",
         )
 
-        proposal.skip(self.user)
+        proposal.mark_skipped(self.user)
 
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.name, "Original")

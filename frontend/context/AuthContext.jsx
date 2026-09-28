@@ -16,6 +16,8 @@ const AuthContext = createContext({
 
 const client = new CrudKitAPIClient();
 
+const fetchProfile = () => client.httpGet('api/v1/user/me/').then((res) => res.json());
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,8 +30,7 @@ export function AuthProvider({ children }) {
     const checkAuthStatus = async () => {
       try {
         try {
-          const userData = await client.httpGet('api/v1/user/me/').then((res) => res.json());
-          setUser(userData);
+          setUser(await fetchProfile());
         } catch (error) {
           if (error?.statusCode === 401 || error?.statusCode === 403) {
             console.log('Server rejected stored credentials, clearing tokens');
@@ -49,7 +50,10 @@ export function AuthProvider({ children }) {
   const login = async (username, password) => {
     try {
       setLoading(true);
-      const userData = await client.login(username, password);
+      await client.login(username, password);
+      // The token response only has the basic user fields; the profile adds
+      // the assistant settings and permission flags.
+      const userData = await fetchProfile();
       setUser(userData);
       return userData;
     } finally {

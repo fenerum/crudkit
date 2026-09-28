@@ -103,6 +103,31 @@ active workspace is client-side state persisted in localStorage — URLs stay
 flat. A deployment with no `Workspace` rows renders the classic sidebar and
 never shows the switcher.
 
+## AI context
+
+`AIContext` (TYPE_ID `AIC`) documents are markdown the users maintain in the
+UI: who the ideal customer is, why customers buy, tone of voice, playbooks.
+Each has a `name`, a markdown `body`, `model_types` (a list of TYPE_IDs; empty
+means global, as for snippets), `active` and an `order`. They are ordinary
+CrudKit records, so they get the REST API (`/api/v1/AIC/`), list and detail
+pages, history and undo at `/AIC`. Add a saved view to the menu to link it.
+
+`crudkit.llm.ai_context(type_id=None)` renders the active documents that apply
+(the global ones plus those listing `type_id`), ordered by `order` then
+`name`, each under a `## <name>` heading. Every LLM feature reads it:
+
+- the assistant's instructions carry the global documents and those for the
+  type of the open record or list (not the `[Screen]` block, which is stored
+  with each user turn and would repeat them on every later turn);
+- AI fields get a `## Company context` section with the global documents and
+  those for the record's type.
+
+The documents are shown to every assistant user, whatever their permissions on
+`AIC`, so keep secrets out of them. When a user teaches the assistant something
+durable about the company, it proposes an edit to the relevant document
+(`propose_patch` with the `AIC` id), which waits for Confirm like any other
+proposal.
+
 ## History and undo
 
 Every write through the REST API, MCP, the assistant or a `@crm_action` is

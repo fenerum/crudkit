@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
-from unittest import TestCase
 from unittest.mock import AsyncMock, MagicMock, patch
+
+from django.test import TestCase
 
 from crudkit.ai_backend import _build_prompt, _build_pydantic_model, process
 
@@ -55,6 +56,11 @@ class BuildPromptTests(TestCase):
     def test_contains_context(self):
         prompt = _build_prompt("my context", {"f": {"type": "string"}})
         self.assertIn("my context", prompt)
+
+    def test_company_context_section(self):
+        prompt = _build_prompt("ctx", {}, "## Tone of voice\nPlain.")
+        self.assertIn("## Company context\n## Tone of voice\nPlain.\n\n## Context\nctx", prompt)
+        self.assertNotIn("Company context", _build_prompt("ctx", {}))
 
     def test_contains_json_schema(self):
         specs = {"summary": {"type": "string", "description": "a summary"}}

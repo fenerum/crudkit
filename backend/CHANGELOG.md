@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- AI context. New `AIContext` model (TYPE_ID `AIC`, migration `crudkit 0005`): markdown
+  documents users maintain in the UI (ideal customer, why customers buy, tone of voice,
+  playbooks), global or scoped to model types via `model_types`, with `active` and `order`.
+  `crudkit.llm.ai_context(type_id)` renders the active ones, and every LLM feature reads it:
+  the assistant's instructions carry the global documents and the ones for the type on
+  screen, and AI fields get a "Company context" section in their prompt
+  (`crudkit.ai_backend.process()` takes an optional `type_id`). The assistant proposes edits to
+  these documents when the user teaches it something durable about the company.
+- SPA: after a password login the SPA loads the full user profile, so the assistant appears
+  without a reload.
 - Undo and history. Every ChangeLog entry now records who made it and how: `action`
   (create/update/delete/restore/action/merge/revert), `source` (ui, api, mcp, assistant,
   agent, revert or system), `client` (the API `Client-Id` or MCP OAuth client), a `change_set`

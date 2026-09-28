@@ -112,7 +112,8 @@ permission and can be narrowed further with
 | `CRUDKIT_FRONTEND_LOGIN_REQUIRED` | redirect anonymous users of the SPA view to `LOGIN_URL` |
 | `CRUDKIT_MCP_SERVER_NAME` | `serverInfo.name` reported by the MCP server (default `"crudkit"`) |
 | `CRUDKIT_MCP_WRITE_ENABLED` | offer the `write` OAuth scope: the create/update/action/note/undo tools write directly (default `False`) |
-| `CRUDKIT_MCP_WRITE_RATE` | write tool calls allowed per token, as `"<count>/<second\|minute\|hour\|day>"` (default `"60/min"`; `None` for no limit). Counted in the Django cache |
+| `CRUDKIT_MCP_WRITE_RATE` | write tool calls allowed per token, as `"<count>/<second\|minute\|hour\|day>"` (default `"60/min"`; `None` for no limit). Counted in the default Django cache: use a shared one (Redis, Memcached, database) with several processes; with `CRUDKIT_MCP_WRITE_ENABLED`, system check `crudkit_mcp.W001` warns otherwise |
+| `CRUDKIT_AI_CONTEXT_MAX_CHARS` | cap on the AI context text sent with every assistant step and AI-field run (default 20000) |
 | `CRUDKIT_MCP_MODELS` | list of TYPE_IDs to expose over MCP (default: every project model) |
 | `CRUDKIT_MCP_EXTRA_TOOLS` | dotted paths to `crudkit_mcp.tools.Tool` instances; added to, or replacing, the generated tools |
 | `CRUDKIT_MCP_BASE_URL` | public origin for OAuth metadata URLs when the request's host/scheme is wrong (e.g. behind a proxy) |

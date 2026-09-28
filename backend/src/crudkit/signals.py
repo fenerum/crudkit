@@ -2,9 +2,9 @@ import logging
 
 from django.apps import apps
 from django.db import transaction
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import m2m_changed, post_delete, post_save
 
-from crudkit.models import BaseCrudKitModel
+from crudkit.models import BaseCrudKitModel, ChangeLog, m2m_value
 from crudkit.realtime import broadcast_change
 
 logger = logging.getLogger(__name__)
@@ -91,5 +91,24 @@ def _handle_post_delete(sender, instance, **kwargs):
             _dispatch_ai_processing(parent_model, parent_pk)
 
 
+def _handle_m2m_changed(sender, instance, action, reverse, **kwargs):
+    """Log a change to a many-to-many field as an update of the record that
+    declares it, with the related ids before and after. The reverse side
+    (`topic.ticket_set.add(...)`) isn't logged."""
+    if reverse or not isinstance(instance, BaseCrudKitModel) or instance.pk is None:
+        return
+    field = next((f for f in instance._meta.many_to_many if f.remote_field.through is sender), None)
+    if field is None:
+        return
+    before = instance.__dict__.setdefault("_crudkit_m2m_before", {})
+    if action in ("pre_add", "pre_remove", "pre_clear"):
+        before[field.name] = m2m_value(instance, field)
+    elif action in ("post_add", "post_remove", "post_clear") and field.name in before:
+        old, new = before.pop(field.name), m2m_value(instance, field)
+        if old != new:
+            ChangeLog.objects.create_for_m2m(instance, field, old, new)
+
+
 post_save.connect(_handle_post_save, dispatch_uid="crudkit_ai_post_save")
+m2m_changed.connect(_handle_m2m_changed, dispatch_uid="crudkit_changelog_m2m")
 post_delete.connect(_handle_post_delete, dispatch_uid="crudkit_ai_post_delete")

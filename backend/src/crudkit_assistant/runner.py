@@ -161,8 +161,11 @@ async def run_turn(
 
 
 def _load_extra_tools(deps: AssistantDeps) -> list:
+    # Background agents get only CrudKit's own tools: a project's tools don't
+    # know about dry runs or agent-sourced proposals, so an agent could write
+    # through them unnoticed (and retrigger itself).
     model = screen_model(deps.screen)
-    return get_assistant_tools(model) if model is not None else []
+    return get_assistant_tools(model) if model is not None and deps.source != "agent" else []
 
 
 def _describe_screen(deps: AssistantDeps) -> str:

@@ -9,8 +9,8 @@ import logging
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
-from django.core.exceptions import FieldDoesNotExist, PermissionDenied
-from django.db import models, transaction
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied, ValidationError
+from django.db import IntegrityError, models, transaction
 from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
@@ -22,6 +22,7 @@ from crudkit.authorization import (
     has_object_permission,
     require_action_permission,
     require_object_permission,
+    requires_approval,
 )
 from crudkit.models import ChangeLog, FeedItem, field_value, same_value
 from crudkit.utils import get_model_types
@@ -198,11 +199,13 @@ def perform_action(instance, action_name: str, user, request=None):
     action = instance._actions[action_name]
     before = _refetch(instance)
     response = action(request)
+    # An action may delete its own record; log that as a delete.
+    after = instance.__class__._base_manager.filter(pk=instance.pk).first()
     ChangeLog.objects.create_from_objects(
         before,
-        _refetch(instance),
+        after,
         user=user,
-        action=ChangeLog.Action.ACTION,
+        action=ChangeLog.Action.ACTION if after is not None else ChangeLog.Action.DELETE,
         label=getattr(action, "verbose_name", None) or action_name,
     )
     return response
@@ -377,6 +380,11 @@ def revert_change_set(change_set, user, force: bool = False) -> dict[str, Any]:
     conflicts = []
     reverted = 0
     with audit("revert", user=user, revert_of=change_set) as context, transaction.atomic():
+        # Locks the change set's entries, so two reverts of it can't both pass
+        # the "already reverted" check (a no-op on SQLite).
+        list(ChangeLog.objects.select_for_update().filter(change_set=change_set).values_list("pk", flat=True))
+        if ChangeLog.objects.filter(revert_of=change_set).exists():
+            raise ValueError("This change has already been reverted")
         for entry in entries:
             model = entry.related_content_type.model_class()
             instance = model._base_manager.filter(pk=entry.related_object_id).first()
@@ -420,10 +428,37 @@ def _require_revert_permission(user, entry, instance):
         raise PermissionDenied(f"You may not {permission} {instance}")
     if entry.action == ChangeLog.Action.ACTION:
         # Undoing an action needs the same permission as running it. Entries
-        # name the action by its label.
-        for name, method in instance._actions.items():
-            if (getattr(method, "verbose_name", None) or name) == entry.label:
-                require_action_permission(user, instance, name)
+        # name the action by its label; an action that no longer exists can't
+        # be checked, so it can't be undone.
+        name = action_for_label(instance.__class__, entry.label)
+        if name is None:
+            raise PermissionDenied(f"The action {entry.label!r} no longer exists on {instance}; it can't be undone")
+        require_action_permission(user, instance, name)
+
+
+def action_for_label(model, label: str) -> str | None:
+    """The @crm_action a ChangeLog entry's label names, if it still exists."""
+    for name, func in model.__dict__.items():
+        if getattr(func, "_crm_action", False) and (getattr(func, "verbose_name", None) or name) == label:
+            return name
+    return None
+
+
+def revert_requires_approval(change_set) -> bool:
+    """Whether undoing `change_set` touches what MCP clients and agents may only
+    propose: an approval field, or the effects of an approval-required action
+    (or of an action that no longer exists, which can't be checked)."""
+    for entry in ChangeLog.objects.filter(change_set=change_set).select_related("related_content_type"):
+        model = entry.related_content_type.model_class() if entry.related_content_type_id else None
+        if model is None:
+            continue
+        if requires_approval(model, fields=list(entry.field_changes or {})):
+            return True
+        if entry.action == ChangeLog.Action.ACTION:
+            name = action_for_label(model, entry.label)
+            if name is None or requires_approval(model, action=name):
+                return True
+    return False
 
 
 def _entry_fields(entry, model):
@@ -469,11 +504,26 @@ def _revert_entry(entry, instance, user):
         instance.soft_delete()
     else:
         update_fields = ["updated_by", "updated_at"]
+        m2m = {}
         for field, old, _new in _entry_fields(entry, instance.__class__):
             if isinstance(field, models.FileField):
+                continue
+            if field.many_to_many:
+                m2m[field] = old or []
                 continue
             setattr(instance, field.attname, None if old is None else field.to_python(old))
             update_fields.append(field.attname)
         instance.updated_by = user
-        instance.save(update_fields=update_fields)
+        try:
+            # The same model validation a PATCH gets (e.g. who an agent may run as).
+            instance.clean()
+            with transaction.atomic():
+                instance.save(update_fields=update_fields)
+                # Logged by the m2m_changed handler, as part of this revert.
+                for field, ids in m2m.items():
+                    getattr(instance, field.name).set([field.related_model._meta.pk.to_python(i) for i in ids])
+        except (ValidationError, IntegrityError) as exc:
+            raise ValueError(f"Could not revert {instance}: {exc}") from exc
+        if m2m and len(update_fields) == 2:
+            return
     ChangeLog.objects.create_from_objects(before, instance, user=user, action=ChangeLog.Action.REVERT)

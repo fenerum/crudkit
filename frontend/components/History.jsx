@@ -56,6 +56,16 @@ function Value({ field, value }) {
     );
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // Many-to-many fields: the related ids.
+  if (Array.isArray(value)) {
+    if (!value.length) return <span className="text-fg-4">—</span>;
+    return value.map((item, i) => (
+      <span key={i}>
+        {i > 0 && ', '}
+        <Value field={field} value={item} />
+      </span>
+    ));
+  }
   if (typeof value === 'object') return <span className="font-mono">{JSON.stringify(value)}</span>;
   return String(choiceLabel(field, value));
 }
@@ -163,6 +173,8 @@ export default function History({ type, id, metadata }) {
   const historyQuery = useQuery({
     queryKey: ['history', type, id],
     queryFn: () => client.history(type, id),
+    // History needs the change log permission; retrying a 403 won't help.
+    retry: (count, error) => error?.statusCode !== 403 && count < 3,
   });
 
   const revertMutation = useMutation({
@@ -180,6 +192,9 @@ export default function History({ type, id, metadata }) {
   });
 
   if (historyQuery.isPending) return <div className="text-sm text-fg-3 animate-pulse">Loading…</div>;
+  if (historyQuery.isError && historyQuery.error?.statusCode === 403) {
+    return <div className="text-sm text-fg-3">You don&apos;t have access to the change history.</div>;
+  }
   if (historyQuery.isError) return <div className="text-sm text-danger">Couldn&apos;t load the history.</div>;
   if (!historyQuery.data.length) return <div className="text-sm text-fg-3">No changes recorded yet.</div>;
 

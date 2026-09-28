@@ -15,7 +15,7 @@ from asgiref.sync import async_to_sync
 from django.contrib.contenttypes.models import ContentType
 from django.core.cache import cache
 from django.db import transaction
-from django.db.models import F
+from django.db.models import F, OuterRef, Subquery
 from django.utils import timezone
 
 from crudkit import llm
@@ -39,6 +39,8 @@ SCHEDULE_INTERVALS = {
     Agent.Schedule.DAILY: timedelta(days=1),
     Agent.Schedule.WEEKLY: timedelta(weeks=1),
 }
+# A queued or running run older than this is taken to be lost.
+STALE_RUN_AFTER = timedelta(hours=1)
 TRIGGER_REASONS = {
     Agent.Trigger.RECORD_CREATED: "was just created",
     Agent.Trigger.RECORD_CHANGED: "just changed",
@@ -90,7 +92,10 @@ def on_change_logged(entry: ChangeLog) -> None:
         elif agent["watch_fields"] and not set(changed) & set(agent["watch_fields"]):
             continue
         info = {"trigger": agent["trigger"], "fields": changed, "change_set": str(entry.change_set)}
-        transaction.on_commit(partial(enqueue_record_run, agent["id"], entry.related_object_id, info))
+        # robust: a broken agent (e.g. its view no longer applies) is logged and
+        # must not turn the already-committed write into an error, nor skip the
+        # other on-commit work (other agents, realtime notifications).
+        transaction.on_commit(partial(enqueue_record_run, agent["id"], entry.related_object_id, info), robust=True)
 
 
 def matching_records(agent: Agent, queryset=None):
@@ -105,28 +110,75 @@ def matching_records(agent: Agent, queryset=None):
 
 
 def runs_today(agent: Agent) -> int:
-    midnight = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+    now = timezone.now()
+    today = timezone.localtime(now) if timezone.is_aware(now) else now
+    midnight = today.replace(hour=0, minute=0, second=0, microsecond=0)
     return agent.runs.filter(dry_run=False, created_at__gte=midnight).count()
 
 
 def enqueue_record_run(agent_id, pk, trigger_info: dict) -> AgentRun | None:
     agent = Agent.objects.filter(pk=agent_id, enabled=True, deleted=False).first()
-    if agent is None:
+    model = agent.get_model() if agent is not None else None
+    if model is None:
         return None
-    record = matching_records(agent, agent.get_model().objects.filter(pk=pk)).first()
+    record = matching_records(agent, model.objects.filter(pk=pk)).first()
     if record is None:
         return None
-    if runs_today(agent) >= agent.max_runs_per_day:
-        logger.warning("Agent %s reached its %d runs today; not running on %s", agent.pk, agent.max_runs_per_day, pk)
+    # A burst of changes to one record (an import, a bulk edit) runs the agent
+    # once. A run stuck for longer (a killed worker, a lost task) doesn't count.
+    waiting = agent.runs.filter(
+        dry_run=False,
+        status__in=[AgentRun.Status.QUEUED, AgentRun.Status.RUNNING],
+        created_at__gte=timezone.now() - STALE_RUN_AFTER,
+        target_content_type=ContentType.objects.get_for_model(record),
+        target_object_id=record.pk,
+    )
+    if waiting.exists():
         return None
-    return _start(agent, record, trigger_info)
+    with transaction.atomic():
+        _lock(agent)
+        if runs_today(agent) >= agent.max_runs_per_day:
+            logger.warning(
+                "Agent %s reached its %d runs today; not running on %s", agent.pk, agent.max_runs_per_day, pk
+            )
+            return None
+        return _start(agent, record, trigger_info)
 
 
 def enqueue_runs(agent: Agent, trigger: str = Agent.Trigger.MANUAL) -> list[AgentRun]:
-    """One run per matching record, up to the per-run and per-day caps."""
-    room = max(agent.max_runs_per_day - runs_today(agent), 0)
-    records = list(matching_records(agent)[: min(agent.max_records_per_run, room)])
-    return [_start(agent, record, {"trigger": trigger}) for record in records]
+    """One run per matching record, up to the per-run and per-day caps. The
+    records the agent worked on longest ago (or never) go first, so capped runs
+    work through the whole view instead of redoing the newest rows."""
+    with transaction.atomic():
+        _lock(agent)
+        room = max(agent.max_runs_per_day - runs_today(agent), 0)
+        return [_start(agent, record, {"trigger": trigger}) for record in _least_recent_first(agent)[:room]]
+
+
+def _lock(agent: Agent) -> None:
+    """Serialise counting-then-starting runs, so concurrent triggers can't
+    together start more than `max_runs_per_day` (a no-op on SQLite, which
+    serialises writes anyway)."""
+    Agent.objects.select_for_update().filter(pk=agent.pk).first()
+
+
+def _least_recent_first(agent: Agent):
+    """The agent's records, up to `max_records_per_run`, those it worked on
+    longest ago (or never) first."""
+    records = matching_records(agent)
+    last_run = (
+        agent.runs.filter(
+            dry_run=False,
+            target_content_type=ContentType.objects.get_for_model(records.model),
+            target_object_id=OuterRef("pk"),
+        )
+        .order_by("-created_at")
+        .values("created_at")[:1]
+    )
+    records = records.annotate(agent_last_run=Subquery(last_run)).order_by(
+        F("agent_last_run").asc(nulls_first=True), "-updated_at"
+    )
+    return list(records[: agent.max_records_per_run])
 
 
 def start_dry_run(agent: Agent) -> AgentRun | None:
@@ -142,8 +194,17 @@ def run_scheduled_agents(now=None) -> int:
         interval = SCHEDULE_INTERVALS.get(agent.schedule)
         if interval is None or (agent.last_scheduled_at and now - agent.last_scheduled_at < interval):
             continue
-        Agent.objects.filter(pk=agent.pk).update(last_scheduled_at=now)
-        started += len(enqueue_runs(agent, Agent.Trigger.SCHEDULE))
+        # Claimed with a compare-and-set, so overlapping beat ticks (or two beat
+        # processes) start the agent once.
+        claimed = Agent.objects.filter(pk=agent.pk, last_scheduled_at=agent.last_scheduled_at).update(
+            last_scheduled_at=now
+        )
+        if not claimed:
+            continue
+        try:
+            started += len(enqueue_runs(agent, Agent.Trigger.SCHEDULE))
+        except Exception:
+            logger.exception("Scheduled agent %s could not start", agent.pk)
     return started
 
 

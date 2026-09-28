@@ -30,10 +30,24 @@ class Migration(migrations.Migration):
                 max_length=16,
             ),
         ),
-        migrations.AddField(
-            model_name="changelog",
-            name="change_set",
-            field=models.UUIDField(blank=True, db_index=True, editable=False, null=True),
+        # The indexes (db_index here, AddIndex below) are built by 0006, concurrently
+        # on PostgreSQL: building them here would block every write to the change
+        # log (i.e. every write) while a large table is indexed.
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.AddField(
+                    model_name="changelog",
+                    name="change_set",
+                    field=models.UUIDField(blank=True, editable=False, null=True),
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="changelog",
+                    name="change_set",
+                    field=models.UUIDField(blank=True, db_index=True, editable=False, null=True),
+                ),
+            ],
         ),
         migrations.AddField(
             model_name="changelog",
@@ -45,21 +59,36 @@ class Migration(migrations.Migration):
             name="label",
             field=models.CharField(blank=True, editable=False, max_length=255),
         ),
-        migrations.AddField(
-            model_name="changelog",
-            name="revert_of",
-            field=models.UUIDField(blank=True, db_index=True, editable=False, null=True),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.AddField(
+                    model_name="changelog",
+                    name="revert_of",
+                    field=models.UUIDField(blank=True, editable=False, null=True),
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name="changelog",
+                    name="revert_of",
+                    field=models.UUIDField(blank=True, db_index=True, editable=False, null=True),
+                ),
+            ],
         ),
         migrations.AddField(
             model_name="changelog",
             name="source",
             field=models.CharField(blank=True, editable=False, max_length=16),
         ),
-        migrations.AddIndex(
-            model_name="changelog",
-            index=models.Index(
-                fields=["related_content_type", "related_object_id"],
-                name="crudkit_cha_related_df5fbc_idx",
-            ),
+        migrations.SeparateDatabaseAndState(
+            state_operations=[
+                migrations.AddIndex(
+                    model_name="changelog",
+                    index=models.Index(
+                        fields=["related_content_type", "related_object_id"],
+                        name="crudkit_cha_related_df5fbc_idx",
+                    ),
+                ),
+            ],
         ),
     ]

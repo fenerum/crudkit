@@ -149,7 +149,11 @@ every note added through them) is
 logged as a `ChangeLog` entry with the old and new value of each changed field,
 the user, and where it came from: `source` (`ui`, `api`, `mcp`, `assistant`,
 `agent`, `revert`, `system`) and `client` (an API `Client-Id` or MCP OAuth
-client name). Entry points wrap their work in `crudkit.audit.audit(source, ...)`;
+client name). `source` and `client` are attribution, not authorization: an API
+client can present itself as the UI, so nothing grants or denies access based
+on them. Many-to-many fields are logged too, as the sorted related ids before
+and after (changes made from the reverse side, `topic.ticket_set.add(...)`,
+aren't). Entry points wrap their work in `crudkit.audit.audit(source, ...)`;
 all entries written inside share one `change_set` UUID, so one request, tool
 call or confirmed proposal is one change set — even when it touched several
 records.

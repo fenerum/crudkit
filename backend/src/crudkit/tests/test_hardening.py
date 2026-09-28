@@ -1,7 +1,7 @@
 """
 The change log's edges: who may read history, undoing actions that are gone
 or deleted their record, syncs that change nothing, AI context validation,
-merge validation and the change log indexes.
+merge validation, many-to-many changes and the change log indexes.
 """
 
 from unittest.mock import patch
@@ -18,7 +18,7 @@ from crudkit.decorators import crm_action
 from crudkit.models import AIContext, ChangeLog
 from crudkit.tests.test_audit import entries, grant
 from crudkit_api import services
-from tests.testapp.models import Customer
+from tests.testapp.models import Customer, Ticket
 
 
 class HistoryPermissionTests(TestCase):
@@ -132,3 +132,47 @@ class ChangeLogIndexTests(TestCase):
         indexed = {tuple(c["columns"]) for c in constraints.values() if c["index"]}
         for columns in (("change_set",), ("revert_of",), ("related_content_type_id", "related_object_id")):
             self.assertIn(columns, indexed)
+
+
+class ManyToManyLoggingTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser("admin")
+        self.ticket = Ticket.objects.create(subject="Help", created_by=self.user, updated_by=self.user)
+        self.a = Customer.objects.create(name="A", created_by=self.user, updated_by=self.user)
+        self.b = Customer.objects.create(name="B", created_by=self.user, updated_by=self.user)
+
+    def m2m_entries(self):
+        return [e for e in entries(self.ticket) if "watchers" in (e.field_changes or {})]
+
+    def test_changes_are_logged_with_the_ids_before_and_after(self):
+        with audit("ui", user=self.user) as context:
+            self.ticket.watchers.add(self.a)
+            self.ticket.watchers.add(self.a)  # no change, no entry
+            self.ticket.watchers.remove(self.a)
+        added, removed = self.m2m_entries()
+        self.assertEqual(added.field_changes["watchers"], [[], [self.a.pk]])
+        self.assertEqual(removed.field_changes["watchers"], [[self.a.pk], []])
+        self.assertEqual({added.change_set, removed.change_set}, {context.change_set})
+        self.assertEqual((added.action, added.source, added.created_by), ("update", "ui", self.user))
+
+    def test_the_reverse_side_is_not_logged(self):
+        # Customer has no reverse accessor (related_name="+"); a through-model write is the reverse-free case.
+        Ticket.watchers.through.objects.create(ticket_id=self.ticket.pk, customer_id=self.a.pk)
+        self.assertEqual(self.m2m_entries(), [])
+
+    def test_revert_restores_the_set(self):
+        self.ticket.watchers.add(self.a)
+        with audit("ui", user=self.user) as context:
+            self.ticket.watchers.set([self.b])
+        result = services.revert_change_set(context.change_set, self.user)
+        self.assertNotIn("conflicts", result)
+        self.assertEqual(list(self.ticket.watchers.all()), [self.a])
+        self.assertTrue(all(e.revert_of == context.change_set for e in ChangeLog.objects.filter(source="revert")))
+
+    def test_revert_reports_a_set_changed_since(self):
+        with audit("ui", user=self.user) as context:
+            self.ticket.watchers.add(self.a)
+        self.ticket.watchers.add(self.b)
+        result = services.revert_change_set(context.change_set, self.user)
+        self.assertEqual([c["field"] for c in result["conflicts"]], ["watchers"])
+        self.assertEqual(set(self.ticket.watchers.all()), {self.a, self.b})

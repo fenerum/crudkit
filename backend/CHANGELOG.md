@@ -28,6 +28,14 @@
   - A record's change history needs `view_changelog` as well as seeing the record: the History
     tab, MCP `get_record`'s `changelog` and the assistant's `get_changelog`.
 - Robustness:
+  - Many-to-many changes are logged (the sorted related ids before and after, in the current
+    change set), shown in History, revertible with the usual conflict check, and matched by
+    agents' `watch_fields`. Changes from the reverse side aren't logged.
+  - Starting agent runs locks the agent's row, so concurrent triggers can't exceed
+    `max_runs_per_day`.
+  - `source`/`client` are documented as attribution only: an API client can present itself as
+    the UI, so nothing authorizes on them (only `agent`, which no request can claim, changes
+    behaviour).
   - The change log indexes from `crudkit 0004` are built by the new `crudkit 0006`, outside a
     transaction and `CONCURRENTLY` on PostgreSQL, so large change logs aren't locked for writes.
   - Agent triggers run as robust on-commit callbacks: a broken agent is logged and no longer

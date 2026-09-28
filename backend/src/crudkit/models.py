@@ -763,7 +763,10 @@ CHANGELOG_SKIP_FIELDS = ("id", "created_at", "updated_at", "created_by", "update
 
 def field_value(obj, field):
     """The JSON-safe value of `field` on `obj` as ChangeLog stores it: the raw
-    attname value (FKs as ids), files as their URL."""
+    attname value (FKs as ids), files as their URL, many-to-many fields as the
+    sorted list of related ids."""
+    if field.many_to_many:
+        return m2m_value(obj, field)
     value = obj.__dict__.get(field.get_attname())
     if isinstance(field, models.FileField):
         if isinstance(value, FieldFile):
@@ -772,11 +775,19 @@ def field_value(obj, field):
     return json.loads(json.dumps(value, cls=PrettyJSONEncoder))
 
 
+def m2m_value(obj, field) -> list:
+    """The ids `obj` is linked to through many-to-many `field`, sorted, as ChangeLog stores them."""
+    ids = getattr(obj, field.name).values_list("pk", flat=True)
+    return sorted(json.loads(json.dumps(list(ids), cls=PrettyJSONEncoder)), key=str)
+
+
 def same_value(field, a, b) -> bool:
     """Whether two logged values of `field` are equal once parsed, so 12.5 and
     "12.50", or 3 and "BOK3", count as the same."""
     if a == b:
         return True
+    if field.many_to_many:
+        return sorted(map(str, a or [])) == sorted(map(str, b or []))
     if isinstance(field, models.FileField):
         return False
     try:
@@ -824,9 +835,18 @@ class ChangeLogManager(models.Manager):
             else:
                 action = ChangeLog.Action.UPDATE
 
+        user = user or audit.current().user or (new.updated_by if new is not None else old.updated_by)
+        return self._log(new if new is not None else old, field_changes, action, user, label)
+
+    def create_for_m2m(self, instance, field, old: list, new: list):
+        """Log a change to many-to-many `field` of `instance` (lists of related ids)."""
         context = audit.current()
-        user = user or context.user or (new.updated_by if new is not None else old.updated_by)
-        instance = new if new is not None else old
+        action = ChangeLog.Action.REVERT if context.revert_of else ChangeLog.Action.UPDATE
+        user = context.user or instance.updated_by
+        return self._log(instance, {field.name: [old, new]}, action, user, "")
+
+    def _log(self, instance, field_changes, action, user, label):
+        context = audit.current()
         type_id, pk = parse_ck_id(instance.pk)
         entry = self.model.objects.create(
             related_object_id=pk,

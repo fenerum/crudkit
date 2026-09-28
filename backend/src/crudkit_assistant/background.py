@@ -135,17 +135,36 @@ def enqueue_record_run(agent_id, pk, trigger_info: dict) -> AgentRun | None:
     )
     if waiting.exists():
         return None
-    if runs_today(agent) >= agent.max_runs_per_day:
-        logger.warning("Agent %s reached its %d runs today; not running on %s", agent.pk, agent.max_runs_per_day, pk)
-        return None
-    return _start(agent, record, trigger_info)
+    with transaction.atomic():
+        _lock(agent)
+        if runs_today(agent) >= agent.max_runs_per_day:
+            logger.warning(
+                "Agent %s reached its %d runs today; not running on %s", agent.pk, agent.max_runs_per_day, pk
+            )
+            return None
+        return _start(agent, record, trigger_info)
 
 
 def enqueue_runs(agent: Agent, trigger: str = Agent.Trigger.MANUAL) -> list[AgentRun]:
     """One run per matching record, up to the per-run and per-day caps. The
     records the agent worked on longest ago (or never) go first, so capped runs
     work through the whole view instead of redoing the newest rows."""
-    room = max(agent.max_runs_per_day - runs_today(agent), 0)
+    with transaction.atomic():
+        _lock(agent)
+        room = max(agent.max_runs_per_day - runs_today(agent), 0)
+        return [_start(agent, record, {"trigger": trigger}) for record in _least_recent_first(agent)[:room]]
+
+
+def _lock(agent: Agent) -> None:
+    """Serialise counting-then-starting runs, so concurrent triggers can't
+    together start more than `max_runs_per_day` (a no-op on SQLite, which
+    serialises writes anyway)."""
+    Agent.objects.select_for_update().filter(pk=agent.pk).first()
+
+
+def _least_recent_first(agent: Agent):
+    """The agent's records, up to `max_records_per_run`, those it worked on
+    longest ago (or never) first."""
     records = matching_records(agent)
     last_run = (
         agent.runs.filter(
@@ -159,7 +178,7 @@ def enqueue_runs(agent: Agent, trigger: str = Agent.Trigger.MANUAL) -> list[Agen
     records = records.annotate(agent_last_run=Subquery(last_run)).order_by(
         F("agent_last_run").asc(nulls_first=True), "-updated_at"
     )
-    return [_start(agent, record, {"trigger": trigger}) for record in records[: min(agent.max_records_per_run, room)]]
+    return list(records[: agent.max_records_per_run])
 
 
 def start_dry_run(agent: Agent) -> AgentRun | None:

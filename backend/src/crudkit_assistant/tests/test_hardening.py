@@ -10,8 +10,10 @@ from unittest.mock import patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.contenttypes.models import ContentType
+from django.db import connection
 from django.db.models.signals import post_save
-from django.test import TestCase, override_settings
+from django.test import TestCase, override_settings, skipUnlessDBFeature
+from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from pydantic_ai.messages import ToolCallPart
 from rest_framework.test import APIClient
@@ -27,7 +29,7 @@ from crudkit_assistant.proposals import create_proposal
 from crudkit_assistant.runner import _load_extra_tools
 from crudkit_assistant.screen import Screen
 from crudkit_assistant.tests.test_agents import AgentTestCase, User, _FakeCtx, grant
-from tests.testapp.models import Customer, Topic
+from tests.testapp.models import Customer, Ticket, Topic
 
 
 def hide_from_non_superusers(customer):
@@ -261,6 +263,23 @@ class AgentHardeningTests(AgentTestCase):
         AgentRun.objects.filter(pk=stuck.pk).update(created_at=timezone.now() - timedelta(hours=2))
         self.patch_customer(self.acme, {"name": "Acme 2"})
         self.assertEqual(agent.runs.count(), 2)
+
+    def test_many_to_many_changes_trigger_watching_agents(self):
+        grant(self.user, Ticket, "view", "change")
+        ticket = Ticket.objects.create(subject="Help", created_by=self.user, updated_by=self.user)
+        agent = self.make_agent(model_type="TIC", watch_fields=["watchers"])
+        agent.updated_by = self.user
+        agent.clean()
+        with self.model(), self.captureOnCommitCallbacks(execute=True), audit("ui", user=self.user):
+            ticket.watchers.add(self.acme)
+        self.assertEqual(AgentRun.objects.get().trigger_info["fields"], ["watchers"])
+
+    @skipUnlessDBFeature("has_select_for_update")
+    def test_starting_runs_locks_the_agent(self):
+        agent = self.make_agent(trigger=Agent.Trigger.MANUAL, watch_fields=[])
+        with CaptureQueriesContext(connection) as queries, self.model(), self.captureOnCommitCallbacks(execute=True):
+            background.enqueue_runs(agent)
+        self.assertTrue(any("FOR UPDATE" in q["sql"] for q in queries.captured_queries))
 
     def test_reenabling_resets_the_failure_streak(self):
         agent = self.make_agent(enabled=False)

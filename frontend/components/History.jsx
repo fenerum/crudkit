@@ -56,6 +56,16 @@ function Value({ field, value }) {
     );
   }
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  // Many-to-many fields: the related ids.
+  if (Array.isArray(value)) {
+    if (!value.length) return <span className="text-fg-4">—</span>;
+    return value.map((item, i) => (
+      <span key={i}>
+        {i > 0 && ', '}
+        <Value field={field} value={item} />
+      </span>
+    ));
+  }
   if (typeof value === 'object') return <span className="font-mono">{JSON.stringify(value)}</span>;
   return String(choiceLabel(field, value));
 }

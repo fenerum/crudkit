@@ -38,7 +38,10 @@ from crudkit_api.services import (
     search_objects,
 )
 
-# The Client-Id the bundled SPA sends; its JWT requests count as "ui".
+# The Client-Id the bundled SPA sends; its JWT requests count as "ui". Any
+# client can send it: `source` is attribution for the History tab, never an
+# authorization input. Only "agent" changes behaviour (agents don't trigger
+# agents), and no request can claim it.
 SPA_CLIENT_ID = "CrudKitAPIClient"
 CHANGE_SET_HEADER = "X-CrudKit-Change-Set"
 

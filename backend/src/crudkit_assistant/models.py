@@ -364,7 +364,7 @@ class Agent(BaseCrudKitModel):
             raise ValidationError({"view": f"Pick a saved view of {model._meta.verbose_name_plural}."})
         if not isinstance(self.watch_fields, list):
             raise ValidationError({"watch_fields": 'Format: ["field1", "field2"]'})
-        unknown = sorted(set(self.watch_fields) - {f.name for f in model._meta.fields})
+        unknown = sorted(set(self.watch_fields) - {f.name for f in [*model._meta.fields, *model._meta.many_to_many]})
         if unknown:
             raise ValidationError({"watch_fields": f"Not fields of {model._meta.verbose_name}: {unknown}"})
         if (self.trigger == self.Trigger.SCHEDULE) != bool(self.schedule):

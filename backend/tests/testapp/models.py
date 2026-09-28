@@ -70,6 +70,7 @@ class Ticket(BaseCrudKitModel):
     summary = AISummaryField(prompt="Concise 2-3 sentence summary of this ticket.")
     is_urgent = AIBooleanField(prompt="Is this ticket urgent?")
     tags = AITagsField(prompt="Short lowercase tags describing this ticket.")
+    watchers = models.ManyToManyField(Customer, blank=True, related_name="+")
 
     def get_ai_context(self) -> str:
         parts = [f"Subject: {self.subject}"]

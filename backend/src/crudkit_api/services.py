@@ -504,8 +504,12 @@ def _revert_entry(entry, instance, user):
         instance.soft_delete()
     else:
         update_fields = ["updated_by", "updated_at"]
+        m2m = {}
         for field, old, _new in _entry_fields(entry, instance.__class__):
             if isinstance(field, models.FileField):
+                continue
+            if field.many_to_many:
+                m2m[field] = old or []
                 continue
             setattr(instance, field.attname, None if old is None else field.to_python(old))
             update_fields.append(field.attname)
@@ -515,6 +519,11 @@ def _revert_entry(entry, instance, user):
             instance.clean()
             with transaction.atomic():
                 instance.save(update_fields=update_fields)
+                # Logged by the m2m_changed handler, as part of this revert.
+                for field, ids in m2m.items():
+                    getattr(instance, field.name).set([field.related_model._meta.pk.to_python(i) for i in ids])
         except (ValidationError, IntegrityError) as exc:
             raise ValueError(f"Could not revert {instance}: {exc}") from exc
+        if m2m and len(update_fields) == 2:
+            return
     ChangeLog.objects.create_from_objects(before, instance, user=user, action=ChangeLog.Action.REVERT)

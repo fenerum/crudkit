@@ -130,6 +130,15 @@ describe("History", () => {
     expect(api.history).toHaveBeenCalledTimes(1);
   });
 
+  test("shows many-to-many changes as linked ids", async () => {
+    api.history.mockResolvedValue([
+      batch({ entries: [{ id: "CHG2", action: "update", field_changes: { watchers: [[], ["CUS1", "CUS2"]] } }] }),
+    ]);
+    renderHistory();
+    expect(await screen.findByRole("link", { name: "CUS1" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "CUS2" })).toBeInTheDocument();
+  });
+
   test("says when nothing is recorded", async () => {
     api.history.mockResolvedValue([]);
     renderHistory();

@@ -54,6 +54,9 @@ class Book(BaseCrudKitModel):
   generated tools (`crudkit_mcp`).
 - `approval_fields` — fields MCP clients and agents may only propose changes
   to (see [Approvals](#approvals)).
+- `default_inlines` — related lists the detail page shows when no `Layout`
+  row exists for the type, in the same `[[TYPE_ID, [field, …]], …]` form as
+  `Layout.inlines`.
 - `owner_access` — set to `True` to let any signed-in user view and change the
   rows they created without the Django model permission (others' rows stay
   hidden unless the user has the permission; delete still needs it).
@@ -136,7 +139,8 @@ proposal.
 
 ## History and undo
 
-Every write through the REST API, MCP, the assistant or a `@crm_action` is
+Every write through the REST API, MCP, the assistant or a `@crm_action` (and
+every note added through them) is
 logged as a `ChangeLog` entry with the old and new value of each changed field,
 the user, and where it came from: `source` (`ui`, `api`, `mcp`, `assistant`,
 `agent`, `revert`, `system`) and `client` (an API `Client-Id` or MCP OAuth
@@ -198,6 +202,50 @@ checks that the user may make the change (add permission for a create,
 change permission on the target otherwise), runs it through the same services
 as the REST API, and logs it as its own change set attributed to the
 proposal's `source` and `client`, so it can be undone like any other change.
+
+## Agents
+
+An `Agent` (TYPE_ID `AGT`, in `crudkit_assistant`) is a set of saved
+instructions that the assistant carries out in the background. Its `trigger` is
+one of:
+
+- `record_created`: a record of `model_type` was created.
+- `record_changed`: a record was changed. When `watch_fields` is set, only
+  changes to those fields count.
+- `schedule`: `hourly`, `daily` or `weekly`, over the records of its view.
+- `manual`: only when started by hand.
+
+A `view` limits the agent to the records in that saved view, resolved as
+`run_as`, the user whose permissions the agent has.
+
+Triggers come from `ChangeLog` entries, so an agent reacts to every logged
+write: the REST API, MCP, the assistant and actions. Plain ORM saves in
+project code are not logged, and so do not trigger agents. Changes made by
+agents (source `agent`) never trigger agents, so agents can't set each other
+off. Scheduled agents need the host's Celery beat to run
+`crudkit_assistant.tasks.run_scheduled_agents`; see `backend/README.md`.
+
+Each run is an `AgentRun` (`AGR`) on one record. The assistant reads the
+record with its usual tools, together with the AI context for the type and the
+agent's instructions, and acts only through proposals:
+
+- **Propose mode** (the default) files the proposals with source `agent` and
+  the agent's name as client. They wait in their owner's Inbox.
+- **Auto mode** applies right away, as `run_as`, every proposal that doesn't
+  need approval (see [Approvals](#approvals)), all in the run's change set.
+  "Revert this run" undoes that change set, notes included.
+- **Dry run** ("Dry run on latest matching record") saves nothing. The run's
+  preview lists what the agent would have proposed.
+
+Two guards cap the work: `max_records_per_run` and `max_runs_per_day`. After 3
+failed runs in a row, the agent disables itself and says so on its feed.
+
+Agents and runs belong to whoever created the agent: others don't see them,
+and superusers see all of them. `run_as` defaults to the creator, and only
+superusers may change it. The agent's behaviour fields are `approval_fields`,
+so MCP clients and other agents can only propose them. Users can ask the
+sidebar for an agent ("every Monday, flag at-risk customers"): it proposes
+creating one.
 
 ## The frontend config contract
 

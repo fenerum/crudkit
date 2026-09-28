@@ -135,6 +135,7 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
         "search_fields": list(getattr(model.CrudKitSettings, "search_fields", [])),
         "can_create": has_model_permission(user, model, "add"),
         "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
+        "default_inlines": list(getattr(model.CrudKitSettings, "default_inlines", [])),
         "fields": fields,
         "relations": relations,
         "actions": [

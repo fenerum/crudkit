@@ -81,6 +81,15 @@ describe("Inbox proposals tab", () => {
     expect(create.getByRole("link", { name: "New BOK" })).toHaveAttribute("href", "/BOK/");
   });
 
+  test("names the agent that made a proposal", async () => {
+    const fromAgent = { ...PROPOSALS[0], id: "ASP6", source: "agent", client: "Finished readings" };
+    api.fetchObjects.mockResolvedValue({ isPaginated: true, count: 1, results: [fromAgent] });
+    renderInbox();
+
+    const [row] = await screen.findAllByTestId("proposal");
+    expect(within(row).getByText("Agent: Finished readings")).toBeInTheDocument();
+  });
+
   test("confirm runs the confirm action and refreshes the target", async () => {
     const qc = renderInbox();
     const invalidate = vi.spyOn(qc, "invalidateQueries");

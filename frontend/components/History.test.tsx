@@ -64,6 +64,7 @@ describe("sourceLabel", () => {
     expect(sourceLabel(batch({ source: "api", client: "" }), me)).toBe("API");
     expect(sourceLabel(batch({ source: "assistant" }), me)).toBe("Assistant");
     expect(sourceLabel(batch({ source: "agent" }), me)).toBe("Agent");
+    expect(sourceLabel(batch({ source: "agent", client: "Churn watch" }), me)).toBe("Agent: Churn watch");
   });
 });
 

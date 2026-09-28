@@ -38,17 +38,22 @@ AUDIT_FIELDS = {"created_by", "updated_by", "created_at", "updated_at"}
 
 
 def get_exposed_models() -> list[type[models.Model]]:
-    """Project models, minus CrudKit's and Django's own. CRUDKIT_MCP_MODELS
-    (a list of TYPE_IDs) narrows this to an explicit allowlist."""
+    """Project models, minus CrudKit's and Django's own (unless they set
+    `CrudKitSettings.ai_exposed`). CRUDKIT_MCP_MODELS (a list of TYPE_IDs)
+    narrows this to an explicit allowlist."""
     allowlist = getattr(settings, "CRUDKIT_MCP_MODELS", None)
     return [
         model
         for type_id, model in get_model_types().items()
         if (type_id in allowlist if allowlist else True)
-        and not model._meta.app_label.startswith("crudkit")
+        and (not model._meta.app_label.startswith("crudkit") or _crudkit_settings(model, "ai_exposed"))
         and model._meta.app_label not in SKIPPED_APP_LABELS
-        and not getattr(getattr(model, "CrudKitSettings", None), "mcp_exclude", False)
+        and not _crudkit_settings(model, "mcp_exclude")
     ]
+
+
+def _crudkit_settings(model, name: str):
+    return getattr(getattr(model, "CrudKitSettings", None), name, False)
 
 
 def visible_models(user) -> list[type[models.Model]]:

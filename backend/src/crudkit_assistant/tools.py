@@ -25,7 +25,12 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied
 from pydantic_ai import RunContext
 
-from crudkit.authorization import get_authorized_instance, get_authorized_queryset, has_action_permission
+from crudkit.authorization import (
+    get_authorized_instance,
+    get_authorized_queryset,
+    has_action_permission,
+    has_model_permission,
+)
 from crudkit.models import parse_ck_id
 from crudkit_api import records, services
 from crudkit_api.metadata import build_instance_metadata
@@ -57,6 +62,7 @@ def describe_call(tool_name: str, args: dict) -> str:
         "propose_bulk_patch": f"Drafting changes to {count} record{'' if count == 1 else 's'}",
         "propose_action": f"Drafting {args.get('action_name')} on {target}",
         "propose_create_note": f"Drafting a note on {target}",
+        "propose_create": f"Drafting a new {args.get('type') or 'record'}",
         "propose_revert": "Drafting an undo",
     }
     return labels.get(tool_name, f"Running {tool_name}")
@@ -247,6 +253,26 @@ async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected
 # Proposal tools (no mutation — only persist + emit)
 
 
+def _file_proposal(deps: AssistantDeps, user, model, instance, kind: str, label: str, payload: dict, reasoning: str):
+    """Persist a proposal and return its pending envelope. On a dry run
+    nothing is saved: the envelope (with no id) is all there is."""
+    if deps.dry_run:
+        return _envelope(None, kind, label[:255], payload, reasoning or "", instance) | {"dry_run": True}
+    proposal = create_proposal(
+        user,
+        model,
+        instance,
+        kind,
+        label,
+        payload,
+        source=deps.source,
+        client=deps.client,
+        reasoning=reasoning,
+        session_key=deps.session_key,
+    )
+    return pending_envelope(proposal)
+
+
 def _make_proposal(
     deps: AssistantDeps,
     object_id: str | None,
@@ -254,34 +280,38 @@ def _make_proposal(
     label: str,
     payload: dict,
     reasoning: str,
-) -> AssistantProposal:
+) -> dict:
     instance, error = _load_instance(deps, object_id, "change")
     if instance is None:
         raise PermissionError(error)
-    return create_proposal(
-        _load_user(deps),
-        instance.__class__,
-        instance,
-        kind,
-        label,
-        payload,
-        reasoning=reasoning,
-        session_key=deps.session_key,
-    )
+    return _file_proposal(deps, _load_user(deps), instance.__class__, instance, kind, label, payload, reasoning)
 
 
-def pending_envelope(proposal: AssistantProposal) -> dict:
-    target = proposal.target
+def _envelope(proposal_id, kind: str, label: str, payload: dict, reasoning: str, target) -> dict:
     return {
         "type": "tool_call_pending",
-        "id": proposal.id,
-        "kind": proposal.kind,
-        "label": proposal.label,
-        "payload": proposal.payload,
-        "reasoning": proposal.reasoning,
+        "id": proposal_id,
+        "kind": kind,
+        "label": label,
+        "payload": payload,
+        "reasoning": reasoning,
         "target": str(target.id) if target is not None else None,
         "target_label": str(target) if target is not None else None,
     }
+
+
+def pending_envelope(proposal: AssistantProposal) -> dict:
+    return _envelope(proposal.id, proposal.kind, proposal.label, proposal.payload, proposal.reasoning, proposal.target)
+
+
+def _pending_text(envelope: dict) -> str:
+    what = f"({envelope['kind']}: {envelope['label']})"
+    if envelope.get("dry_run"):
+        return f"Dry run: proposal {what} recorded; nothing was saved."
+    return (
+        f"Proposal {envelope['id']} {what} is awaiting user confirmation. "
+        "The action has NOT run yet. You will be told the outcome in a later turn."
+    )
 
 
 async def _emit(ctx: RunContext[AssistantDeps], envelope: dict) -> None:
@@ -301,14 +331,11 @@ async def _propose(
     """Shared helper: persist a proposal, push the pending envelope to the
     consumer's outbox, and return a string the model treats as the tool result."""
     try:
-        proposal = await sync_to_async(_make_proposal)(ctx.deps, object_id, kind, label, payload, reasoning)
+        envelope = await sync_to_async(_make_proposal)(ctx.deps, object_id, kind, label, payload, reasoning)
     except PermissionError as exc:
         return f"ERROR: {exc}"
-    await _emit(ctx, await sync_to_async(pending_envelope)(proposal))
-    return (
-        f"Proposal {proposal.id} ({kind}: {label}) is awaiting user confirmation. "
-        "The action has NOT run yet. You will be told the outcome in a later turn."
-    )
+    await _emit(ctx, envelope)
+    return _pending_text(envelope)
 
 
 def _field_errors(model, fields: dict) -> str | None:
@@ -420,17 +447,18 @@ async def propose_bulk_patch(
             ):
                 unchanged.append(str(instance.id))
                 continue
-            proposal = create_proposal(
-                user,
-                instance.__class__,
-                instance,
-                AssistantProposal.Kind.PATCH,
-                label,
-                {"fields": fields},
-                reasoning=reasoning,
-                session_key=ctx.deps.session_key,
+            envelopes.append(
+                _file_proposal(
+                    ctx.deps,
+                    user,
+                    instance.__class__,
+                    instance,
+                    AssistantProposal.Kind.PATCH,
+                    label,
+                    {"fields": fields},
+                    reasoning,
+                )
             )
-            envelopes.append(pending_envelope(proposal))
         return envelopes, refused, unchanged
 
     try:
@@ -441,7 +469,9 @@ async def propose_bulk_patch(
         await _emit(ctx, envelope)
 
     lines = []
-    if envelopes:
+    if envelopes and ctx.deps.dry_run:
+        lines.append(f"Dry run: {len(envelopes)} proposal(s) ({label}) recorded; nothing was saved.")
+    elif envelopes:
         drafted = ", ".join(f"{e['target']} (proposal {e['id']})" for e in envelopes)
         lines.append(
             f"{len(envelopes)} proposal(s) ({label}) are awaiting user confirmation, one per record: {drafted}. "
@@ -467,6 +497,42 @@ async def propose_create_note(
     snippet = (body or "").strip().splitlines()[0] if body else ""
     label = f"Add note: {snippet[:80]}"
     return await _propose(ctx, id, AssistantProposal.Kind.NOTE, label, {"body": body}, reasoning)
+
+
+async def propose_create(
+    ctx: RunContext[AssistantDeps],
+    type: str,
+    fields: dict[str, Any],
+    reasoning: str = "",
+) -> str:
+    """Propose creating a new record of `type` (a TYPE_ID, e.g. AGT for an
+    agent) with `fields`, a {field_name: value} dict whose names and choice
+    values come from describe_types(type). Nothing is created until the user
+    confirms."""
+    if not isinstance(fields, dict) or not fields:
+        return "ERROR: `fields` must be a non-empty {field_name: value} dict."
+
+    def _run():
+        user = _load_user(ctx.deps)
+        model = records.resolve_type(user, type)
+        if not has_model_permission(user, model, "add"):
+            raise PermissionDenied
+        checked = records.checked_fields(model, user, fields)
+        if error := _field_errors(model, checked):
+            raise ValueError(error)
+        services.check_create(model, checked, user)
+        label = f"Create {model._meta.verbose_name}"
+        payload = {"type": model.TYPE_ID, "fields": checked}
+        return _file_proposal(ctx.deps, user, model, None, AssistantProposal.Kind.CREATE, label, payload, reasoning)
+
+    try:
+        envelope = await sync_to_async(_run)()
+    except PermissionDenied:
+        return f"ERROR: you may not create {type} records."
+    except ValueError as exc:
+        return f"ERROR: {exc}"
+    await _emit(ctx, envelope)
+    return _pending_text(envelope)
 
 
 async def propose_revert(ctx: RunContext[AssistantDeps], change_set: str, reasoning: str = "") -> str:

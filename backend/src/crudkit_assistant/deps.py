@@ -10,6 +10,13 @@ class AssistantDeps:
     user_id: int
     session_key: str  # ties proposals to one conversation
     screen: Screen = field(default_factory=Screen)
+    # Where proposals come from: the sidebar ("assistant") or a background
+    # agent ("agent", with the agent's name as client and its instructions).
+    source: str = "assistant"
+    client: str = ""
+    agent_instructions: str = ""
+    # Proposal tools persist nothing; the runner still reports what they would file.
+    dry_run: bool = False
 
     # Kept for per-model `assistant_tools` written against the old
     # one-record-per-socket deps.

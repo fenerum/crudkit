@@ -122,13 +122,15 @@ class ReadToolsTest(MCPTestCase):
     def test_type_enum_follows_view_permission(self):
         result = self.server().handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
         schema = next(t for t in result["result"]["tools"] if t["name"] == "list_records")["inputSchema"]
-        self.assertEqual(set(schema["properties"]["type"]["enum"]), {"CUS", "TOP"})
+        # Agents use owner_access: everyone may have their own.
+        self.assertEqual(set(schema["properties"]["type"]["enum"]), {"AGT", "CUS", "TOP"})
 
     def test_describe_types_lists_visible_types(self):
         summaries = self.call("describe_types")
         self.assertEqual(
             summaries,
             [
+                {"type": "AGT", "name": "agent", "name_plural": "agents"},
                 {"type": "TOP", "name": "topic", "name_plural": "topics"},
                 {"type": "CUS", "name": "customer", "name_plural": "customers"},
             ],
@@ -495,7 +497,7 @@ class McpViewIntegrationTest(TestCase):
     def test_tools_list_uses_token_user(self):
         tools = self._mcp_request("tools/list").json()["result"]["tools"]
         types = next(t for t in tools if t["name"] == "list_records")["inputSchema"]["properties"]["type"]["enum"]
-        self.assertEqual(types, ["CUS"])
+        self.assertEqual(types, ["AGT", "CUS"])
 
     def test_invalid_json(self):
         response = self.client.post(

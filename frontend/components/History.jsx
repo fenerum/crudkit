@@ -36,7 +36,7 @@ export function sourceLabel(batch, currentUser) {
     case 'assistant':
       return 'Assistant';
     case 'agent':
-      return 'Agent';
+      return batch.client ? `Agent: ${batch.client}` : 'Agent';
     case 'revert':
       return 'Undo';
     case 'system':

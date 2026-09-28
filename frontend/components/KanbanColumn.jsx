@@ -13,6 +13,7 @@ export default function KanbanColumn({
   objectMap,
   view,
   metadata,
+  onAdd,
   showColumnCount = true
 }) {
   const { isOver, setNodeRef } = useDroppable({ id });
@@ -60,7 +61,7 @@ export default function KanbanColumn({
               <Icon name={isCollapsed ? 'chevron-down' : 'chevron-up'} size={12} color="currentColor" />
             </button>
           </div>
-          <button type="button" className="ck-icon-btn ck-icon-btn-sm" aria-label="Add item">
+          <button type="button" onClick={onAdd} className="ck-icon-btn ck-icon-btn-sm" aria-label="Add item">
             <Icon name="plus" size={12} color="currentColor" />
           </button>
         </div>

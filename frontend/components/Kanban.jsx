@@ -13,6 +13,7 @@ import {
     sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
 import KanbanColumn from "./KanbanColumn";
+import InlineCreateModal from "./InlineCreateModal";
 import {groupBy} from "../utils/groupby";
 import CrudKitAPIClient from "../data/api";
 import { toast } from "react-toastify";
@@ -30,6 +31,8 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
     const filterText = q;
     const [draggedItemData, setDraggedItemData] = useState(null);
     const [activeId, setActiveId] = useState();
+    // Column whose "+" opened the create modal; the new card starts in it.
+    const [addingTo, setAddingTo] = useState(null);
     // handleDragOver moves the card between columns while dragging, so the
     // column it started in has to be remembered to revert a rejected drop.
     const dragSourceRef = useRef(null);
@@ -115,6 +118,13 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
         })();
     }, [columns.length, groupByField, loadColumns, objectList, view.group_by]);
 
+    const addPrefill = useMemo(() => {
+        if (addingTo === null) return null;
+        const label = columns.find(([id]) => id === addingTo)?.[1];
+        const value = groupByField?.type === "ForeignKey" ? { id: addingTo, label: label || String(addingTo) } : addingTo;
+        return { [view.group_by]: value };
+    }, [addingTo, columns, groupByField, view.group_by]);
+
     const isDataLimited = objectList?.length >= 500;
 
     if (!view.group_by) {
@@ -163,6 +173,7 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
                                 showColumnCount={true}
                                 view={view}
                                 metadata={metadata}
+                                onAdd={() => setAddingTo(id)}
                             />
                         ))}
                     </div>
@@ -178,6 +189,15 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
                     </DragOverlay>
                 </DndContext>
             </div>
+
+            {addingTo !== null && (
+                <InlineCreateModal
+                    type={model}
+                    prefill={addPrefill}
+                    onCreated={() => setAddingTo(null)}
+                    onClose={() => setAddingTo(null)}
+                />
+            )}
         </div>
     );
 

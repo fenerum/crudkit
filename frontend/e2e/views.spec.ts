@@ -87,6 +87,21 @@ test.describe('layouts', () => {
     await expect(finishedColumn(page)).toContainText(name);
   });
 
+  test('kanban column "+" creates a card in that column', async ({ page }) => {
+    const name = unique('Added from board');
+    await openView(page, 'Board');
+    await finishedColumn(page).getByRole('button', { name: 'Add item' }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByText('Finished', { exact: true })).toBeVisible();
+    await dialog.locator('input[name="name"]').fill(name);
+    await dialog.getByRole('button', { name: 'Create' }).click();
+
+    await expect(dialog).toHaveCount(0);
+    await expect(page).toHaveURL(/\/RDG\/VIW\/VIW\d+$/);
+    await expect(finishedColumn(page)).toContainText(name);
+  });
+
   test('gallery filters cards by choice', async ({ page }) => {
     await openView(page, 'Covers');
     const main = page.getByRole('main');

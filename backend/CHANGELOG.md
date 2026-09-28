@@ -26,6 +26,12 @@
   - `crudkit_assistant`: `get_changelog` returns each entry's change set; new
     `propose_revert` tool (a Confirm card, proposal kind `revert`, migration
     `crudkit_assistant 0003`); confirmed proposals can be undone from their card.
+- `crudkit_assistant`: new `propose_bulk_patch` tool — one call drafts the same field change on
+  up to 100 records, still one Confirm/Skip card (and permission check) per record, skipping
+  records that already have the values. The prompt no longer asks for `get_object`, `get_feed`
+  and `describe_object` on every record of a bulk change: the model reads the rows on screen (or
+  `list_records`) and `describe_types(type)` once, so "set all of these to high priority" takes
+  a few tool calls instead of three per record.
 - `crudkit_assistant`: `describe_object` no longer fails on models with lazily translated
   `help_text`.
 - Packaging: require `pydantic-ai-slim>=2.51` (the tested version); 1.x is incompatible with the

@@ -22,6 +22,7 @@ from crudkit_assistant.tools import (
     get_screen_rows,
     list_records,
     propose_action,
+    propose_bulk_patch,
     propose_create_note,
     propose_patch,
     propose_revert,
@@ -46,7 +47,8 @@ since earlier messages.
 The ONLY tools you may call are exactly these — never invent another name:
   Record tools:  get_object, describe_object, get_changelog, get_feed, get_related
   Search tools:  search, describe_types, list_records, get_record, get_screen_rows
-  Propose tools: propose_patch, propose_action, propose_create_note, propose_revert
+  Propose tools: propose_patch, propose_bulk_patch, propose_action, propose_create_note,
+                 propose_revert
 
 Record and propose tools take an optional `id` (e.g. CUS123); without it they
 use the record open on screen. Use `get_screen_rows` to read the selected or
@@ -56,22 +58,31 @@ Proposals do NOT take effect immediately — they pop up as a Confirm/Skip
 card in the user's chat. You will be told the outcome in a later turn
 before you can propose anything that depends on it. Never claim an action
 has run unless a confirmation outcome has been delivered to you. Each
-proposal changes exactly one record; for several records, make one
-proposal per record.
+card changes exactly one record; `propose_bulk_patch` makes one card per
+record in a single call.
 
-Before proposing anything on a record, call `get_object`, `get_feed`, AND
-`describe_object` for that record. `describe_object` returns the writable
-fields with their current values, the exact list of valid choices for
-choice fields, the available rows for foreign-key fields, and the names of
-the @crm_actions you may propose. Every field name, choice value, FK
-target, and action name you put in a proposal MUST appear verbatim in that
-payload. If the right value isn't listed, ask the user instead of guessing.
+Before proposing anything on a single record, call `get_object`,
+`get_feed`, AND `describe_object` for that record. `describe_object`
+returns the writable fields with their current values, the exact list of
+valid choices for choice fields, the available rows for foreign-key
+fields, and the names of the @crm_actions you may propose.
+
+When the same field change applies to several records ("set all of these
+to high priority"), do NOT read each record. Read their current values
+once with `get_screen_rows` or `list_records`, read the writable fields
+and valid choices once per type with `describe_types(type)`, then make ONE
+`propose_bulk_patch` call with every id that needs the change. Leave out
+records that already have the target value.
+
+Every field name, choice value, FK target, and action name you put in a
+proposal MUST appear verbatim in `describe_object` or `describe_types`.
+If the right value isn't listed, ask the user instead of guessing.
 
 When choosing between proposal types, prefer in this order:
-1. `propose_patch` — if the information belongs in a structured field on
-   the object (status, stage, owner, dates, amounts, contact details,
-   etc.), update the field. Structured data is searchable and reportable;
-   notes are not.
+1. `propose_patch` (or `propose_bulk_patch` for several records) — if the
+   information belongs in a structured field on the object (status, stage,
+   owner, dates, amounts, contact details, etc.), update the field.
+   Structured data is searchable and reportable; notes are not.
 2. `propose_action` — if there is a named `@crm_action` that captures the
    intent better than a freeform note.
 3. `propose_create_note` — only as a last resort, for information that
@@ -111,6 +122,7 @@ for _tool in (
     get_screen_rows,
     propose_action,
     propose_patch,
+    propose_bulk_patch,
     propose_create_note,
     propose_revert,
 ):

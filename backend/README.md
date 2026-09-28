@@ -82,9 +82,9 @@ only shows the assistant when an AI model is configured (`CRUDKIT_AI_MODEL` or
 
 Company knowledge for the AI lives in **AI context** documents (`AIContext`,
 AIC), which users edit in the UI at `/AIC` (add a saved view to the menu to link it).
-Active documents without `model_types` go into the assistant's instructions;
-documents scoped to a type go into its screen description when a record or
-list of that type is open; AI fields get both in a "Company context" section
+Active documents without `model_types` go into the assistant's instructions,
+joined by documents scoped to a type while a record or list of that type is
+open; AI fields get both in a "Company context" section
 of their prompt. Code can render them with `crudkit.llm.ai_context(type_id)`.
 The assistant proposes edits to these documents when the user teaches it
 something durable about the company.

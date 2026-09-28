@@ -116,9 +116,9 @@ pages, history and undo at `/AIC`. Add a saved view to the menu to link it.
 (the global ones plus those listing `type_id`), ordered by `order` then
 `name`, each under a `## <name>` heading. Every LLM feature reads it:
 
-- the assistant's instructions carry the global documents;
-- its `[Screen]` block adds the documents for the type of the open record or
-  list;
+- the assistant's instructions carry the global documents and those for the
+  type of the open record or list (not the `[Screen]` block, which is stored
+  with each user turn and would repeat them on every later turn);
 - AI fields get a `## Company context` section with the global documents and
   those for the record's type.
 

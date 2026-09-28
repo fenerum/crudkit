@@ -38,8 +38,7 @@ class AIContextTests(TestCase):
 
         self.assertEqual(ai_context(), "## Global\nEverywhere.")
         self.assertEqual(ai_context("CUS"), "## Customers\nChurn playbook.\n\n## Global\nEverywhere.")
-        self.assertEqual(ai_context("CUS", include_global=False), "## Customers\nChurn playbook.")
-        self.assertEqual(ai_context("XYZ", include_global=False), "")
+        self.assertEqual(ai_context("XYZ"), "## Global\nEverywhere.")
 
     def test_inactive_and_deleted_are_left_out(self):
         make_doc(self.user, "Draft", "Not yet.", active=False)

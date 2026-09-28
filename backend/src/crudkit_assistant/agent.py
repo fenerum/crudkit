@@ -13,6 +13,7 @@ from pydantic_ai.settings import ModelSettings
 
 from crudkit import llm
 from crudkit_assistant.deps import AssistantDeps
+from crudkit_assistant.screen import screen_model
 from crudkit_assistant.tools import (
     describe_object,
     describe_types,
@@ -97,9 +98,8 @@ When choosing between proposal types, prefer in this order:
 To undo an earlier change, find its `change_set` with `get_changelog` and
 call `propose_revert`; it undoes every change made together with it.
 
-Any company context (at the end of these instructions or in the `[Screen]`
-block) comes from AI context documents the users maintain; each heading
-carries the document's id. When
+Any company context at the end of these instructions comes from AI context
+documents the users maintain; each heading carries the document's id. When
 the user teaches you something durable about the company (who we sell to,
 why customers buy, tone of voice, how we work), propose an edit to the
 relevant document with `propose_patch(id="AIC…")`.
@@ -145,12 +145,16 @@ for _tool in (
 @assistant_agent.instructions
 async def _instructions(ctx: RunContext[AssistantDeps]) -> str:
     """The project's own prompt prefix, the assistant's name, the base prompt and
-    the global AI context documents."""
+    the AI context documents: the global ones plus those for the type on screen.
+    Scoped documents live here rather than in the `[Screen]` block, which is
+    stored with each user turn and would repeat them, stale, on every later turn."""
     lines = []
     if project_prefix := getattr(settings, "CRUDKIT_ASSISTANT_SYSTEM_PROMPT", "") or "":
         lines.append(project_prefix)
     lines.append(f"Your name is {getattr(settings, 'CRUDKIT_ASSISTANT_NAME', 'Assistant')}.")
     lines.append(_BASE_SYSTEM_PROMPT)
-    if company_context := await sync_to_async(llm.ai_context)(with_ids=True):
+    model = screen_model(ctx.deps.screen)
+    type_id = model.TYPE_ID if model is not None else None
+    if company_context := await sync_to_async(llm.ai_context)(type_id, with_ids=True):
         lines.append(f"# Company context\n\n{company_context}")
     return "\n\n".join(lines)

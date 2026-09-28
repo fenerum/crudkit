@@ -51,7 +51,7 @@ async def model_context() -> AsyncGenerator[Model]:
     )
 
 
-def ai_context(type_id: str | None = None, *, include_global: bool = True, with_ids: bool = False) -> str:
+def ai_context(type_id: str | None = None, *, with_ids: bool = False) -> str:
     """Active AI context documents as markdown, each under a ``## <name>`` heading:
     the global ones (no ``model_types``) plus those scoped to ``type_id``.
     ``with_ids`` adds each document's id to its heading so the assistant can
@@ -60,6 +60,6 @@ def ai_context(type_id: str | None = None, *, include_global: bool = True, with_
         doc
         for doc in AIContext.objects.filter(deleted=False, active=True).order_by("order", "name")
         # Filtered in Python: JSON containment lookups differ between SQLite and Postgres.
-        if (include_global and not doc.model_types) or (type_id and type_id in (doc.model_types or []))
+        if not doc.model_types or (type_id and type_id in doc.model_types)
     ]
     return "\n\n".join(f"## {doc.name}{f' ({doc.pk})' if with_ids else ''}\n{doc.body.strip()}" for doc in docs)

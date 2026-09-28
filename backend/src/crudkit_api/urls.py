@@ -6,7 +6,7 @@ from crudkit.authorization import has_model_permission
 from crudkit.utils import get_model_types
 from crudkit_api.authentication import LoginView, UserProfileView
 from crudkit_api.serializers import get_serializer
-from crudkit_api.views import GenericViewSet, SearchViewSet, WidgetsViewSet
+from crudkit_api.views import ChangeSetRevertView, GenericViewSet, SearchViewSet, WidgetsViewSet
 
 # ViewSets define the view behavior.
 
@@ -55,4 +55,5 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     # User profile endpoint
     path("user/me/", UserProfileView.as_view(), name="user_profile"),
+    path("changesets/<uuid:change_set>/revert/", ChangeSetRevertView.as_view(), name="changeset_revert"),
 ]

@@ -9,7 +9,7 @@ import logging
 from typing import Any
 
 from crudkit.authorization import require_object_permission
-from crudkit_api.services import create_note, patch_fields, run_action
+from crudkit_api.services import create_note, patch_fields, revert_change_set, run_action
 
 logger = logging.getLogger(__name__)
 
@@ -37,4 +37,10 @@ def execute_proposal(proposal, user, request=None) -> dict[str, Any]:
         return patch_fields(instance, payload.get("fields") or {}, user, request)
     if proposal.kind == proposal.Kind.NOTE:
         return create_note(instance, payload.get("body"), user)
+    if proposal.kind == proposal.Kind.REVERT:
+        result = revert_change_set(payload.get("change_set"), user)
+        if "conflicts" in result:
+            changed = ", ".join(f"{c['object']}.{c['field']}" for c in result["conflicts"])
+            raise ValueError(f"Not reverted: changed since ({changed})")
+        return {"kind": "revert", **result}
     raise ValueError(f"Unknown proposal kind {proposal.kind!r}")

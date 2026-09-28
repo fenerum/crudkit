@@ -1,4 +1,4 @@
-const UNPREFIXED_KEYS = new Set(['non_field_errors', '__all__', 'detail']);
+const UNPREFIXED_KEYS = new Set(['non_field_errors', '__all__', 'detail', 'error']);
 
 function firstMessage(value: unknown): string {
   if (Array.isArray(value)) return firstMessage(value[0]);

@@ -18,6 +18,7 @@ the RunContext.deps shim attached by the runner.
 
 import json
 import logging
+import uuid
 from typing import Any
 
 from asgiref.sync import sync_to_async
@@ -53,6 +54,7 @@ def describe_call(tool_name: str, args: dict) -> str:
         "propose_patch": f"Drafting a change to {target}",
         "propose_action": f"Drafting {args.get('action_name')} on {target}",
         "propose_create_note": f"Drafting a note on {target}",
+        "propose_revert": "Drafting an undo",
     }
     return labels.get(tool_name, f"Running {tool_name}")
 
@@ -116,7 +118,9 @@ async def get_changelog(
 ) -> list[dict[str, Any]] | str:
     """Return up to `limit` recent ChangeLog entries for a record (default: the one open on screen).
 
-    Each entry has {at, by, field_changes: {field: [old, new]}}.
+    Each entry has {at, by, action, source, client, label, change_set,
+    field_changes: {field: [old, new]}}. Entries sharing a change_set were made
+    together and can be undone together with propose_revert.
     """
 
     def _run():
@@ -387,3 +391,23 @@ async def propose_create_note(
     snippet = (body or "").strip().splitlines()[0] if body else ""
     label = f"Add note: {snippet[:80]}"
     return await _propose(ctx, id, AssistantProposal.Kind.NOTE, label, {"body": body}, reasoning)
+
+
+async def propose_revert(ctx: RunContext[AssistantDeps], change_set: str, reasoning: str = "") -> str:
+    """Propose undoing a change set: every change one earlier edit made, as
+    listed by get_changelog's `change_set`. Nothing is reverted until the user
+    confirms."""
+
+    def _target():
+        try:
+            entries = services.check_revertible(uuid.UUID(str(change_set)))
+        except ValueError as exc:
+            return None, str(exc)
+        newest = entries[0]
+        return f"{newest.related_content_type.model_class().TYPE_ID}{newest.related_object_id}", None
+
+    target, error = await sync_to_async(_target)()
+    if error:
+        return f"ERROR: {error}"
+    label = f"Undo change {str(change_set)[:8]}"
+    return await _propose(ctx, target, AssistantProposal.Kind.REVERT, label, {"change_set": str(change_set)}, reasoning)

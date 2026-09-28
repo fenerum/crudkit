@@ -34,7 +34,7 @@ class McpView(APIView):
             return response
 
         user, token = auth_result
-        server = MCPServer(user, oauth_scopes=getattr(request, "oauth_scopes", []))
+        server = MCPServer(user, oauth_scopes=getattr(request, "oauth_scopes", []), token=token)
         result = server.handle_message(request.data)
 
         if result is None:

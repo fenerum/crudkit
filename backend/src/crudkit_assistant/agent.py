@@ -24,6 +24,7 @@ from crudkit_assistant.tools import (
     propose_action,
     propose_create_note,
     propose_patch,
+    propose_revert,
     search,
 )
 
@@ -45,7 +46,7 @@ since earlier messages.
 The ONLY tools you may call are exactly these — never invent another name:
   Record tools:  get_object, describe_object, get_changelog, get_feed, get_related
   Search tools:  search, describe_types, list_records, get_record, get_screen_rows
-  Propose tools: propose_patch, propose_action, propose_create_note
+  Propose tools: propose_patch, propose_action, propose_create_note, propose_revert
 
 Record and propose tools take an optional `id` (e.g. CUS123); without it they
 use the record open on screen. Use `get_screen_rows` to read the selected or
@@ -80,6 +81,9 @@ When choosing between proposal types, prefer in this order:
    — quote the existing item's date in your reasoning and skip the
    proposal instead.
 
+To undo an earlier change, find its `change_set` with `get_changelog` and
+call `propose_revert`; it undoes every change made together with it.
+
 Style:
 - Be concise. Short paragraphs and bullet lists, not essays.
 - Lead with the observation or recommendation. Cite the specific records,
@@ -108,6 +112,7 @@ for _tool in (
     propose_action,
     propose_patch,
     propose_create_note,
+    propose_revert,
 ):
     assistant_agent.tool(_tool)
 

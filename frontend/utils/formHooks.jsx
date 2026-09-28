@@ -3,25 +3,25 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { FormProvider, useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
-import CrudKitAPIClient, { fetchMetadata } from '../data/api';
-import { invalidateModel } from '../data/invalidate';
+import CrudKitAPIClient, { changeSetOf, fetchMetadata } from '../data/api';
+import { invalidateModel, invalidateRecords } from '../data/invalidate';
+import { showSuccessToast } from '../components/SuccessToast';
 import generateFieldPairs from './fieldpairs';
 import { url } from './urls';
 
-const showSuccessToastWithLink = (action, data, navigate) => {
-  const label = data.label || data._label || 'Item';
-  const itemId = data.id;
-
-  toast.success(
-    <button
-      type="button"
-      onClick={() => navigate(url(itemId))}
-      className="text-left bg-transparent border-0 p-0 cursor-pointer"
-    >
-      <span className="underline font-semibold">{label}</span>
-      <span> {action} successfully</span>
-    </button>,
-  );
+// "<label> <action> successfully", linking to the record, with Undo when the
+// write reported a change set.
+const showSuccessToastWithLink = (action, data, navigate, { changeSet, queryClient } = {}) => {
+  showSuccessToast({
+    label: data.label || data._label || 'Item',
+    verb: action,
+    onOpen: () => navigate(url(data.id)),
+    changeSet,
+    onUndone: () => {
+      invalidateRecords(queryClient);
+      navigate(url(data.id));
+    },
+  });
 };
 
 export function useCrudForm({ type, defaultValues = {} }) {
@@ -164,7 +164,7 @@ export function useCreateForm({ type, params = {}, onCreated = null, initialValu
     },
     onSuccess: (data) => {
       invalidateModel(queryClient, type, { viewModel: data?.model });
-      showSuccessToastWithLink('created', data, router.push);
+      showSuccessToastWithLink('created', data, router.push, { changeSet: data._change_set, queryClient });
       if (onCreated) onCreated(data);
       else router.push(nextUrl || url(data.id));
     },
@@ -240,7 +240,7 @@ export function useEditForm({ type, id }) {
     },
     onSuccess: (data) => {
       invalidateModel(queryClient, type, { viewModel: data?.model });
-      showSuccessToastWithLink('updated', data, router.push);
+      showSuccessToastWithLink('updated', data, router.push, { changeSet: data._change_set, queryClient });
       router.push(nextUrl || url(data.id));
     },
     onError: (error) => {
@@ -282,10 +282,12 @@ export function useDeleteForm({ type, id }) {
 
   const deleteMutation = useMutation({
     mutationFn: () => client.delete(type, id),
-    onSuccess: () => {
+    onSuccess: (response) => {
       invalidateModel(queryClient, type, { viewModel: objectQuery.data?.model });
-      const label = objectQuery.data?.label || objectQuery.data?._label || 'Item';
-      toast.success(`${label} deleted successfully`);
+      showSuccessToastWithLink('deleted', objectQuery.data || { id }, router.push, {
+        changeSet: changeSetOf(response),
+        queryClient,
+      });
       router.push(nextUrl || `/${type}/`);
     },
     onError: (error) => {

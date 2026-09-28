@@ -37,6 +37,18 @@ const getDefaultBaseUrl = (): string => {
   return '';
 };
 
+// Write responses name the change set they made; POSTing to
+// `api/v1/changesets/<id>/revert/` undoes it.
+export const CHANGE_SET_HEADER = 'X-CrudKit-Change-Set';
+
+export function changeSetOf(response: Response): string | null {
+  return response.headers.get(CHANGE_SET_HEADER);
+}
+
+async function withChangeSet(response: Response) {
+  return { ...(await response.json()), _change_set: changeSetOf(response) };
+}
+
 export default class CrudKitAPIClient {
   baseUrl: string;
   clientId: string = 'CrudKitAPIClient';
@@ -352,20 +364,39 @@ export default class CrudKitAPIClient {
     return await response.json();
   }
 
-  async retrieve(modelName: string, id: string) {
-    return await this.httpGet(`api/v1/${modelName}/${id}/`).then((r) => r.json());
+  async retrieve(modelName: string, id: string, querystring: Record<string, any> = {}) {
+    return await this.httpGet(`api/v1/${modelName}/${id}/`, querystring).then((r) => r.json());
   }
 
   async create(modelName: string, data: Record<string, any>, prefills: Record<string, any>) {
-    return await this.httpPost(`api/v1/${modelName}/`, data, prefills).then((r) => r.json());
+    return await this.httpPost(`api/v1/${modelName}/`, data, prefills).then(withChangeSet);
   }
 
   async update(modelName: string, id: string, data: Record<string, any>) {
-    return await this.httpPut(`api/v1/${modelName}/${id}/`, data).then((r) => r.json());
+    return await this.httpPut(`api/v1/${modelName}/${id}/`, data).then(withChangeSet);
   }
 
   async partialUpdate(modelName: string, id: string, data: Record<string, any>) {
-    return await this.httpPatch(`api/v1/${modelName}/${id}/`, data).then((r) => r.json());
+    return await this.httpPatch(`api/v1/${modelName}/${id}/`, data).then(withChangeSet);
+  }
+
+  async history(modelName: string, id: string) {
+    return await this.httpGet(`api/v1/${modelName}/${id}/history/`).then((r) => r.json());
+  }
+
+  async restore(modelName: string, id: string) {
+    return await this.httpPost(`api/v1/${modelName}/${id}/restore/`).then(withChangeSet);
+  }
+
+  // Resolves to {change_set, reverted}, or {conflicts} when records changed
+  // since (nothing is reverted then, unless `force`).
+  async revertChangeSet(changeSet: string, force = false) {
+    try {
+      return await this.httpPost(`api/v1/changesets/${changeSet}/revert/`, { force }).then((r) => r.json());
+    } catch (error: any) {
+      if (error.statusCode === 409 && error.errorData?.conflicts) return error.errorData;
+      throw error;
+    }
   }
 
   async delete(modelName: string, id: string) {

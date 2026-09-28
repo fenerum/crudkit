@@ -7,6 +7,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 from django.utils import timezone
 
+from crudkit.audit import audit
 from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,7 @@ class AssistantProposal(BaseCrudKitModel):
         ACTION = "action", "Run action"
         PATCH = "patch", "Update fields"
         NOTE = "note", "Add note"
+        REVERT = "revert", "Revert change"
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -73,7 +75,10 @@ class AssistantProposal(BaseCrudKitModel):
         from crudkit_assistant.execution import execute_proposal
 
         try:
-            outcome = execute_proposal(self, user, request=request)
+            with audit("assistant", user=user) as context:
+                outcome = execute_proposal(self, user, request=request)
+            if context.logged and isinstance(outcome, dict):
+                outcome = {**outcome, "change_set": str(context.change_set)}
             self.outcome = outcome
             self.status = self.Status.CONFIRMED
         except Exception as exc:

@@ -11,6 +11,8 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 
+from crudkit.models import ChangeLog
+from crudkit_api import services
 from crudkit_assistant import tools
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
@@ -28,9 +30,7 @@ def grant_customer_permissions(user):
     user.user_permissions.add(*permissions)
 
 
-class ProposalSafetyTests(TestCase):
-    """Verify proposal tools persist a PENDING row and do NOT mutate."""
-
+class ProposalToolTestCase(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="staff", password="x")
         grant_customer_permissions(self.user)
@@ -53,6 +53,10 @@ class ProposalSafetyTests(TestCase):
     def _run_tool(self, coro_fn, *args, **kwargs):
         ctx = _FakeCtx(self.deps)
         return async_to_sync(coro_fn)(ctx, *args, **kwargs)
+
+
+class ProposalSafetyTests(ProposalToolTestCase):
+    """Verify proposal tools persist a PENDING row and do NOT mutate."""
 
     def test_propose_patch_does_not_mutate(self):
         result = self._run_tool(tools.propose_patch, {"name": "Renamed"}, "model thinks so")
@@ -88,6 +92,48 @@ class ProposalSafetyTests(TestCase):
         proposal = AssistantProposal.objects.get(session_key="testsession")
         self.assertEqual(proposal.status, AssistantProposal.Status.PENDING)
         self.assertEqual(proposal.kind, AssistantProposal.Kind.NOTE)
+
+
+class ProposeRevertTests(ProposalToolTestCase):
+    def setUp(self):
+        super().setUp()
+        services.patch_fields(self.customer, {"name": "Renamed"}, self.user)
+        self.change_set = str(ChangeLog.objects.get(related_object_id=self.customer.pk).change_set)
+
+    def test_propose_revert_waits_for_confirmation(self):
+        self._run_tool(tools.propose_revert, self.change_set, "user asked to undo")
+
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Renamed")
+        proposal = AssistantProposal.objects.get(session_key="testsession")
+        self.assertEqual((proposal.kind, proposal.target), (AssistantProposal.Kind.REVERT, self.customer))
+        self.assertEqual(proposal.payload, {"change_set": self.change_set})
+
+    def test_confirmed_revert_undoes_the_change(self):
+        self._run_tool(tools.propose_revert, self.change_set)
+        proposal = AssistantProposal.objects.get(session_key="testsession")
+
+        outcome = proposal.apply(self.user)
+
+        self.assertEqual(proposal.status, AssistantProposal.Status.CONFIRMED, outcome)
+        self.assertEqual((outcome["kind"], outcome["reverted"]), ("revert", 1))
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Original")
+
+    def test_confirmed_revert_fails_on_conflict(self):
+        self._run_tool(tools.propose_revert, self.change_set)
+        services.patch_fields(self.customer, {"name": "Changed again"}, self.user)
+        proposal = AssistantProposal.objects.get(session_key="testsession")
+
+        outcome = proposal.apply(self.user)
+
+        self.assertEqual(proposal.status, AssistantProposal.Status.FAILED)
+        self.assertIn("changed since", outcome["error"])
+
+    def test_propose_revert_rejects_unknown_change_sets(self):
+        result = self._run_tool(tools.propose_revert, "00000000-0000-0000-0000-000000000000")
+        self.assertIn("Unknown change set", result)
+        self.assertFalse(AssistantProposal.objects.exists())
 
 
 class ProposalApplyTests(TestCase):

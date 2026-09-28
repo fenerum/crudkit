@@ -1,15 +1,18 @@
 import { useMemo } from 'react';
-import { useMutation, useQueries, useQuery } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import CrudKitAPIClient from '../../data/api';
 import DetailPane from '../../components/DetailPane';
 import InlineList from '../../components/InlineList';
 import Feed from '../../components/Feed';
+import History from '../../components/History';
+import { invalidateObject } from '../../data/invalidate';
+import { formatApiError } from '../../utils/apiErrors';
 import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
-import { Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
+import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { isFrontendPath } from './is-frontend-path';
 
 function truncateLabel(s: string, max = 18) {
@@ -119,6 +122,7 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
 
   const tabIds = ['properties'];
   otherInlines.forEach(([mdl]: any) => tabIds.push(`inline-${mdl}`));
+  tabIds.push('history');
 
   const defaultTab = 'properties';
   const tabParam = searchParams.get('tab');
@@ -167,6 +171,15 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
             </button>
           );
         })}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'history'}
+          className={`ck-vt-tab ${tab === 'history' ? 'is-on' : ''}`}
+          onClick={() => setTab('history')}
+        >
+          <span>History</span>
+        </button>
       </div>
       <div className="ck-vt-body">
         {tab === 'properties' && (
@@ -204,7 +217,37 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
             />
           );
         })}
+        {tab === 'history' && <History type={type} id={id} metadata={metadata} />}
       </div>
+    </div>
+  );
+}
+
+function DeletedBanner({ object, onRestore, isRestoring }: any) {
+  return (
+    <div
+      role="status"
+      className="mb-4 flex items-center gap-3 rounded-md border border-border-1 bg-bg-2 px-3 py-2 text-sm"
+    >
+      <span className="flex-1 text-fg-2">
+        <span className="text-danger">●</span>{' '}
+        {object.merged_into ? (
+          <>
+            This record was merged into{' '}
+            <Link to={url(object.merged_into)} className="underline">
+              {object.merged_into}
+            </Link>
+            .
+          </>
+        ) : (
+          'This record was deleted.'
+        )}
+      </span>
+      {!object.merged_into && (
+        <Button size="sm" icon="rotate-ccw" onClick={onRestore} disabled={isRestoring}>
+          Restore
+        </Button>
+      )}
     </div>
   );
 }
@@ -215,11 +258,12 @@ export default function Detail() {
   const type = id.substring(0, 3);
   const navigate = useNavigate();
   const client = useMemo(() => new CrudKitAPIClient(), []);
+  const queryClient = useQueryClient();
 
   const currentUrl = useMemo(() => `/${id}`, [id]);
 
   useHotkeys('e', () => {
-    if (id) navigate(url(id, 'edit', { next: currentUrl }));
+    if (id && !objectQuery.data?.deleted) navigate(url(id, 'edit', { next: currentUrl }));
   });
 
   const actionMutation = useMutation({
@@ -286,9 +330,27 @@ export default function Detail() {
     queryFn: () => client.list('LAY', { model: type }),
   });
 
+  // The API hides deleted records unless asked for them; those open with a
+  // banner offering to restore them.
   const objectQuery = useQuery({
     queryKey: ['detail', type, id],
-    queryFn: () => client.retrieve(type, id),
+    queryFn: async () => {
+      try {
+        return await client.retrieve(type, id);
+      } catch (error: any) {
+        if (error.statusCode !== 404) throw error;
+        return await client.retrieve(type, id, { deleted: 'True' });
+      }
+    },
+  });
+
+  const restoreMutation = useMutation({
+    mutationFn: () => client.restore(type, id),
+    onSuccess: () => {
+      invalidateObject(queryClient, id);
+      toast.success(`${objectQuery.data?.label || id} restored`);
+    },
+    onError: (error: any) => toast.error(`Restore failed: ${formatApiError(error)}`),
   });
 
   let layoutData: any = null;
@@ -335,17 +397,19 @@ export default function Detail() {
         ),
     });
     items.push({
-      label: 'View changes',
-      icon: 'activity',
-      onSelect: () => navigate(`/CHG/?related_object=${id}`),
+      label: 'History',
+      icon: 'history',
+      onSelect: () => navigate(`${currentUrl}?tab=history`),
     });
-    items.push({
-      label: 'Delete',
-      icon: 'trash-2',
-      tone: 'danger',
-      shortcut: 'X',
-      onSelect: () => navigate(url(object.id, 'delete')),
-    });
+    if (!object.deleted) {
+      items.push({
+        label: 'Delete',
+        icon: 'trash-2',
+        tone: 'danger',
+        shortcut: 'X',
+        onSelect: () => navigate(url(object.id, 'delete')),
+      });
+    }
     return items;
     // `actionMutation` intentionally omitted: its `.mutate` reference is stable
     // and including the wrapper object would cause `overflowItems` to retain a
@@ -359,7 +423,7 @@ export default function Detail() {
       // The breadcrumb already shows the model and the bolded ID; just append
       // the object's human label inline.
       title: object.label && object.label !== object.id ? { label: object.label } : undefined,
-      primary: (
+      primary: object.deleted ? undefined : (
         <Link
           to={url(object.id, 'edit', { next: currentUrl })}
           className="ck-btn ck-btn-primary ck-btn-sm"
@@ -371,7 +435,7 @@ export default function Detail() {
       ),
       right: <OverflowMenu items={overflowItems} />,
     };
-  }, [ready, metadata?.verbose_name, object?.label, object?.id, currentUrl, overflowItems]);
+  }, [ready, metadata?.verbose_name, object?.label, object?.id, object?.deleted, currentUrl, overflowItems]);
 
   if (objectQuery.isPending || metadataQuery.isPending || layoutsQuery.isPending) {
     return <div className="px-1 py-6 text-sm text-fg-3 animate-pulse">Loading…</div>;
@@ -384,6 +448,13 @@ export default function Detail() {
 
   return (
     <>
+      {object.deleted && (
+        <DeletedBanner
+          object={object}
+          onRestore={() => restoreMutation.mutate()}
+          isRestoring={restoreMutation.isPending}
+        />
+      )}
       <DetailWebTabs
         fieldPairs={fieldPairs}
         object={object}

@@ -1,4 +1,6 @@
+import copy
 import functools
+import json
 import re
 
 from django.conf import settings
@@ -7,12 +9,13 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.core.serializers.json import DjangoJSONEncoder
 from django.db import models
-from django.db.models.fields.files import ImageFieldFile
+from django.db.models.fields.files import FieldFile
 from django.db.models.signals import post_save
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 from phonenumber_field.phonenumber import PhoneNumber
 
+from crudkit import audit
 from crudkit.fields import DEFAULT_CURRENCY, CurrencyField, ModelField
 from crudkit.utils import get_model_types, get_system_user
 
@@ -165,10 +168,9 @@ class BaseCrudKitManager(models.Manager):
         if it doesn't exist, lookup by kwargs otherwise create a new one.
         Return a tuple (object, created), where created is a boolean
         specifying whether an object was created.
-
-        TODO: Changelog indicating that the object was updated from an external source
         """
         created = False
+        system = get_system_user()
         try:
             ext = ExternalObject.objects.get(
                 system_name=system_name,
@@ -177,18 +179,25 @@ class BaseCrudKitManager(models.Manager):
             )
             # Update defaults
             if defaults:
-                self.model.objects.filter(pk=ext.related_object.pk).update(**defaults)
+                obj = ext.related_object
+                before = copy.copy(obj)
+                self.model.objects.filter(pk=obj.pk).update(**defaults)
                 # .update() doesnt trigger signals, so we will do it manually
-                ext.related_object.refresh_from_db()
-                post_save.send(type(ext.related_object), instance=ext.related_object, created=True)
+                obj.refresh_from_db()
+                post_save.send(type(obj), instance=obj, created=True)
+                ChangeLog.objects.create_from_objects(before, obj, user=system, label=f"Updated from {system_name}")
         except ExternalObject.DoesNotExist:
             if kwargs:
+                before = self.filter(**kwargs).first()
                 obj, created = self.update_or_create(defaults=defaults, create_defaults=create_defaults, **kwargs)
             else:
+                before = None
                 obj = self.create(**kwargs, **create_defaults or defaults)
                 created = True
+            ChangeLog.objects.create_from_objects(
+                None if created else before, obj, user=system, label=f"Imported from {system_name}"
+            )
 
-            system = get_system_user()
             create_kwargs = {"created_by": system, "updated_by": system}
             ext = ExternalObject.objects.create(
                 system_name=system_name,
@@ -362,7 +371,11 @@ class BaseCrudKitModel(models.Model):
                 "Cascading object deletes not handled by delete_and_merge_with: %s" % related_objects,
                 params=related_objects,
             )
+        before = copy.copy(self)
         self.soft_delete(merged_into=other_object)
+        ChangeLog.objects.create_from_objects(
+            before, self, action=ChangeLog.Action.MERGE, label=f"Merged into {other_object}"
+        )
 
     class CrudKitSettings:
         allowed_prefills = []
@@ -737,49 +750,101 @@ class ExternalObject(BaseCrudKitModel):
         unique_together = ["system_name", "system_id", "related_content_type"]
 
 
+CHANGELOG_SKIP_FIELDS = ("id", "created_at", "updated_at", "created_by", "updated_by")
+
+
+def field_value(obj, field):
+    """The JSON-safe value of `field` on `obj` as ChangeLog stores it: the raw
+    attname value (FKs as ids), files as their URL."""
+    value = obj.__dict__.get(field.get_attname())
+    if isinstance(field, models.FileField):
+        if isinstance(value, FieldFile):
+            return value.url if value else None
+        return value or None
+    return json.loads(json.dumps(value, cls=PrettyJSONEncoder))
+
+
+def same_value(field, a, b) -> bool:
+    """Whether two logged values of `field` are equal once parsed, so 12.5 and
+    "12.50", or 3 and "BOK3", count as the same."""
+    if a == b:
+        return True
+    if isinstance(field, models.FileField):
+        return False
+    try:
+        return field.to_python(a) == field.to_python(b)
+    except (ValidationError, ValueError, TypeError):
+        return False
+
+
+def logged_fields(obj):
+    # primary_key also skips the parent link of multi-table inheritance children.
+    return [
+        field for field in obj._meta.fields if not field.primary_key and field.name not in CHANGELOG_SKIP_FIELDS
+    ]
+
+
 class ChangeLogManager(models.Manager):
-    def create_from_objects(self, old, new):
+    def create_from_objects(self, old, new, user=None, action=None, label=""):
+        """Log the change from `old` to `new` (either may be None for a create or
+        delete) under the active `crudkit.audit` context."""
         if type(new) is ChangeLog:
             raise Exception("Cannot change a ChangeLog object")
         field_changes = {}
-        if new:
-            for field in new._meta.fields:
-                if field.name not in [
-                    "id",
-                    "created_at",
-                    "updated_at",
-                    "created_by",
-                    "updated_by",
-                ]:
-                    # Get values
-                    old_value = None
-                    if old is not None:
-                        old_value = old.__dict__.get(field.get_attname())
-                    new_value = new.__dict__.get(field.get_attname())
-                    # Convert to serializable
-                    if type(field) in [models.FileField, models.ImageField]:
-                        if old_value and isinstance(old_value, ImageFieldFile):
-                            old_value = old_value.url
-                        if new_value and isinstance(new_value, ImageFieldFile):
-                            new_value = new_value.url
-                        else:  # Catch special case where the image is not saved
-                            new_value = None
-                    # Check if changed
-                    change = [old_value, new_value]
-                    if change[0] != change[1]:
-                        field_changes[field.name] = change
-        type_id, pk = parse_ck_id(new.pk if new else old.pk)
-        self.model.objects.create(
+        if new is not None:
+            for field in logged_fields(new):
+                change = [field_value(old, field) if old is not None else None, field_value(new, field)]
+                if not same_value(field, *change):
+                    field_changes[field.name] = change
+        else:
+            # A delete keeps a snapshot of what was deleted.
+            for field in logged_fields(old):
+                value = field_value(old, field)
+                if value is not None:
+                    field_changes[field.name] = [value, None]
+
+        if action is None:
+            if old is None:
+                action = ChangeLog.Action.CREATE
+            elif new is None:
+                action = ChangeLog.Action.DELETE
+            elif getattr(old, "deleted", False) and not getattr(new, "deleted", False):
+                action = ChangeLog.Action.RESTORE
+            else:
+                action = ChangeLog.Action.UPDATE
+
+        context = audit.current()
+        user = user or context.user or (new.updated_by if new is not None else old.updated_by)
+        instance = new if new is not None else old
+        type_id, pk = parse_ck_id(instance.pk)
+        entry = self.model.objects.create(
             related_object_id=pk,
-            related_content_type=ContentType.objects.get_for_model(new if new else old),
+            related_content_type=ContentType.objects.get_for_model(instance),
             field_changes=field_changes,
-            created_by=new.updated_by if new else old.created_by,
-            updated_by=new.updated_by if new else old.updated_by,
+            action=action,
+            source=context.source,
+            client=context.client[:255],
+            change_set=context.change_set,
+            revert_of=context.revert_of,
+            label=label[:255],
+            created_by=user,
+            updated_by=user,
         )
+        context.logged = True
+        return entry
 
 
 class ChangeLog(BaseCrudKitModel):
     TYPE_ID = "CHG"
+
+    class Action(models.TextChoices):
+        CREATE = "create", _("Create")
+        UPDATE = "update", _("Update")
+        DELETE = "delete", _("Delete")
+        RESTORE = "restore", _("Restore")
+        ACTION = "action", _("Action")
+        MERGE = "merge", _("Merge")
+        REVERT = "revert", _("Revert")
 
     related_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, editable=False, null=True)
     related_object_id = CrudKitPositiveIntegerField(editable=False, null=True)
@@ -791,11 +856,20 @@ class ChangeLog(BaseCrudKitModel):
         help_text=('Format: {"field": ["old_value", "new_value"], "field2": ["old_value", "new_value"], ...}'),
         encoder=PrettyJSONEncoder,
     )
+    action = models.CharField(max_length=16, choices=Action.choices, blank=True, editable=False)
+    source = models.CharField(max_length=16, blank=True, editable=False)
+    client = models.CharField(max_length=255, blank=True, editable=False)
+    change_set = models.UUIDField(null=True, blank=True, db_index=True, editable=False)
+    label = models.CharField(max_length=255, blank=True, editable=False)
+    revert_of = models.UUIDField(null=True, blank=True, db_index=True, editable=False)
 
     objects = ChangeLogManager()
 
     class Meta:
-        indexes = [models.Index(fields=["updated_at"])]
+        indexes = [
+            models.Index(fields=["updated_at"]),
+            models.Index(fields=["related_content_type", "related_object_id"]),
+        ]
 
 
 class ExchangeRateManager(BaseCrudKitManager):

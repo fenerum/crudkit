@@ -6,7 +6,7 @@ and CK-ID, so the same tools serve any CrudKit project:
 
 and, with the `write` scope and CRUDKIT_MCP_WRITE_ENABLED:
 
-    create_record, update_record, run_action, add_note
+    create_record, update_record, run_action, add_note, undo
 
 `describe_types` is the schema tool: it reports each type's filters, writable
 fields and actions, which `list_records`/`create_record`/… then take as a
@@ -19,6 +19,7 @@ Projects add or override tools with CRUDKIT_MCP_EXTRA_TOOLS: dotted paths to
 `Tool` instances. Their handlers must do their own permission checks.
 """
 
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
@@ -156,6 +157,19 @@ def _write_tools(types: dict) -> list[Tool]:
             scope="write",
             annotations={"readOnlyHint": False, "destructiveHint": False},
         ),
+        Tool(
+            "undo",
+            "Revert a change set: every change one earlier write made, as returned in its `change_set` "
+            "or listed in get_record's changelog. Returns `conflicts` and changes nothing if the records "
+            "were changed since, unless `force` is true.",
+            _undo,
+            _schema(
+                {"change_set": {"type": "string", "description": "Change set UUID"}, "force": {"type": "boolean"}},
+                ["change_set"],
+            ),
+            scope="write",
+            annotations=changing,
+        ),
     ]
 
 
@@ -231,3 +245,8 @@ def _run_action(user, arguments: dict) -> dict:
 def _add_note(user, arguments: dict) -> dict:
     _, instance = records.get_instance(user, arguments.get("id"), "change")
     return services.create_note(instance, arguments.get("body"), user)
+
+
+def _undo(user, arguments: dict) -> dict:
+    change_set = uuid.UUID(str(arguments.get("change_set")))
+    return services.revert_change_set(change_set, user, force=bool(arguments.get("force")))

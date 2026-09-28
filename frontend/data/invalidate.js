@@ -3,6 +3,7 @@
 // Convention used across the app:
 //   ['list',   model, ...rest]   list/index queries (incl. sidebar's VIW menu)
 //   ['detail', model, id]        single-object queries
+//   ['history', model, id]       an object's change history
 //   ['views',  model]            view configs for a target model
 //   ['metadata', model]          model metadata
 //   ['layouts',  model]          layout configs
@@ -17,6 +18,7 @@ export function invalidateModel(qc, model, options = {}) {
   qc.invalidateQueries({ queryKey: ['list', model] });
   qc.invalidateQueries({ queryKey: ['detail', model] });
   qc.invalidateQueries({ queryKey: ['views', model] });
+  qc.invalidateQueries({ queryKey: ['history', model] });
 
   const related = options.relatedModels || [];
   if (model === 'VIW' && options.viewModel) related.push(options.viewModel);
@@ -33,4 +35,12 @@ export function invalidateObject(qc, ckId) {
   if (!qc || !ckId) return;
   invalidateModel(qc, ckId.slice(0, 3));
   ['inline-list', 'inline-count', 'inline-feed'].forEach((key) => qc.invalidateQueries({ queryKey: [key] }));
+}
+
+// After an undo, which may touch any number of records of any model.
+export function invalidateRecords(qc) {
+  if (!qc) return;
+  ['list', 'detail', 'history', 'inline-list', 'inline-count', 'inline-feed'].forEach((key) =>
+    qc.invalidateQueries({ queryKey: [key] }),
+  );
 }

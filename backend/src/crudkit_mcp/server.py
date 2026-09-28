@@ -1,9 +1,13 @@
 import json
 import logging
+import time
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 
+from crudkit.audit import audit
+from crudkit_mcp.conf import RATE_PERIODS, write_rate
 from crudkit_mcp.tools import get_tools
 
 logger = logging.getLogger(__name__)
@@ -18,9 +22,10 @@ def get_server_name() -> str:
 
 
 class MCPServer:
-    def __init__(self, user, oauth_scopes: list[str] | None = None):
+    def __init__(self, user, oauth_scopes: list[str] | None = None, token=None):
         self.user = user
         self.oauth_scopes = oauth_scopes or []
+        self.token = token
 
     def handle_message(self, message: dict) -> dict | None:
         if not isinstance(message, dict):
@@ -79,8 +84,15 @@ class MCPServer:
         if tool is None:
             return _error_content(f"Unknown tool: {tool_name}")
 
+        if tool.scope == "write" and (limit := self._write_limit_exceeded()):
+            return _error_content(limit)
+
+        client = self.token.client.client_name if self.token else ""
         try:
-            result = tool.handler(self.user, arguments)
+            with audit("mcp", client=client, user=self.user) as context:
+                result = tool.handler(self.user, arguments)
+            if context.logged and isinstance(result, dict):
+                result = {**result, "change_set": str(context.change_set)}
         except PermissionDenied:
             return _error_content("Permission denied")
         except (KeyError, ValueError, TypeError, ValidationError) as e:
@@ -90,6 +102,21 @@ class MCPServer:
             return _error_content(f"Error: {e}")
         text = result if isinstance(result, str) else json.dumps(result, default=str)
         return {"content": [{"type": "text", "text": text}], "isError": False}
+
+    def _write_limit_exceeded(self) -> str | None:
+        """Count a write attempt against CRUDKIT_MCP_WRITE_RATE; the error
+        text once the token (or user) is over it. Failed writes count too."""
+        rate = write_rate()
+        if rate is None:
+            return None
+        count, period = rate
+        seconds = RATE_PERIODS[period]
+        caller = f"token{self.token.pk}" if self.token else f"user{self.user.pk}"
+        key = f"crudkit_mcp_write:{caller}:{int(time.time() // seconds)}"
+        cache.add(key, 0, seconds)
+        if cache.incr(key) <= count:
+            return None
+        return f"Write rate limit exceeded: at most {count} writes per {period}. Try again shortly."
 
     def _error_response(self, msg_id, code: int, message: str) -> dict:
         return {"jsonrpc": "2.0", "id": msg_id, "error": {"code": code, "message": message}}

@@ -3,6 +3,7 @@ from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
+from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.utils import timezone, translation
 
@@ -281,7 +282,7 @@ class WriteToolsTest(MCPTestCase):
         self.assertNotIn("update_record", self.tool_names())
         self.assertEqual(
             self.tool_names(scopes=self.WRITE)[4:],
-            ["create_record", "update_record", "run_action", "add_note"],
+            ["create_record", "update_record", "run_action", "add_note", "undo"],
         )
 
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
@@ -351,7 +352,8 @@ class WriteToolsTest(MCPTestCase):
     @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
     def test_run_action(self):
         result = self.call("run_action", {"id": self.customer.id, "action": "mark_churned"}, scopes=self.WRITE)
-        self.assertEqual(result, {"kind": "object", "id": self.customer.id})
+        change = ChangeLog.objects.get(related_object_id=self.customer.pk)
+        self.assertEqual(result, {"kind": "object", "id": self.customer.id, "change_set": str(change.change_set)})
         self.customer.refresh_from_db()
         self.assertEqual(self.customer.status, "churned")
 
@@ -377,6 +379,60 @@ class WriteToolsTest(MCPTestCase):
         self.assertIn("Unknown type", result["error"])
 
 
+@override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
+class UndoAndRateLimitTest(MCPTestCase):
+    WRITE = ("read", "write")
+
+    def setUp(self):
+        super().setUp()
+        grant(self.user, Customer, "change")
+        cache.clear()
+
+    def rename(self, name):
+        return self.call("update_record", {"id": self.customer.id, "fields": {"name": name}}, scopes=self.WRITE)
+
+    def test_writes_report_their_change_set_and_undo_reverts_it(self):
+        result = self.rename("Acme Inc")
+        change = ChangeLog.objects.get(related_object_id=self.customer.pk)
+        self.assertEqual(result["change_set"], str(change.change_set))
+        self.assertEqual(change.source, "mcp")
+
+        undone = self.call("undo", {"change_set": result["change_set"]}, scopes=self.WRITE)
+
+        self.assertEqual(undone["reverted"], 1)
+        self.customer.refresh_from_db()
+        self.assertEqual(self.customer.name, "Acme Corp")
+
+    def test_undo_reports_conflicts(self):
+        first = self.rename("B")["change_set"]
+        self.rename("C")
+        result = self.call("undo", {"change_set": first}, scopes=self.WRITE)
+        self.assertEqual([c["field"] for c in result["conflicts"]], ["name"])
+
+    def test_undo_refuses_unknown_change_sets(self):
+        result = self.call("undo", {"change_set": "00000000-0000-0000-0000-000000000000"}, scopes=self.WRITE)
+        self.assertIn("Unknown change set", result["error"])
+
+    @override_settings(CRUDKIT_MCP_WRITE_RATE="2/min")
+    def test_write_rate_limit(self):
+        self.rename("B")
+        self.rename("C")
+        self.assertEqual(
+            self.rename("D")["error"], "Write rate limit exceeded: at most 2 writes per minute. Try again shortly."
+        )
+        self.assertEqual(self.call("get_record", {"id": self.customer.id})["name"], "C")
+
+    @override_settings(CRUDKIT_MCP_WRITE_RATE="1/min")
+    def test_write_rate_limit_is_per_caller(self):
+        other = User.objects.create_user("other")
+        grant(other, Customer, "view", "change")
+        self.rename("B")
+        result = self.call(
+            "update_record", {"id": self.customer.id, "fields": {"name": "C"}}, scopes=self.WRITE, user=other
+        )
+        self.assertNotIn("error", result)
+
+
 class McpViewIntegrationTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user("testuser", password="testpass")
@@ -399,6 +455,19 @@ class McpViewIntegrationTest(TestCase):
             content_type="application/json",
             HTTP_AUTHORIZATION=f"Bearer {self.token.token}",
         )
+
+    @override_settings(CRUDKIT_MCP_WRITE_ENABLED=True)
+    def test_writes_are_attributed_to_the_oauth_client(self):
+        grant(self.user, Customer, "change")
+        self.token.scopes = "read write"
+        self.token.save()
+        customer = Customer.objects.create(name="Acme", created_by=self.user, updated_by=self.user)
+        response = self._mcp_request(
+            "tools/call", {"name": "update_record", "arguments": {"id": customer.id, "fields": {"name": "Acme Inc"}}}
+        )
+        self.assertFalse(response.json()["result"]["isError"])
+        change = ChangeLog.objects.get(related_object_id=customer.pk)
+        self.assertEqual((change.source, change.client, change.created_by), ("mcp", "Test App", self.user))
 
     def test_initialize_via_http(self):
         response = self._mcp_request("initialize")

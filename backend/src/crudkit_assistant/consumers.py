@@ -328,6 +328,7 @@ def _expand_transcript(conversation: AssistantConversation) -> list[dict]:
                     "role": "proposal",
                     "status": proposal.status,
                     "summary": _summarize_outcome(proposal.outcome, proposal),
+                    "change_set": (proposal.outcome or {}).get("change_set"),
                 }
             )
     return out
@@ -347,6 +348,8 @@ def _summarize_outcome(outcome: Optional[dict], proposal: AssistantProposal) -> 
         return f"Applied fields: {', '.join(outcome.get('applied') or [])}"
     if kind == "note":
         return f"Note {outcome.get('feeditem_id')} added"
+    if kind == "revert":
+        return f"Reverted {outcome.get('reverted')} change(s)"
     if kind == "response":
         return "Action returned a response"
     return outcome.get("value") or ""

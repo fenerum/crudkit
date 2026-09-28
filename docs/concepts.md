@@ -103,6 +103,29 @@ active workspace is client-side state persisted in localStorage — URLs stay
 flat. A deployment with no `Workspace` rows renders the classic sidebar and
 never shows the switcher.
 
+## History and undo
+
+Every write through the REST API, MCP, the assistant or a `@crm_action` is
+logged as a `ChangeLog` entry with the old and new value of each changed field,
+the user, and where it came from: `source` (`ui`, `api`, `mcp`, `assistant`,
+`agent`, `revert`, `system`) and `client` (an API `Client-Id` or MCP OAuth
+client name). Entry points wrap their work in `crudkit.audit.audit(source, ...)`;
+all entries written inside share one `change_set` UUID, so one request, tool
+call or confirmed proposal is one change set — even when it touched several
+records.
+
+A change set can be reverted as a whole
+(`POST /api/v1/changesets/<uuid>/revert/`, the MCP `undo` tool, the
+assistant's `propose_revert`, or Revert in a record's History tab). Reverting
+restores the logged old values, soft-deletes created records and restores
+deleted ones, all in one transaction and itself logged as a new change set. It
+refuses merges and change sets already reverted, checks the user may change
+every record, and reports conflicts instead of overwriting values that were
+changed again since, unless forced. Undoing an action needs permission to run
+it, and only restores the fields the action changed on its record: side effects
+such as sent emails or external calls are not undone. Deleted records can also
+be restored directly (`POST /api/v1/<TYPE>/<pk>/restore/`).
+
 ## The frontend config contract
 
 The built SPA shell (`index.html`) is served as a Django template by

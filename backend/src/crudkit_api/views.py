@@ -1,3 +1,4 @@
+import copy
 import re
 
 from django.contrib.auth.models import User
@@ -8,12 +9,15 @@ from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
 from django.utils.safestring import mark_safe
 from rest_framework import viewsets
+from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
+from crudkit.audit import audit
 from crudkit.authorization import (
     get_authorized_queryset,
     get_permission_action,
@@ -24,10 +28,53 @@ from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
-from crudkit_api.services import search_filter, search_objects
+from crudkit_api.services import (
+    get_history,
+    perform_action,
+    restore_object,
+    revert_change_set,
+    search_filter,
+    search_objects,
+)
+
+# The Client-Id the bundled SPA sends; its JWT requests count as "ui".
+SPA_CLIENT_ID = "CrudKitAPIClient"
+CHANGE_SET_HEADER = "X-CrudKit-Change-Set"
 
 
-class GenericViewSet(viewsets.ModelViewSet):
+class AuditedViewMixin:
+    """Attribute ChangeLog entries written by this view to the caller (see
+    crudkit.audit), and tell the client which change set its write made."""
+
+    def initial(self, request, *args, **kwargs):
+        super().initial(request, *args, **kwargs)
+        client_id = request.headers.get("Client-Id", "")
+        if isinstance(request.successful_authenticator, SessionAuthentication) or client_id == SPA_CLIENT_ID:
+            source, client = "ui", ""
+        else:
+            source, client = "api", client_id
+        self._audit = audit(source, client=client, user=request.user)
+        self._audit.__enter__()
+
+    def finalize_response(self, request, response, *args, **kwargs):
+        response = super().finalize_response(request, response, *args, **kwargs)
+        scope = getattr(self, "_audit", None)
+        if scope and request.method not in SAFE_METHODS and scope.context.logged and response.status_code < 400:
+            response[CHANGE_SET_HEADER] = str(scope.context.change_set)
+        return response
+
+    def dispatch(self, request, *args, **kwargs):
+        # DRF skips finalize_response when it re-raises an unhandled exception,
+        # so the context is left here, where it always runs.
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        finally:
+            if scope := getattr(self, "_audit", None):
+                del self._audit
+                scope.__exit__(None, None, None)
+
+
+class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
     permission_classes = [CrudKitModelPermissions]
 
     def get_queryset(self):
@@ -37,7 +84,11 @@ class GenericViewSet(viewsets.ModelViewSet):
 
     def filter_queryset(self, queryset):
         queryset = super().filter_queryset(queryset)
-        if hasattr(self.queryset.model, "deleted") and not self.request.GET.get("deleted", False):
+        if (
+            hasattr(self.queryset.model, "deleted")
+            and not self.request.GET.get("deleted", False)
+            and self.action not in ("history", "restore")
+        ):
             queryset = queryset.filter(deleted=False)
         search = self.request.GET.get("_q", False)
         if search:
@@ -58,7 +109,7 @@ class GenericViewSet(viewsets.ModelViewSet):
 
     @transaction.atomic
     def perform_destroy(self, instance: BaseCrudKitModel):
-        ChangeLog.objects.create_from_objects(instance, None)
+        ChangeLog.objects.create_from_objects(instance, None, user=self.request.user)
         instance.soft_delete()
 
     def create(self, request, *args, **kwargs):
@@ -162,9 +213,18 @@ class GenericViewSet(viewsets.ModelViewSet):
                 merge_fields = post_data
                 objects_by_id = {obj.id: obj for obj in [to_stay_obj, *other_objects]}
 
+                before = copy.copy(to_stay_obj)
                 for field, value in merge_fields.items():
                     setattr(to_stay_obj, field, getattr(objects_by_id[value], field))
+                to_stay_obj.updated_by = request.user
                 to_stay_obj.save()
+                ChangeLog.objects.create_from_objects(
+                    before,
+                    to_stay_obj,
+                    user=request.user,
+                    action=ChangeLog.Action.MERGE,
+                    label=f"Merged {len(other_objects)} record(s) into {to_stay_obj}",
+                )
 
                 for to_be_deleted_object in other_objects:
                     to_be_deleted_object.delete_and_merge_with(to_stay_obj)
@@ -183,12 +243,25 @@ class GenericViewSet(viewsets.ModelViewSet):
             return Response({"error": f"Action {action_name} not found"}, status=400)
         if not has_action_permission(request.user, instance, action_name):
             raise PermissionDenied
-        response = instance._actions[action_name](self.request)
+        response = perform_action(instance, action_name, request.user, request=self.request)
         if isinstance(response, HttpResponseRedirect):
             return Response({"redirect": response.url})
         if isinstance(response, models.Model):
             return Response({"redirect": response.id})
         return response
+
+    @action(detail=True)
+    def history(self, request, pk=None):
+        return Response(get_history(self.get_object()))
+
+    @action(["POST"], detail=True)
+    def restore(self, request, pk=None):
+        instance = self.get_object()
+        try:
+            restore_object(instance, request.user)
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+        return Response(self.get_serializer(instance).data)
 
     @action(detail=False, url_path="initial")
     def initial_data(self, request):
@@ -213,6 +286,22 @@ class GenericViewSet(viewsets.ModelViewSet):
     @action(detail=False)
     def metadata(self, request):
         return Response(build_model_metadata(self.queryset.model, request.user))
+
+
+class ChangeSetRevertView(AuditedViewMixin, APIView):
+    """POST {force} to undo a change set; 409 with the conflicts if records
+    have changed since, unless forced."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, change_set):
+        if not ChangeLog.objects.filter(change_set=change_set).exists():
+            raise NotFound("Unknown change set")
+        try:
+            result = revert_change_set(change_set, request.user, force=bool(request.data.get("force")))
+        except ValueError as e:
+            return Response({"error": str(e)}, status=400)
+        return Response(result, status=409 if "conflicts" in result else 200)
 
 
 CRM_TYPE_REGEX = re.compile(r"[A-Z]{3}")

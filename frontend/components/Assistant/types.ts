@@ -14,6 +14,7 @@ export type TranscriptItem =
       target_label?: string | null;
       status: string;
       summary?: string;
+      change_set?: string | null;
     };
 
 export type IncomingEvent =
@@ -63,6 +64,9 @@ export type ChatItem =
       targetLabel?: string | null;
       resolved?: Resolution;
       summary?: string;
+      // Set once confirmed, when the proposal changed records that can be undone.
+      changeSet?: string | null;
+      undone?: boolean;
     }
   | { kind: 'system'; id: string; text: string }
   | {

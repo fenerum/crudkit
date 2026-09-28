@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+- Undo and history. Every ChangeLog entry now records who made it and how: `action`
+  (create/update/delete/restore/action/merge/revert), `source` (ui, api, mcp, assistant,
+  agent, revert or system), `client` (the API `Client-Id` or MCP OAuth client), a `change_set`
+  UUID shared by everything one request, tool call or confirmed proposal changed, and a
+  `label`. Entry points set this with the new `crudkit.audit.audit()` context manager;
+  outside one, entries are `system`. New ChangeLog fields and an index on the related object
+  (migration `crudkit 0004`).
+  - Deletes snapshot the deleted record's values and record the user who deleted it (it was
+    the record's creator). `@crm_action` runs (REST and `services.run_action`), merges and
+    `update_or_create_external` are now logged. File and image fields log correctly.
+  - `ChangeLog.objects.create_from_objects()` takes optional `user`, `action` and `label`.
+  - `GET /api/v1/<TYPE>/<pk>/history/` lists a record's changes grouped by change set;
+    `POST /api/v1/changesets/<uuid>/revert/` undoes a change set (409 with the conflicts if
+    the records changed since, unless `{"force": true}`; merges can't be reverted);
+    `POST /api/v1/<TYPE>/<pk>/restore/` brings back a deleted record. Write responses carry
+    the change set in `X-CrudKit-Change-Set`. New services `revert_change_set`,
+    `restore_object`, `get_history`, `perform_action`.
+  - SPA: a History tab on every record with per-change Revert, Undo in the toast after save
+    and delete, and a Restore banner on deleted records.
+  - `crudkit_mcp`: write tools return their `change_set`; a new `undo` tool reverts one;
+    writes are limited per token by `CRUDKIT_MCP_WRITE_RATE` (default `"60/min"`).
+  - `crudkit_assistant`: `get_changelog` returns each entry's change set; new
+    `propose_revert` tool (a Confirm card, proposal kind `revert`, migration
+    `crudkit_assistant 0003`); confirmed proposals can be undone from their card.
 - `crudkit_assistant`: `describe_object` no longer fails on models with lazily translated
   `help_text`.
 - Packaging: require `pydantic-ai-slim>=2.51` (the tested version); 1.x is incompatible with the

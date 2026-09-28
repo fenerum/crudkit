@@ -33,7 +33,7 @@ export default function DeleteConfirmation({
       <div className="mb-6">
         <h2 className="text-xl font-bold text-fg-1 mb-2">Confirm Delete</h2>
         <p className="text-fg-2">
-          Are you sure you want to delete {object?.label || "this item"}? This action cannot be undone.
+          Are you sure you want to delete {object?.label || "this item"}? You can restore it from History.
         </p>
       </div>
 

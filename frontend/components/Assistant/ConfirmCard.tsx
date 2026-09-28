@@ -15,6 +15,9 @@ type Props = {
   deciding?: 'confirm' | 'skip';
   onConfirm: () => void;
   onSkip: () => void;
+  // Offered on confirmed proposals whose changes can be reverted.
+  onUndo?: () => void;
+  undone?: boolean;
 };
 
 function prettyPayload(kind: string, payload: any): string {
@@ -37,6 +40,7 @@ const KIND_ICON: Record<string, string> = {
   action: 'zap',
   patch: 'edit-3',
   note: 'message-square',
+  revert: 'rotate-ccw',
 };
 
 export default function ConfirmCard({
@@ -51,6 +55,8 @@ export default function ConfirmCard({
   deciding,
   onConfirm,
   onSkip,
+  onUndo,
+  undone,
 }: Props) {
   const body = prettyPayload(kind, payload);
   return (
@@ -72,14 +78,26 @@ export default function ConfirmCard({
       )}
       {reasoning && <div className="text-xs text-fg-3 italic">{reasoning}</div>}
       {resolved ? (
-        <div
-          className={`text-xs ${
-            resolved === 'confirmed' ? 'text-success' : resolved === 'failed' ? 'text-danger' : 'text-fg-3'
-          }`}
-        >
-          {resolved === 'confirmed' && (summary || 'Done.')}
-          {resolved === 'skipped' && 'Skipped.'}
-          {resolved === 'failed' && (summary || 'Failed.')}
+        <div className="flex items-center gap-2">
+          <div
+            className={`flex-1 text-xs ${
+              resolved === 'confirmed' ? 'text-success' : resolved === 'failed' ? 'text-danger' : 'text-fg-3'
+            }`}
+          >
+            {resolved === 'confirmed' && (summary || 'Done.')}
+            {resolved === 'skipped' && 'Skipped.'}
+            {resolved === 'failed' && (summary || 'Failed.')}
+          </div>
+          {resolved === 'confirmed' &&
+            (undone ? (
+              <span className="text-xs text-fg-3">Undone.</span>
+            ) : (
+              onUndo && (
+                <button type="button" className="ck-btn ck-btn-ghost ck-btn-sm" onClick={onUndo}>
+                  Undo
+                </button>
+              )
+            ))}
         </div>
       ) : deciding ? (
         <div className="flex items-center gap-1.5 text-xs text-fg-3">

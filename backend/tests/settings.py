@@ -97,3 +97,6 @@ CELERY_TASK_EAGER_PROPAGATES = True
 
 CRUDKIT_DEFAULT_CURRENCY = "DKK"
 CRUDKIT_AI_MODEL_FACTORY = "tests.testapp.ai.create_model"
+# The MCP write limit counts in the cache across tests; tests that exercise it
+# set it explicitly.
+CRUDKIT_MCP_WRITE_RATE = None

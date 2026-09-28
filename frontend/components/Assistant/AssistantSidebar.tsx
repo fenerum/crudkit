@@ -1,9 +1,12 @@
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'react-toastify';
 import SafeMarkdown from '../../shared/SafeMarkdown';
 import { Icon, useScreen } from '../ui';
 import { useAuth } from '../../context/AuthContext';
-import { invalidateObject } from '../../data/invalidate';
+import CrudKitAPIClient from '../../data/api';
+import { invalidateObject, invalidateRecords } from '../../data/invalidate';
+import { formatApiError } from '../../utils/apiErrors';
 import ActivityBlock from './ActivityBlock';
 import ConfirmCard from './ConfirmCard';
 import { useReconnectingSocket, wsUrl } from '../../hooks/useReconnectingSocket';
@@ -39,6 +42,7 @@ export function fromTranscript(transcript: TranscriptItem[]): ChatItem[] {
           targetLabel: item.target_label,
           resolved: resolutionOf(item.status),
           summary: item.summary,
+          changeSet: item.change_set,
         }
       : { kind: item.role, id: nextItemId(), text: item.text },
   );
@@ -164,7 +168,12 @@ export default function AssistantSidebar({ onClose }: Props) {
         setItems((prev) =>
           prev.map((it) =>
             it.kind === 'proposal' && it.id === evt.id
-              ? { ...it, resolved: evt.ok ? 'confirmed' : resolutionOf(evt.status) || 'failed', summary: evt.summary }
+              ? {
+                  ...it,
+                  resolved: evt.ok ? 'confirmed' : resolutionOf(evt.status) || 'failed',
+                  summary: evt.summary,
+                  changeSet: evt.outcome?.change_set,
+                }
               : it,
           ),
         );
@@ -234,6 +243,22 @@ export default function AssistantSidebar({ onClose }: Props) {
   const decide = (proposalIds: (number | string)[], ok: boolean) => {
     send({ type: 'confirm', ids: proposalIds, ok });
     setDeciding((prev) => new Map([...prev, ...proposalIds.map((id) => [id, ok ? 'confirm' : 'skip'] as const)]));
+  };
+
+  const undo = async (proposalId: number | string, changeSet: string) => {
+    try {
+      const result = await new CrudKitAPIClient().revertChangeSet(changeSet);
+      if (result.conflicts) {
+        toast.error('Not undone: the record has changed since. You can still revert it from History.');
+        return;
+      }
+      setItems((prev) =>
+        prev.map((it) => (it.kind === 'proposal' && it.id === proposalId ? { ...it, undone: true } : it)),
+      );
+      invalidateRecords(queryClient);
+    } catch (error) {
+      toast.error(`Undo failed: ${formatApiError(error)}`);
+    }
   };
 
   const pendingIds = items.flatMap((it) =>
@@ -349,6 +374,8 @@ export default function AssistantSidebar({ onClose }: Props) {
               deciding={deciding.get(it.id)}
               onConfirm={() => decide([it.id], true)}
               onSkip={() => decide([it.id], false)}
+              undone={it.undone}
+              onUndo={it.changeSet ? () => undo(it.id, it.changeSet!) : undefined}
             />
           );
         })}

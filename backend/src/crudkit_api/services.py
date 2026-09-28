@@ -4,21 +4,26 @@ They route through the same serializers and permission checks as the REST
 API so validation, FK coercion and ChangeLog behave identically everywhere.
 """
 
+import copy
 import logging
 from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import FieldDoesNotExist, PermissionDenied
 from django.db import models, transaction
-from django.db.models import Q
+from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from crudkit.audit import audit
 from crudkit.authorization import (
     get_authorized_queryset,
     has_model_permission,
+    has_object_permission,
     require_action_permission,
+    require_object_permission,
 )
-from crudkit.models import ChangeLog, FeedItem
+from crudkit.models import ChangeLog, FeedItem, field_value, same_value
 from crudkit.utils import get_model_types
 from crudkit_api.serializers import get_serializer
 
@@ -94,7 +99,8 @@ def get_feed(instance, limit: int = 20) -> list[dict[str, Any]]:
 
 
 def get_changelog(instance, limit: int = 20) -> list[dict[str, Any]]:
-    """Recent ChangeLog entries for `instance`: {at, by, field_changes: {field: [old, new]}}."""
+    """Recent ChangeLog entries for `instance`: {at, by, action, source, client,
+    label, change_set, field_changes: {field: [old, new]}}."""
     ct = ContentType.objects.get_for_model(instance.__class__)
     qs = ChangeLog.objects.filter(related_content_type=ct, related_object_id=instance.pk).order_by("-updated_at")[
         :limit
@@ -103,19 +109,74 @@ def get_changelog(instance, limit: int = 20) -> list[dict[str, Any]]:
         {
             "at": cl.updated_at.isoformat(),
             "by": str(cl.updated_by) if cl.updated_by_id else None,
+            "action": cl.action,
+            "source": cl.source,
+            "client": cl.client,
+            "label": cl.label,
+            "change_set": str(cl.change_set) if cl.change_set else None,
             "field_changes": cl.field_changes or {},
         }
         for cl in qs
     ]
 
 
+def get_history(instance, limit: int = 200) -> list[dict[str, Any]]:
+    """ChangeLog entries for `instance`, newest first, grouped into the change
+    sets that produced them, each flagged with whether it can be reverted."""
+    ct = ContentType.objects.get_for_model(instance.__class__)
+    entries = list(
+        ChangeLog.objects.filter(related_content_type=ct, related_object_id=instance.pk)
+        .select_related("updated_by")
+        .order_by("-created_at", "-id")[:limit]
+    )
+    change_sets = {entry.change_set for entry in entries if entry.change_set}
+    totals = {
+        row["change_set"]: row
+        for row in ChangeLog.objects.filter(change_set__in=change_sets)
+        .values("change_set")
+        .annotate(
+            total=Count("id"),
+            unrevertible=Count("id", filter=~Q(action__in=REVERTIBLE_ACTIONS)),
+        )
+    }
+    reverted = set(ChangeLog.objects.filter(revert_of__in=change_sets).values_list("revert_of", flat=True))
+
+    groups: dict[Any, dict[str, Any]] = {}
+    for entry in entries:
+        key = entry.change_set or entry.id
+        group = groups.get(key)
+        if group is None:
+            user = entry.updated_by
+            stats = totals.get(entry.change_set, {})
+            group = groups[key] = {
+                "change_set": str(entry.change_set) if entry.change_set else None,
+                "at": entry.created_at.isoformat(),
+                "by": {"id": user.pk, "label": user.get_full_name() or user.get_username()} if user else None,
+                "source": entry.source,
+                "client": entry.client,
+                "label": entry.label,
+                "actions": [],
+                "entries": [],
+                "total_entries": stats.get("total", 1),
+                "reverted": entry.change_set in reverted,
+                "revertible": bool(stats) and not stats["unrevertible"] and entry.change_set not in reverted,
+            }
+        if entry.action not in group["actions"]:
+            group["actions"].append(entry.action)
+        group["label"] = group["label"] or entry.label
+        group["entries"].append({"id": entry.id, "action": entry.action, "field_changes": entry.field_changes or {}})
+    for group in groups.values():
+        group["other_records"] = group.pop("total_entries") - len(group["entries"])
+    return list(groups.values())
+
+
 # ---------------------------------------------------------------------------
 # Writes
 
 
-def run_action(instance, action_name: str, user, request=None) -> dict[str, Any]:
-    """Mirror crudkit_api.views.GenericViewSet.call_action — invoke a
-    @crm_action method bound to the instance."""
+def perform_action(instance, action_name: str, user, request=None):
+    """Invoke a @crm_action method bound to the instance, log what it changed,
+    and return whatever the action returned."""
     if not action_name or action_name not in instance._actions:
         available = list(instance._actions.keys())
         logger.warning(
@@ -129,8 +190,22 @@ def run_action(instance, action_name: str, user, request=None) -> dict[str, Any]
     if request is None:
         request = RequestShim(user)
     logger.info("Running action %s on %s.%s", action_name, instance.__class__.__name__, instance.pk)
-    response = instance._actions[action_name](request)
-    return _serialize_action_response(response)
+    action = instance._actions[action_name]
+    before = _refetch(instance)
+    response = action(request)
+    ChangeLog.objects.create_from_objects(
+        before,
+        _refetch(instance),
+        user=user,
+        action=ChangeLog.Action.ACTION,
+        label=getattr(action, "verbose_name", None) or action_name,
+    )
+    return response
+
+
+def run_action(instance, action_name: str, user, request=None) -> dict[str, Any]:
+    """Like perform_action, with the result normalised to a JSON-safe outcome."""
+    return _serialize_action_response(perform_action(instance, action_name, user, request))
 
 
 def _serialize_action_response(response) -> dict[str, Any]:
@@ -199,10 +274,10 @@ def patch_fields(instance, fields: dict[str, Any], user, request=None) -> dict[s
 
     # Mirror GenericViewSet.perform_update — snapshot the pre-save state for
     # ChangeLog, save, log the diff.
-    old_instance = instance.__class__.objects.get(pk=instance.pk)
+    old_instance = _refetch(instance)
     with transaction.atomic():
         serializer.save()
-        ChangeLog.objects.create_from_objects(old_instance, serializer.instance)
+        ChangeLog.objects.create_from_objects(old_instance, serializer.instance, user=user)
 
     logger.info("Patched %s.%s fields=%s", instance.__class__.__name__, instance.pk, list(fields))
     return {"kind": "patch", "applied": list(fields.keys())}
@@ -214,7 +289,7 @@ def create_object(model, fields: dict[str, Any], user, request=None):
     serializer.initial_instance = model.from_query_params({}, {"created_by": user, "updated_by": user})
     with transaction.atomic():
         instance = serializer.save()
-        ChangeLog.objects.create_from_objects(None, instance)
+        ChangeLog.objects.create_from_objects(None, instance, user=user)
     logger.info("Created %s.%s", model.__name__, instance.pk)
     return instance
 
@@ -233,3 +308,151 @@ def create_note(instance, body: str, user) -> dict[str, Any]:
     )
     logger.info("Created FeedItem %s on %s.%s", fei.pk, instance.__class__.__name__, instance.pk)
     return {"kind": "note", "feeditem_id": fei.id}
+
+
+def _refetch(instance):
+    return instance.__class__._base_manager.get(pk=instance.pk)
+
+
+# ---------------------------------------------------------------------------
+# Undo
+
+REVERTIBLE_ACTIONS = [
+    ChangeLog.Action.CREATE,
+    ChangeLog.Action.UPDATE,
+    ChangeLog.Action.DELETE,
+    ChangeLog.Action.RESTORE,
+    ChangeLog.Action.ACTION,
+    ChangeLog.Action.REVERT,
+]
+
+
+def check_revertible(change_set) -> list[ChangeLog]:
+    """The change set's entries, newest first. Raises ValueError if it cannot
+    be reverted."""
+    entries = list(
+        ChangeLog.objects.filter(change_set=change_set)
+        .select_related("related_content_type")
+        .order_by("-created_at", "-id")
+    )
+    if not entries:
+        raise ValueError(f"Unknown change set {change_set}")
+    if any(entry.action == ChangeLog.Action.MERGE for entry in entries):
+        raise ValueError("Merges cannot be reverted")
+    if any(entry.action not in REVERTIBLE_ACTIONS for entry in entries):
+        raise ValueError("This change was recorded before undo was available and cannot be reverted")
+    if ChangeLog.objects.filter(revert_of=change_set).exists():
+        raise ValueError("This change has already been reverted")
+    return entries
+
+
+def revert_change_set(change_set, user, force: bool = False) -> dict[str, Any]:
+    """Undo every entry of a change set, newest first, in one transaction.
+
+    Returns {"change_set", "reverted"} for the new change set, or
+    {"conflicts": [...]} (and changes nothing) when a record has changed since,
+    unless `force`."""
+    entries = check_revertible(change_set)
+    conflicts = []
+    reverted = 0
+    with audit("revert", user=user, revert_of=change_set) as context, transaction.atomic():
+        for entry in entries:
+            model = entry.related_content_type.model_class()
+            instance = model._base_manager.filter(pk=entry.related_object_id).first()
+            if instance is None:
+                conflicts.append(_conflict(entry, model, reason="The record no longer exists"))
+                continue
+            _require_revert_permission(user, entry, instance)
+            conflicts += _entry_conflicts(entry, instance)
+            _revert_entry(entry, instance, user)
+            reverted += 1
+        if conflicts and not force:
+            transaction.set_rollback(True)
+            return {"conflicts": conflicts}
+    logger.info("Reverted change set %s as %s", change_set, context.change_set)
+    return {"change_set": str(context.change_set), "reverted": reverted}
+
+
+def restore_object(instance, user):
+    """Bring back a soft-deleted record."""
+    require_object_permission(user, instance, "change")
+    if not getattr(instance, "deleted", False):
+        raise ValueError(f"{instance} is not deleted")
+    if instance.merged_into_id:
+        raise ValueError(f"{instance} was merged into {instance.merged_into_id} and cannot be restored")
+    with transaction.atomic():
+        _undelete(instance, user, ChangeLog.Action.RESTORE)
+    return instance
+
+
+def _undelete(instance, user, action):
+    before = copy.copy(instance)
+    instance.deleted = False
+    instance.updated_by = user
+    instance.save(update_fields=["deleted", "updated_by", "updated_at"])
+    ChangeLog.objects.create_from_objects(before, instance, user=user, action=action)
+
+
+def _require_revert_permission(user, entry, instance):
+    permission = "delete" if entry.action == ChangeLog.Action.CREATE else "change"
+    if not has_object_permission(user, instance, permission):
+        raise PermissionDenied(f"You may not {permission} {instance}")
+    if entry.action == ChangeLog.Action.ACTION:
+        # Undoing an action needs the same permission as running it. Entries
+        # name the action by its label.
+        for name, method in instance._actions.items():
+            if (getattr(method, "verbose_name", None) or name) == entry.label:
+                require_action_permission(user, instance, name)
+
+
+def _entry_fields(entry, model):
+    for name, (old, new) in (entry.field_changes or {}).items():
+        try:
+            yield model._meta.get_field(name), old, new
+        except FieldDoesNotExist:
+            continue
+
+
+def _entry_conflicts(entry, instance) -> list[dict[str, Any]]:
+    model = instance.__class__
+    if entry.action == ChangeLog.Action.DELETE:
+        if instance.deleted:
+            return []
+        return [_conflict(entry, model, instance, "deleted", True, False)]
+    return [
+        _conflict(entry, model, instance, field.name, new, current)
+        for field, _old, new in _entry_fields(entry, model)
+        if not isinstance(field, models.FileField)
+        and not same_value(field, current := field_value(instance, field), new)
+    ]
+
+
+def _conflict(entry, model, instance=None, field=None, expected=None, current=None, reason="") -> dict[str, Any]:
+    return {
+        "object": f"{model.TYPE_ID}{entry.related_object_id}" if model else None,
+        "label": str(instance) if instance is not None else None,
+        "field": field,
+        "expected": expected,
+        "current": current,
+        "reason": reason,
+    }
+
+
+def _revert_entry(entry, instance, user):
+    if entry.action == ChangeLog.Action.DELETE:
+        _undelete(instance, user, ChangeLog.Action.REVERT)
+        return
+    before = copy.copy(instance)
+    if entry.action == ChangeLog.Action.CREATE:
+        instance.updated_by = user
+        instance.soft_delete()
+    else:
+        update_fields = ["updated_by", "updated_at"]
+        for field, old, _new in _entry_fields(entry, instance.__class__):
+            if isinstance(field, models.FileField):
+                continue
+            setattr(instance, field.attname, None if old is None else field.to_python(old))
+            update_fields.append(field.attname)
+        instance.updated_by = user
+        instance.save(update_fields=update_fields)
+    ChangeLog.objects.create_from_objects(before, instance, user=user, action=ChangeLog.Action.REVERT)

@@ -1,8 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-09-29)
 
-- Hardening of proposals, undo and agents:
+- Hardening of proposals, undo and agents (#58):
   - A filed `AssistantProposal` can't be edited (its `clean()` refuses, so a REST PATCH
     returns 400), and Confirm checks that both the confirming user and the proposal's creator
     may make the change. Previously a user could rewrite their own pending proposal to target
@@ -27,7 +27,7 @@
     numeric choices are validated too. Proposals can't target CrudKit's own bookkeeping.
   - A record's change history needs `view_changelog` as well as seeing the record: the History
     tab, MCP `get_record`'s `changelog` and the assistant's `get_changelog`.
-- Robustness:
+- Robustness (#58):
   - Many-to-many changes are logged (the sorted related ids before and after, in the current
     change set), shown in History, revertible with the usual conflict check, and matched by
     agents' `watch_fields`. Changes from the reverse side aren't logged.
@@ -63,7 +63,7 @@
   Guards: `max_records_per_run`, `max_runs_per_day`, and auto-disable after 3 failed runs in a
   row (noted on the agent's feed). Agents are triggered by ChangeLog entries, so plain ORM saves
   and changes made by agents don't trigger agents. Users see and edit their own agents and runs;
-  `run_as` defaults to the creator and only superusers can change it.
+  `run_as` defaults to the creator and only superusers can change it. (#57)
   - Hosts add `crudkit_assistant.tasks.run_scheduled_agents` to `CELERY_BEAT_SCHEDULE` (every 5
     minutes) for scheduled agents.
   - The assistant has a new `propose_create` tool, so the sidebar can create records, agents
@@ -78,11 +78,13 @@
   - SPA: agent runs show their summary and proposals; proposals and history entries from agents
     read "Agent: <name>".
 
+- SPA: the "+" in a kanban column header opens the inline create modal, prefilled with the
+  column's value; the modal is larger. (#55)
 - Approvals. Models declare which changes need a person's approval:
   `@crm_action(..., requires_approval=True)` (the new keyword is optional) and
   `CrudKitSettings.approval_fields`; `crudkit.authorization.requires_approval(model, action, fields)`
   checks them. The rule binds MCP clients and agents; people in the UI and REST API are the
-  approvers. REST metadata actions carry `requires_approval`, and the SPA shows a shield on them.
+  approvers. REST metadata actions carry `requires_approval`, and the SPA shows a shield on them. (#54)
   - `crudkit_mcp`: a new `propose` OAuth scope (offered when `crudkit_assistant` is installed).
     The consent page is now a choice of Read only / Propose changes / Write directly (the last
     only with `CRUDKIT_MCP_WRITE_ENABLED`); the form field is `access` instead of the `write`
@@ -111,16 +113,16 @@
   the assistant's instructions carry the global documents and the ones for the type on
   screen, and AI fields get a "Company context" section in their prompt
   (`crudkit.ai_backend.process()` takes an optional `type_id`). The assistant proposes edits to
-  these documents when the user teaches it something durable about the company.
+  these documents when the user teaches it something durable about the company. (#53)
 - SPA: after a password login the SPA loads the full user profile, so the assistant appears
-  without a reload.
+  without a reload. (#53)
 - Undo and history. Every ChangeLog entry now records who made it and how: `action`
   (create/update/delete/restore/action/merge/revert), `source` (ui, api, mcp, assistant,
   agent, revert or system), `client` (the API `Client-Id` or MCP OAuth client), a `change_set`
   UUID shared by everything one request, tool call or confirmed proposal changed, and a
   `label`. Entry points set this with the new `crudkit.audit.audit()` context manager;
   outside one, entries are `system`. New ChangeLog fields and an index on the related object
-  (migration `crudkit 0004`).
+  (migration `crudkit 0004`). (#52)
   - Deletes snapshot the deleted record's values and record the user who deleted it (it was
     the record's creator). `@crm_action` runs (REST and `services.run_action`), merges and
     `update_or_create_external` are now logged. File and image fields log correctly.
@@ -143,11 +145,11 @@
   records that already have the values. The prompt no longer asks for `get_object`, `get_feed`
   and `describe_object` on every record of a bulk change: the model reads the rows on screen (or
   `list_records`) and `describe_types(type)` once, so "set all of these to high priority" takes
-  a few tool calls instead of three per record.
+  a few tool calls instead of three per record. (#51)
 - `crudkit_assistant`: `describe_object` no longer fails on models with lazily translated
-  `help_text`.
+  `help_text`. (#50)
 - Packaging: require `pydantic-ai-slim>=2.51` (the tested version); 1.x is incompatible with the
-  assistant.
+  assistant. (#49)
 
 ## 0.5.0 (2026-09-27)
 

@@ -8,6 +8,7 @@ export interface AppConfig {
   app_name: string;
   org_name: string;
   logo_url: string | null;
+  brand_color: string | null;
   auth_mode: 'password' | 'saml';
   storage_prefix: string;
   conversation_link_pattern: string;
@@ -19,6 +20,7 @@ const defaults: AppConfig = {
   app_name: 'CrudKit',
   org_name: 'CrudKit',
   logo_url: null,
+  brand_color: null,
   auth_mode: 'password',
   storage_prefix: 'crudkit',
   conversation_link_pattern: 'deal|opportunity|case',
@@ -42,3 +44,9 @@ function load(): AppConfig {
 }
 
 export const appConfig: AppConfig = load();
+
+// Set before first paint; global.css derives the --primary-* scale from --brand.
+if (appConfig.brand_color) {
+  document.documentElement.style.setProperty('--brand', appConfig.brand_color);
+  document.documentElement.dataset.brand = '';
+}

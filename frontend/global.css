@@ -40,7 +40,7 @@
   --primary-500: #5D62F5;
   --primary-600: #464BD8;
   --primary-700: #363AAE;
-  --primary-glow: rgba(123, 127, 255, 0.20);
+  --primary-glow: color-mix(in srgb, var(--primary-400) 20%, transparent);
 
   /* Semantic */
   --success: #3DD68C;
@@ -111,7 +111,7 @@
   /* Shadows (overlays only) */
   --shadow-menu:   0 8px 24px -6px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.3);
   --shadow-modal:  0 20px 60px -10px rgba(0, 0, 0, 0.7), 0 4px 12px rgba(0, 0, 0, 0.4);
-  --shadow-focus:  0 0 0 2px rgba(123, 127, 255, 0.40);
+  --shadow-focus:  0 0 0 2px color-mix(in srgb, var(--primary-400) 40%, transparent);
 
   /* Motion */
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
@@ -204,7 +204,7 @@ div[dir="auto"] > * {
   --primary-500: #464BD8;
   --primary-600: #363AAE;
   --primary-700: #272A82;
-  --primary-glow: rgba(93, 98, 245, 0.18);
+  --primary-glow: color-mix(in srgb, var(--primary-400) 18%, transparent);
 
   /* Semantic — pull saturation up for white backdrops */
   --success: #1FA770;
@@ -227,10 +227,24 @@ div[dir="auto"] > * {
   /* Shadows — deeper, with cooler tint */
   --shadow-menu:   0 6px 16px -4px rgba(15, 17, 20, 0.10), 0 2px 4px rgba(15, 17, 20, 0.06);
   --shadow-modal:  0 18px 48px -8px rgba(15, 17, 20, 0.18), 0 4px 12px rgba(15, 17, 20, 0.08);
-  --shadow-focus:  0 0 0 2px rgba(93, 98, 245, 0.32);
+  --shadow-focus:  0 0 0 2px color-mix(in srgb, var(--primary-400) 32%, transparent);
 
   /* Translucent topbar — paper-white at 80% opacity. */
   --topbar-bg: rgba(255, 255, 255, 0.8);
+}
+
+/* Host brand color (CRUDKIT_FRONTEND_CONFIG["brand_color"]), set as --brand
+   by utils/appConfig.ts. Replaces the indigo scale in both themes; the
+   selector outranks [data-theme="light"]. */
+:root[data-brand] {
+  --primary-50:  color-mix(in oklab, var(--brand) 8%, white);
+  --primary-100: color-mix(in oklab, var(--brand) 18%, white);
+  --primary-200: color-mix(in oklab, var(--brand) 40%, white);
+  --primary-300: color-mix(in oklab, var(--brand) 70%, white);
+  --primary-400: var(--brand);
+  --primary-500: color-mix(in oklab, var(--brand) 85%, black);
+  --primary-600: color-mix(in oklab, var(--brand) 70%, black);
+  --primary-700: color-mix(in oklab, var(--brand) 55%, black);
 }
 
 [data-theme="light"] ::-webkit-scrollbar-thumb {
@@ -384,7 +398,7 @@ div[dir="auto"] > * {
     transition: background var(--dur-fast) var(--ease-out);
   }
   .ck-lrow:hover { background: var(--bg-2); }
-  .ck-lrow.is-selected { background: rgba(123,127,255,0.08); }
+  .ck-lrow.is-selected { background: color-mix(in srgb, var(--primary-400) 8%, transparent); }
   .ck-lh-c {
     min-width: 0;
     overflow: hidden;
@@ -619,7 +633,7 @@ div[dir="auto"] > * {
     transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
   }
   .ck-deal-card:hover { background: var(--bg-3); border-color: var(--border-2); }
-  .ck-deal-card.is-selected { border-color: var(--primary-400); background: rgba(123,127,255,0.06); }
+  .ck-deal-card.is-selected { border-color: var(--primary-400); background: color-mix(in srgb, var(--primary-400) 6%, transparent); }
 
   .ck-dc-head { display: flex; align-items: center; justify-content: space-between; }
   .ck-dc-id   { font-family: var(--font-mono); font-size: 10px; color: var(--fg-3); }
@@ -1496,7 +1510,7 @@ div[dir="auto"] > * {
     min-height: 240px;
     margin: 0 auto;
     background:
-      radial-gradient(circle at 50% 50%, rgba(123,127,255,0.04), transparent 70%),
+      radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--primary-400) 4%, transparent), transparent 70%),
       repeating-linear-gradient(0deg, var(--border-1) 0, var(--border-1) 1px, transparent 1px, transparent 40px),
       repeating-linear-gradient(90deg, var(--border-1) 0, var(--border-1) 1px, transparent 1px, transparent 40px);
     border: 1px solid var(--border-1); border-radius: 8px; overflow: hidden;
@@ -1563,7 +1577,7 @@ div[dir="auto"] > * {
     transition: background var(--dur-fast) var(--ease-out);
   }
   .ck-inbox-row:hover { background: var(--bg-2); }
-  .ck-inbox-row.is-unread { background: rgba(123,127,255,0.04); }
+  .ck-inbox-row.is-unread { background: color-mix(in srgb, var(--primary-400) 4%, transparent); }
 
   /* ---- Command palette ---- */
   .ck-cmd-backdrop {

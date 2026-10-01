@@ -13,6 +13,9 @@
   Models without `search_fields` are now included in global search (ID matches only), and a
   list search on them no longer returns every row. A `TYPE:` scoped search with a second colon
   no longer errors.
+- `CRUDKIT_FRONTEND_CONFIG["brand_color"]` (any CSS color) replaces the indigo accent across
+  the UI in both themes. The sidebar logo no longer sits on an accent-colored tile; `logo_url`
+  is shown as-is.
 
 ## 0.6.0 (2026-09-29)
 

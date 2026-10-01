@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Kanban card order persists: when a kanban view's `order_by` is a numeric field (e.g.
+  `sort_order`), dropping a card renumbers its column in that field through the new
+  `POST /api/v1/<TYPE>/reorder/` (`{"field", "ids"}`; needs change permission, one change
+  set). Without such a field, a card dropped within its own column snaps back instead of
+  showing an order that's lost on reload.
+
 ## 0.6.0 (2026-09-29)
 
 - Hardening of proposals, undo and agents (#58):

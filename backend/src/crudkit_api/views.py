@@ -3,7 +3,7 @@ import re
 
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
-from django.core.exceptions import ValidationError
+from django.core.exceptions import FieldDoesNotExist, ValidationError
 from django.db import connection, models, reset_queries, transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
@@ -24,7 +24,7 @@ from crudkit.authorization import (
     has_action_permission,
     has_model_permission,
 )
-from crudkit.models import BaseCrudKitModel, ChangeLog
+from crudkit.models import BaseCrudKitModel, ChangeLog, ck_id_regex
 from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
@@ -44,6 +44,7 @@ from crudkit_api.services import (
 # agents), and no request can claim it.
 SPA_CLIENT_ID = "CrudKitAPIClient"
 CHANGE_SET_HEADER = "X-CrudKit-Change-Set"
+ORDERABLE_FIELDS = (models.IntegerField, models.FloatField, models.DecimalField)
 
 
 class AuditedViewMixin:
@@ -239,6 +240,39 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
                 return Response({"messages": messages, "redirect": to_stay_obj.id})
         except (ValidationError, ProtectedError) as e:
             return Response({"errors": [str(e)]}, status=400)
+
+    @action(["POST"], detail=False)
+    def reorder(self, request):
+        """Set the numeric `field` of each record in `ids` (CK-IDs) to its position,
+        e.g. after a card is dragged within a kanban column sorted by that field."""
+        field_name, ids = request.data.get("field"), request.data.get("ids")
+        model = self.queryset.model
+        try:
+            field = model._meta.get_field(field_name)
+        except (FieldDoesNotExist, TypeError):
+            field = None
+        if (
+            not isinstance(field, ORDERABLE_FIELDS)
+            or not field.concrete
+            or not field.editable
+            or field.primary_key
+            or not isinstance(ids, list)
+            or not all(isinstance(pk, str) and ck_id_regex.fullmatch(pk) and pk[:3] == model.TYPE_ID for pk in ids)
+        ):
+            return Response({"errors": [f"Cannot reorder by {field_name!r}"]}, status=400)
+
+        with transaction.atomic():
+            objects = {obj.pk: obj for obj in self.filter_queryset(self.get_queryset()).filter(pk__in=ids)}
+            for position, pk in enumerate(ids):
+                obj = objects.get(pk)
+                if obj is None or getattr(obj, field.name) == position:
+                    continue
+                before = copy.copy(obj)
+                setattr(obj, field.name, position)
+                obj.updated_by = request.user
+                obj.save()
+                ChangeLog.objects.create_from_objects(before, obj)
+        return Response(status=204)
 
     @action(["POST"], detail=True, url_path="action")
     def call_action(self, request, pk=None):

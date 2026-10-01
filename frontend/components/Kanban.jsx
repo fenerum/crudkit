@@ -21,11 +21,22 @@ import ErrorMessage from "./ErrorMessage.jsx";
 import { Icon } from "./ui";
 import { formatApiError } from "../utils/apiErrors";
 
+const NUMERIC_FIELD_TYPES = new Set([
+    'IntegerField', 'PositiveIntegerField', 'SmallIntegerField', 'PositiveSmallIntegerField',
+    'BigIntegerField', 'PositiveBigIntegerField', 'FloatField', 'DecimalField',
+]);
+
 export default function KanbanBoard({objectList, view, model, metadata, q = ''}) {
     const client = useMemo(() => new CrudKitAPIClient(), []);
 
     const groupByField = view?.group_by ? metadata.fields[view.group_by] : null;
     const initialColumns = groupByField?.choices ? groupByField.choices : [];
+    // When the view sorts by a numeric field, dropping a card renumbers its
+    // column in that field so the order survives a reload.
+    const orderBy = view?.order_by?.split(',')[0].trim() || '';
+    const orderDescending = orderBy.startsWith('-');
+    const orderFieldMeta = metadata.fields[orderBy.replace(/^-/, '')];
+    const orderField = NUMERIC_FIELD_TYPES.has(orderFieldMeta?.type) && orderFieldMeta.editable ? orderFieldMeta.name : null;
     const [columns, setColumns] = useState(initialColumns);
     const [objectMap, setObjectMap] = useState({});
     const filterText = q;
@@ -264,14 +275,28 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
         if (!activeContainer || !overContainer || !sourceContainer) return;
         const activeIndex = items[activeContainer].indexOf(id);
         const overIndex = items[overContainer].indexOf(overId);
+        const sameColumn = sourceContainer === overContainer;
+        const moved = activeContainer === overContainer && activeIndex !== overIndex;
 
-        if (activeContainer === overContainer && activeIndex !== overIndex) {
-            setItems((prev) => ({
-                ...prev,
-                [overContainer]: arrayMove(prev[overContainer], activeIndex, overIndex)
-            }));
+        // Without an order field a reorder within a column can't be saved,
+        // so the card snaps back rather than pretending.
+        let columnIds = items[overContainer];
+        if (moved && (orderField || !sameColumn)) {
+            columnIds = arrayMove(columnIds, activeIndex, overIndex);
+            setItems((prev) => ({...prev, [overContainer]: columnIds}));
         }
-        if (sourceContainer === overContainer) return;
+        const persistOrder = () => {
+            if (!orderField) return;
+            client.reorder(model, orderField, orderDescending ? [...columnIds].reverse() : columnIds)
+                .catch(error => {
+                    toast.error(formatApiError(error, metadata.fields) || 'Failed to save the order');
+                    console.error('Error saving card order:', error);
+                });
+        };
+        if (sameColumn) {
+            if (moved) persistOrder();
+            return;
+        }
 
         client.partialUpdate(model, id, {
             [view.group_by]: overContainer,
@@ -286,6 +311,7 @@ export default function KanbanBoard({objectList, view, model, metadata, q = ''})
                 updatedObj[view.group_by] = overContainer;
             }
             setObjectMap(prev => ({ ...prev, [id]: updatedObj }));
+            persistOrder();
         })
         .catch(error => {
             toast.error(formatApiError(error, metadata.fields) || 'Failed to update status');

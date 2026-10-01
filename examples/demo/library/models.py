@@ -50,6 +50,7 @@ class Reading(BaseCrudKitModel):
     priority = models.CharField(max_length=16, choices=Priority.choices, default=Priority.LOW)
     pages = models.PositiveIntegerField(null=True, blank=True)
     rating = models.PositiveIntegerField(null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name

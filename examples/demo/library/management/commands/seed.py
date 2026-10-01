@@ -40,7 +40,12 @@ SAMPLE_READINGS = [
 # One view per layout. The default list view keeps /RDG a plain list.
 SAMPLE_VIEWS = {
     "All readings": {"layout": "list", "default": True, "fields": ["name", "status", "priority"]},
-    "Board": {"layout": "kanban", "fields": ["name", "priority"], "group_by": "status"},
+    "Board": {
+        "layout": "kanban",
+        "fields": ["name", "priority"],
+        "group_by": "status",
+        "order_by": "sort_order",
+    },
     "Covers": {"layout": "gallery", "fields": ["name", "status"]},
     "Pages vs rating": {"layout": "quadrant", "fields": ["pages", "rating", "name"]},
     "Lanes": {

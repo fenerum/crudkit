@@ -27,13 +27,12 @@ from pydantic_ai import RunContext
 
 from crudkit.authorization import (
     get_authorized_instance,
-    get_authorized_queryset,
     has_action_permission,
     has_model_permission,
 )
 from crudkit.models import ChangeLog, parse_ck_id
 from crudkit_api import records, services
-from crudkit_api.metadata import build_instance_metadata
+from crudkit_api.metadata import build_instance_metadata, related_queryset, reverse_relations
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantProposal
 from crudkit_assistant.proposals import create_proposal, patch_label
@@ -159,23 +158,32 @@ async def get_feed(
 async def get_related(
     ctx: RunContext[AssistantDeps], relation_name: str, id: str | None = None, limit: int = 20
 ) -> list[dict[str, Any]] | str:
-    """Walk a reverse FK relation on a record (default: the one open on screen),
-    e.g. 'activity_set', 'opportunityproduct_set', 'message_set'. Returns up
-    to `limit` rows summarised via get_ai_context()."""
+    """List the records pointing at a record (default: the one open on screen)
+    through one of the relations in describe_object's `related`, e.g.
+    'ticket_set' (or its TYPE_ID, 'TIC'). Returns up to `limit` rows
+    summarised via get_ai_context()."""
 
     def _run():
         instance, error = _load_instance(ctx.deps, id)
         if instance is None:
             return f"ERROR: {error}"
-        manager = getattr(instance, relation_name, None)
-        if manager is None or not hasattr(manager, "all"):
-            return f"ERROR: Unknown relation {relation_name!r}"
-        out = []
-        queryset = get_authorized_queryset(_load_user(ctx.deps), manager.all(), "view")
-        for obj in queryset[:limit]:
-            ctx_text = obj.get_ai_context() if hasattr(obj, "get_ai_context") else str(obj)
-            out.append({"id": str(getattr(obj, "id", obj.pk)), "context": ctx_text})
-        return out
+        user = _load_user(ctx.deps)
+        relations = reverse_relations(instance.__class__, user)
+        relation = next(
+            (
+                rel
+                for rel in relations
+                if relation_name in (rel.get_accessor_name(), rel.name, rel.related_model.TYPE_ID)
+            ),
+            None,
+        )
+        if relation is None:
+            valid = [f"{rel.get_accessor_name()} ({rel.related_model.TYPE_ID})" for rel in relations]
+            return f"ERROR: Unknown relation {relation_name!r}. Valid: {valid}"
+        return [
+            {"id": str(obj.pk), "context": obj.get_ai_context()}
+            for obj in related_queryset(instance, relation, user)[:limit]
+        ]
 
     return await sync_to_async(_run)()
 

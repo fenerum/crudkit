@@ -314,8 +314,12 @@ class BaseCrudKitModel(models.Model):
             if isinstance(field, (models.ImageField, models.FileField)):
                 continue
             value = getattr(self, field.name, None)
-            if value is not None:
-                parts.append(f"{field.verbose_name}: {value}")
+            if value is None:
+                continue
+            # The id lets the assistant follow the link (get_object).
+            if hasattr(value, "TYPE_ID"):
+                value = f"{value} ({value.pk})"
+            parts.append(f"{field.verbose_name}: {value}")
         return "\n".join(parts)
 
     def get_fields(self):

@@ -18,6 +18,7 @@ from crudkit.authorization import get_authorized_queryset, has_model_permission
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem
 from crudkit.utils import get_model_types
+from crudkit_api.records import SKIPPED_FIELDS
 
 # Fields that are housekeeping/audit — never useful patch targets and not
 # worth showing the LLM.
@@ -219,10 +220,35 @@ def _coerce_current_value(value: Any) -> Any:
     return str(value)
 
 
+def reverse_relations(model, user=None) -> list:
+    """The relations through which CrudKit records point at a row of `model`
+    (reverse foreign keys and many-to-manys), limited to types `user` may view."""
+    return [
+        relation
+        for relation in model._meta.related_objects
+        if (relation.one_to_many or relation.many_to_many)
+        and not relation.hidden
+        and relation.field.name not in SKIPPED_FIELDS
+        and hasattr(relation.related_model, "TYPE_ID")
+        and (user is None or has_model_permission(user, relation.related_model, "view"))
+    ]
+
+
+def related_queryset(instance: Model, relation, user=None):
+    """The live records pointing at `instance` through `relation` that `user` may view."""
+    queryset = getattr(instance, relation.get_accessor_name()).all()
+    if user is not None:
+        queryset = get_authorized_queryset(user, queryset, "view")
+    if "deleted" in {f.name for f in relation.related_model._meta.fields}:
+        queryset = queryset.filter(deleted=False)
+    return queryset
+
+
 def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
     """Return a slim, LLM-friendly projection of the writable fields on an
     instance: name, type, current value, valid choices, FK options, plus
-    the available @crm_action names. Skips audit/housekeeping fields."""
+    the available @crm_action names and the records pointing at it. Skips
+    audit/housekeeping fields."""
     base = build_model_metadata(instance.__class__)
     fields_out: dict[str, Any] = {}
     for name, meta in base["fields"].items():
@@ -250,4 +276,13 @@ def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
         "type": base["type"],
         "fields": fields_out,
         "actions": [a["action"] for a in base["actions"]],
+        "related": [
+            {
+                "relation": relation.get_accessor_name(),
+                "type": relation.related_model.TYPE_ID,
+                "field": relation.field.name,
+                "count": related_queryset(instance, relation, user).count(),
+            }
+            for relation in (reverse_relations(instance.__class__, user) if instance.pk else [])
+        ],
     }

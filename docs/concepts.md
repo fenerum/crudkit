@@ -296,9 +296,11 @@ by `frontend/scripts/postbuild.mjs`):
   `crudkit_frontend.context_processors.crudkit_config` context processor.
 
 At startup the SPA parses that script tag (`frontend/utils/appConfig.ts`) and
-merges it over defaults: `app_name`, `org_name`, `logo_url`, `auth_mode`
-(`password` or `saml`), `storage_prefix`, `conversation_link_pattern`,
-`default_currency`, `crudkit_version` (shown at the bottom of the sidebar).
+merges it over defaults: `app_name`, `org_name`, `logo_url`, `brand_color`
+(any CSS color; replaces the indigo accent — buttons, selection, focus rings —
+in both themes), `auth_mode` (`password` or `saml`), `storage_prefix`,
+`conversation_link_pattern`, `default_currency`, `crudkit_version` (shown at
+the bottom of the sidebar).
 Branding is therefore a runtime concern of the host project — nothing is
 compiled into the bundle.
 

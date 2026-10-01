@@ -75,7 +75,7 @@ export default function KanbanColumn({
         {!isCollapsed && (
           <div
             className="flex flex-col gap-1.5 min-h-[40px] rounded-md p-px transition-colors duration-fast"
-            style={isOver ? { background: 'rgba(123,127,255,0.08)', outline: '1px dashed var(--primary-400)' } : undefined}
+            style={isOver ? { background: 'color-mix(in srgb, var(--primary-400) 8%, transparent)', outline: '1px dashed var(--primary-400)' } : undefined}
           >
             {items.length === 0 ? (
               <div className="border border-dashed border-border-1 rounded-md py-6 text-center text-fg-3 text-xs">

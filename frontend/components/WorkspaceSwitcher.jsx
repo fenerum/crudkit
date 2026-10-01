@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { appConfig } from "../utils/appConfig";
-import defaultLogoUrl from "../images/logo.svg";
+import AppLogo from "./AppLogo";
 import { Icon } from "./ui";
 
 // Sidebar-header workspace picker. Replaces the plain home link when the
@@ -50,13 +50,7 @@ export default function WorkspaceSwitcher({ workspaces, activeWorkspace, onSelec
         aria-expanded={open}
         className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-2 text-left"
       >
-        <span className="flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 6, overflow: 'hidden', flex: '0 0 24px', background: 'var(--primary-400)'}}>
-          <img
-            src={appConfig.logo_url || defaultLogoUrl}
-            alt={appConfig.app_name}
-            style={{width: 18, height: 18, objectFit: 'contain'}}
-          />
-        </span>
+        <AppLogo />
         <span className="flex-1 min-w-0">
           <span className="block text-sm font-semibold text-fg-1 truncate">
             {activeWorkspace ? activeWorkspace.name : appConfig.org_name}

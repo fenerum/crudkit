@@ -9,7 +9,7 @@ import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
 import {isMine, isVisibleToUser, useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
 import {resolveWorkspaceViews} from "../utils/workspaces";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
-import defaultLogoUrl from "../images/logo.svg";
+import AppLogo from "../components/AppLogo";
 import faviconUrl from "../images/favicon.svg";
 import {appConfig} from "../utils/appConfig";
 import TimeTracker from "../components/TimeTracker";
@@ -319,13 +319,7 @@ function BaseLayoutInner() {
               onClick={handleNavClick}
               className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-2"
             >
-              <span className="flex items-center justify-center" style={{width: 24, height: 24, borderRadius: 6, overflow: 'hidden', flex: '0 0 24px', background: 'var(--primary-400)'}}>
-                <img
-                  src={appConfig.logo_url || defaultLogoUrl}
-                  alt={appConfig.app_name}
-                  style={{width: 18, height: 18, objectFit: 'contain'}}
-                />
-              </span>
+              <AppLogo />
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-semibold text-fg-1 truncate">{appConfig.org_name}</span>
                 <span className="block text-2xs text-fg-3">{userName}</span>

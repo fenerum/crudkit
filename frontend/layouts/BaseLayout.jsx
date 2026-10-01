@@ -25,6 +25,7 @@ import AssistantSidebar from "../components/Assistant/AssistantSidebar";
 import {AssistantContext, useAssistant} from "../components/Assistant/AssistantContext";
 
 const ASSISTANT_OPEN_KEY = "crudkit.assistant.open";
+const VIEW_DOT_PALETTE = ['var(--stage-blue)', 'var(--stage-amber)', 'var(--stage-violet)', 'var(--stage-green)', 'var(--stage-rose)', 'var(--stage-slate)'];
 
 const NavItem = React.memo(function NavItem({href, icon, label, count, color, active, onClick}) {
   const cls =
@@ -230,7 +231,7 @@ function BaseLayoutInner() {
   const {activeWorkspaceId, setActiveWorkspaceId} = useWorkspace();
 
   // Group views by ownership: public views show under "Workspace"; private
-  // views the current user created show under "My Views" with colored dots.
+  // views the current user created show under "My Views".
   const userId = user?.id;
   const myViews = useMemo(() => menuViews.filter(v => !v.public && isMine(v, userId)), [menuViews, userId]);
   const workspaceViews = useMemo(() => menuViews.filter(v => v.public), [menuViews]);
@@ -361,14 +362,14 @@ function BaseLayoutInner() {
           {/* Workspace — the active workspace's tabs, or all shared views */}
           {(activeWorkspace || workspaceViews.length > 0) && (
             <NavSection title={activeWorkspace ? activeWorkspace.name : 'Workspace'}>
-              {(activeWorkspace ? workspaceTabs : workspaceViews).map((view) => {
+              {(activeWorkspace ? workspaceTabs : workspaceViews).map((view, i) => {
                 const href = view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
                 const active = pathname === href || pathname.startsWith(`/${view.model}`);
                 return (
                   <NavItem
                     key={view.id}
                     href={href}
-                    icon="layout-grid"
+                    color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
                     label={view.name || 'Untitled'}
                     count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                     active={active}
@@ -402,12 +403,11 @@ function BaseLayoutInner() {
           >
             {myViews.map((view, i) => {
               const href = view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
-              const palette = ['var(--stage-blue)', 'var(--stage-amber)', 'var(--stage-violet)', 'var(--stage-green)', 'var(--stage-rose)', 'var(--stage-slate)'];
               return (
                 <NavItem
                   key={view.id}
                   href={href}
-                  color={palette[i % palette.length]}
+                  color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
                   label={view.name || 'Untitled'}
                   count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                   active={pathname === href}

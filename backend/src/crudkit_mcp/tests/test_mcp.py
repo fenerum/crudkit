@@ -157,6 +157,10 @@ class ReadToolsTest(MCPTestCase):
             self.call("search", {"query": "acme"}),
             [{"id": self.customer.id, "label": "Acme Corp", "object_images": []}],
         )
+        self.assertEqual(
+            self.call("search", {"query": self.customer.id.lower()}),
+            [{"id": self.customer.id, "label": "Acme Corp", "object_images": []}],
+        )
         self.assertEqual(self.call("search", {"query": ""}), "No query provided")
         self.assertEqual(self.call("search", {"query": "zzz"}), "No results found")
 

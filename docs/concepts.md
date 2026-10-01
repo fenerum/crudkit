@@ -41,7 +41,8 @@ class Book(BaseCrudKitModel):
         allowed_prefills = ["author"]
 ```
 
-- `search_fields` — used by list search and the global `/api/v1/search/`.
+- `search_fields` — used by list search and the global `/api/v1/search/`. The
+  CK-ID is always searchable too (exact, case-insensitive), with or without them.
 - `allowed_prefills` — query params accepted by the `/initial/` action to
   prefill create forms (e.g. "new book for author AUT7").
 - `inline_create` — set to `False` to hide the "Create new…" option in

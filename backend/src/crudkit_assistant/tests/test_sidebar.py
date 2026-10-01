@@ -23,7 +23,7 @@ from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantConversation, AssistantProposal
 from crudkit_assistant.routing import websocket_urlpatterns
 from crudkit_assistant.screen import MAX_IDS, Screen, describe_screen, parse_screen
-from tests.testapp.models import Customer
+from tests.testapp.models import Comment, Customer, Ticket
 
 User = get_user_model()
 
@@ -149,6 +149,32 @@ class CrossRecordToolTests(TestCase):
         self.assertTrue(self.run_tool(tools.get_object).startswith("ERROR: No record is open"))
         self.assertTrue(self.run_tool(tools.get_related, "notes", id=self.other.pk).startswith("ERROR: Unknown"))
         self.assertIn("Other", self.run_tool(tools.get_object, id=self.other.pk))
+
+    def test_related_records_are_listed_and_followable(self):
+        grant(self.user, "view_ticket", "view_comment")
+        ticket = Ticket.objects.create(
+            customer=self.other, subject="Broken", created_by=self.user, updated_by=self.user
+        )
+        Ticket.objects.create(
+            customer=self.other, subject="Gone", deleted=True, created_by=self.user, updated_by=self.user
+        )
+        Comment.objects.create(ticket=ticket, body="Still broken", created_by=self.user, updated_by=self.user)
+
+        related = self.run_tool(tools.describe_object, id=self.other.pk)["related"]
+        self.assertEqual(related, [{"relation": "ticket_set", "type": "TIC", "field": "customer", "count": 1}])
+        for name in ("ticket_set", "ticket", "TIC"):
+            rows = self.run_tool(tools.get_related, name, id=self.other.pk)
+            self.assertEqual([row["id"] for row in rows], [ticket.pk])
+        error = self.run_tool(tools.get_related, "case_set", id=self.other.pk)
+        self.assertIn("Valid: ['ticket_set (TIC)']", error)
+        # Rows name the records they point at by id, so the assistant can follow them.
+        comment = self.run_tool(tools.get_related, "comment_set", id=ticket.pk)[0]
+        self.assertIn(f"ticket: Broken ({ticket.pk})", comment["context"])
+
+    def test_related_types_the_user_cannot_view_are_left_out(self):
+        Ticket.objects.create(customer=self.other, subject="Broken", created_by=self.user, updated_by=self.user)
+        self.assertEqual(self.run_tool(tools.describe_object, id=self.other.pk)["related"], [])
+        self.assertTrue(self.run_tool(tools.get_related, "ticket_set", id=self.other.pk).startswith("ERROR"))
 
     def test_screen_rows_skip_hidden_records(self):
         with hide(self.other):

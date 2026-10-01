@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- The assistant and agents can find the records that point at a record (association rows,
+  children): `describe_object` lists them under `related` with their counts, `get_related`
+  accepts the relation's accessor name, related name or TYPE_ID and names the valid relations
+  when it can't match, and leaves out soft-deleted rows. The default `get_ai_context()` shows
+  a foreign key's id next to its label (`case: Refund missing (CAS12)`), so the assistant can
+  follow it. Agents previously guessed relation names and concluded there were none.
+
 ## 0.6.1 (2026-10-01)
 
 - Kanban card order persists: when a kanban view's `order_by` is a numeric field (e.g.

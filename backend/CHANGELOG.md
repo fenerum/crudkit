@@ -1,21 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.6.1 (2026-10-01)
 
 - Kanban card order persists: when a kanban view's `order_by` is a numeric field (e.g.
   `sort_order`), dropping a card renumbers its column in that field through the new
   `POST /api/v1/<TYPE>/reorder/` (`{"field", "ids"}`; needs change permission, one change
   set). Without such a field, a card dropped within its own column snaps back instead of
-  showing an order that's lost on reload.
+  showing an order that's lost on reload. (#60)
 - Search by CRM ID. Every model's list search (`_q`), the global `/api/v1/search/`, FK
   pickers, the MCP `search`/`list_records` tools and the assistant now match a record's CK-ID
   exactly and case-insensitively (`cus123` finds `CUS123`), alongside its `search_fields`.
   Models without `search_fields` are now included in global search (ID matches only), and a
   list search on them no longer returns every row. A `TYPE:` scoped search with a second colon
-  no longer errors.
+  no longer errors. (#56)
 - `CRUDKIT_FRONTEND_CONFIG["brand_color"]` (any CSS color) replaces the indigo accent across
   the UI in both themes. The sidebar logo no longer sits on an accent-colored tile; `logo_url`
-  is shown as-is.
+  is shown as-is. (#61)
 
 ## 0.6.0 (2026-09-29)
 

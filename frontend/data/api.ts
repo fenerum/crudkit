@@ -417,6 +417,11 @@ export default class CrudKitAPIClient {
     return await this.httpPost(`api/v1/${modelName}/${id}/action/`, { action }).then((r) => r.json());
   }
 
+  // Sets the numeric `field` of each record in `ids` to its position.
+  async reorder(modelName: string, field: string, ids: Array<string | number>) {
+    return changeSetOf(await this.httpPost(`api/v1/${modelName}/reorder/`, { field, ids }));
+  }
+
   async merge(modelName: string, id: string, data: Record<string, any>) {
     try {
       const response = await this.httpPost(`api/v1/${modelName}/${id}/merge/`, data);

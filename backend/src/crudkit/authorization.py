@@ -7,7 +7,7 @@ from crudkit.utils import get_model_types
 def get_permission_action(method: str, view_action: str | None = None) -> str:
     if view_action in {"create", "initial_data"}:
         return "add"
-    if view_action in {"update", "partial_update", "merge", "call_action", "restore"}:
+    if view_action in {"update", "partial_update", "merge", "reorder", "call_action", "restore"}:
         return "change"
     if view_action == "destroy":
         return "delete"

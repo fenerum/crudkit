@@ -19,6 +19,7 @@ from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField, WYSIWY
 class Topic(BaseCrudKitModel):
     TYPE_ID = "TOP"
     name = models.CharField(max_length=128)
+    sort_order = models.PositiveIntegerField(default=0)
 
     def __str__(self):
         return self.name

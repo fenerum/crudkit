@@ -59,32 +59,73 @@ test.describe('layouts', () => {
     await expect(card.getByRole('img', { name: 'priority: High' })).toBeVisible();
   });
 
-  test('kanban drag and drop moves a card to another column', async ({ page, request }) => {
-    const name = unique('Drag me');
-    // Start in "Reading": other specs pile new cards into "To read", which can
-    // push a new card there below the fold.
-    const reading = await createObject(request, 'RDG', { name, status: 'reading' });
-    await page.reload();
-    await openView(page, 'Board');
+  // A write broadcasts a refetch to every open board, which resets a drag in
+  // progress, so the drag specs mustn't overlap.
+  test.describe('kanban drag', () => {
+    test.describe.configure({ mode: 'serial' });
 
-    const card = page.locator('.ck-deal-card').filter({ hasText: name });
-    const target = finishedColumn(page);
-    await expect(card).toBeVisible();
+    test('kanban drag and drop moves a card to another column', async ({ page, request }) => {
+      const name = unique('Drag me');
+      // Start in "Reading": other specs pile new cards into "To read", which can
+      // push a new card there below the fold.
+      const reading = await createObject(request, 'RDG', { name, status: 'reading' });
+      await page.reload();
+      await openView(page, 'Board');
 
-    const from = await card.boundingBox();
-    const to = await target.boundingBox();
-    const patched = page.waitForResponse(
-      (r) => r.request().method() === 'PATCH' && r.url().includes(`/api/v1/RDG/${reading.id}/`)
-    );
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(to.x + to.width / 2, to.y + 120, { steps: 20 });
-    await page.mouse.up();
+      const card = page.locator('.ck-deal-card').filter({ hasText: name });
+      const target = finishedColumn(page);
+      await expect(card).toBeVisible();
 
-    expect((await patched).ok()).toBeTruthy();
-    await expect(page.getByText('Status updated')).toBeVisible();
-    await page.reload();
-    await expect(finishedColumn(page)).toContainText(name);
+      const from = await card.boundingBox();
+      const to = await target.boundingBox();
+      const patched = page.waitForResponse(
+        (r) => r.request().method() === 'PATCH' && r.url().includes(`/api/v1/RDG/${reading.id}/`)
+      );
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(to.x + to.width / 2, to.y + 120, { steps: 20 });
+      await page.mouse.up();
+
+      expect((await patched).ok()).toBeTruthy();
+      await expect(page.getByText('Status updated')).toBeVisible();
+      await page.reload();
+      await expect(finishedColumn(page)).toContainText(name);
+    });
+
+    test('kanban drag within a column persists the order field', async ({ page, request }) => {
+      const first = unique('Order first');
+      const second = unique('Order second');
+      // High sort_order keeps both below cards other specs add concurrently.
+      await createObject(request, 'RDG', { name: first, status: 'reading', sort_order: 1000 });
+      await createObject(request, 'RDG', { name: second, status: 'reading', sort_order: 1001 });
+      await page.reload();
+      await openView(page, 'Board');
+
+      const card = (name: string) => page.locator('.ck-deal-card').filter({ hasText: name });
+      const readingCards = page
+        .locator('.ck-pipe-col')
+        .filter({ has: page.locator('.ck-pipe-name', { hasText: /^Reading$/ }) })
+        .locator('.ck-deal-card');
+      const position = async (name: string) =>
+        (await readingCards.allTextContents()).findIndex((text) => text.includes(name));
+      await card(second).scrollIntoViewIfNeeded();
+      expect(await position(second)).toBeGreaterThan(await position(first));
+
+      const from = await card(second).boundingBox();
+      const to = await card(first).boundingBox();
+      const reordered = page.waitForResponse(
+        (r) => r.request().method() === 'POST' && r.url().includes('/api/v1/RDG/reorder/')
+      );
+      await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(to.x + to.width / 2, to.y + 5, { steps: 20 });
+      await page.mouse.up();
+
+      expect((await reordered).ok()).toBeTruthy();
+      await page.reload();
+      await expect(card(second)).toBeVisible();
+      expect(await position(second)).toBeLessThan(await position(first));
+    });
   });
 
   test('kanban column "+" creates a card in that column', async ({ page }) => {

@@ -1,13 +1,15 @@
 # Changelog
 
-## Unreleased
+## 0.6.2 (2026-10-01)
 
 - The assistant and agents can find the records that point at a record (association rows,
   children): `describe_object` lists them under `related` with their counts, `get_related`
   accepts the relation's accessor name, related name or TYPE_ID and names the valid relations
   when it can't match, and leaves out soft-deleted rows. The default `get_ai_context()` shows
   a foreign key's id next to its label (`case: Refund missing (CAS12)`), so the assistant can
-  follow it. Agents previously guessed relation names and concluded there were none.
+  follow it. Agents previously guessed relation names and concluded there were none. (#64)
+- Workspace views in the sidebar get a colored dot like My Views instead of the grid icon.
+  (#63)
 
 ## 0.6.1 (2026-10-01)
 

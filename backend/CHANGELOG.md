@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.6.3 (2026-10-08)
 
 - The assistant can work in forms. With a create or edit form open (page or inline-create
   modal), it sees the form and what has been typed so far, and `fill_form` fills in fields
@@ -8,7 +8,9 @@
   a reading for Kindred, high priority"). Filled fields are outlined briefly, and nothing is
   saved until the user clicks Save/Create. Chat only: background agents don't get these
   tools. The `[Screen]` block reports `/<TYPE>/create` and `/<CK-ID>/edit` as `create` /
-  `edit` routes.
+  `edit` routes. (#66)
+- Fix: a chat turn on a model with `CrudKitSettings.assistant_tools` no longer fails with
+  `TypeError`; the per-model tools are passed to the agent as a toolset. (#67)
 
 ## 0.6.2 (2026-10-01)
 

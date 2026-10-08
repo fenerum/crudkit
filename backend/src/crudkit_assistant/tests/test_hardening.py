@@ -15,6 +15,7 @@ from django.db.models.signals import post_save
 from django.test import TestCase, override_settings, skipUnlessDBFeature
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
+from pydantic_ai import RunContext, Tool
 from pydantic_ai.messages import ToolCallPart
 from rest_framework.test import APIClient
 
@@ -26,7 +27,7 @@ from crudkit_assistant import background, tools
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import Agent, AgentRun, AssistantProposal
 from crudkit_assistant.proposals import create_proposal
-from crudkit_assistant.runner import _load_extra_tools
+from crudkit_assistant.runner import _load_extra_tools, run_turn
 from crudkit_assistant.screen import Screen
 from crudkit_assistant.tests.test_agents import AgentTestCase, User, _FakeCtx, grant
 from tests.testapp.models import Customer, Ticket, Topic
@@ -349,6 +350,19 @@ class AgentHardeningTests(AgentTestCase):
             )
             self.assertEqual(len(_load_extra_tools(chat)), 1)
             self.assertEqual(_load_extra_tools(agent), [])
+
+    def test_project_tools_run_in_the_chat(self):
+        ran = []
+
+        def ping(ctx: RunContext[AssistantDeps]) -> str:
+            ran.append(ctx.deps.screen.record_id)
+            return "pong"
+
+        self.calls = [ToolCallPart(tool_name="ping", args={})]
+        deps = AssistantDeps(user_id=self.user.pk, session_key="s", screen=Screen(record_id=self.acme.id))
+        with self.model(), patch.object(Customer.CrudKitSettings, "assistant_tools", [Tool(ping)], create=True):
+            async_to_sync(run_turn)("Ping it", deps)
+        self.assertEqual(ran, [self.acme.id])
 
     def test_ai_context_teaching_is_for_the_chat_only(self):
         agent = self.make_agent(trigger=Agent.Trigger.MANUAL, watch_fields=[])

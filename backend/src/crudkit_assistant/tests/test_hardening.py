@@ -5,6 +5,7 @@ proposal tools refuse what the serializer would silently mangle.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import timedelta
 from unittest.mock import patch
 
@@ -16,7 +17,8 @@ from django.test import TestCase, override_settings, skipUnlessDBFeature
 from django.test.utils import CaptureQueriesContext
 from django.utils import timezone
 from pydantic_ai import RunContext, Tool
-from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.messages import ModelResponse, TextPart, ToolCallPart, UserPromptPart
+from pydantic_ai.models.function import FunctionModel
 from rest_framework.test import APIClient
 
 from crudkit.audit import audit
@@ -351,23 +353,39 @@ class AgentHardeningTests(AgentTestCase):
             self.assertEqual(len(_load_extra_tools(chat)), 1)
             self.assertEqual(_load_extra_tools(agent), [])
 
+    def test_ai_context_teaching_is_for_the_chat_only(self):
+        agent = self.make_agent(trigger=Agent.Trigger.MANUAL, watch_fields=[])
+        self.start(agent)
+        self.assertNotIn('propose_patch(id="AIC', self.instructions[0])
+
+
+class ProjectToolTests(TestCase):
     def test_project_tools_run_in_the_chat(self):
+        user = User.objects.create_user("user")
+        grant(user, Customer, "view")
+        customer = Customer.objects.create(name="Acme", created_by=user, updated_by=user)
         ran = []
 
         def ping(ctx: RunContext[AssistantDeps]) -> str:
             ran.append(ctx.deps.screen.record_id)
             return "pong"
 
-        self.calls = [ToolCallPart(tool_name="ping", args={})]
-        deps = AssistantDeps(user_id=self.user.pk, session_key="s", screen=Screen(record_id=self.acme.id))
-        with self.model(), patch.object(Customer.CrudKitSettings, "assistant_tools", [Tool(ping)], create=True):
-            async_to_sync(run_turn)("Ping it", deps)
-        self.assertEqual(ran, [self.acme.id])
+        def model_fn(messages, info):
+            if isinstance(messages[-1].parts[-1], UserPromptPart):
+                return ModelResponse(parts=[ToolCallPart(tool_name="ping", args={})])
+            return ModelResponse(parts=[TextPart("Pinged.")])
 
-    def test_ai_context_teaching_is_for_the_chat_only(self):
-        agent = self.make_agent(trigger=Agent.Trigger.MANUAL, watch_fields=[])
-        self.start(agent)
-        self.assertNotIn('propose_patch(id="AIC', self.instructions[0])
+        @asynccontextmanager
+        async def fake_factory():
+            yield FunctionModel(model_fn)
+
+        deps = AssistantDeps(user_id=user.pk, session_key="s", screen=Screen(record_id=customer.id))
+        with (
+            patch("tests.testapp.ai.create_model", fake_factory),
+            patch.object(Customer.CrudKitSettings, "assistant_tools", [Tool(ping)], create=True),
+        ):
+            async_to_sync(run_turn)("Ping it", deps)
+        self.assertEqual(ran, [customer.id])
 
 
 class ProposalToolTests(TestCase):

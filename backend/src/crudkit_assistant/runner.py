@@ -35,6 +35,7 @@ from pydantic_ai.messages import (
     ThinkingPartDelta,
     ToolReturnPart,
 )
+from pydantic_ai.toolsets import FunctionToolset
 
 from crudkit import llm
 from crudkit_assistant.agent import assistant_agent
@@ -119,7 +120,7 @@ async def run_turn(
                 deps=deps,
                 model=model,
                 message_history=message_history or [],
-                **({"tools": extra_tools} if extra_tools else {}),
+                **({"toolsets": [FunctionToolset(extra_tools)]} if extra_tools else {}),
             ) as agent_run:
                 async for node in agent_run:
                     if Agent.is_call_tools_node(node):

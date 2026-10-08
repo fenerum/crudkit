@@ -1,11 +1,11 @@
 import GenericDetailField from "./GenericDetailField.jsx";
 import { Icon } from "./ui";
 
-function Cell({ fieldName, form, value, metadata, errors, modelType }) {
+function Cell({ fieldName, form, value, metadata, errors, modelType, highlighted }) {
     if (!metadata) return null;
     const fieldErr = errors;
     return (
-        <div className={`ck-vt-cell ${form ? 'is-form' : ''}`}>
+        <div className={`ck-vt-cell ${form ? 'is-form' : ''} ${highlighted ? 'is-ai-filled' : ''}`}>
             <div className="ck-vt-cell-l">
                 {metadata.verbose_name}
                 {form && metadata.required && <span className="ck-req">*</span>}
@@ -28,7 +28,7 @@ function Cell({ fieldName, form, value, metadata, errors, modelType }) {
     );
 }
 
-export default function DetailPane({ field_pairs, form, object, metadata, errors, modelType }) {
+export default function DetailPane({ field_pairs, form, object, metadata, errors, modelType, highlighted }) {
     return (
         <div className="flex flex-col gap-4">
             {form && form.non_field_errors && (
@@ -71,6 +71,7 @@ export default function DetailPane({ field_pairs, form, object, metadata, errors
                                     metadata={metadata[field]}
                                     errors={errors?.[field]}
                                     modelType={modelType}
+                                    highlighted={highlighted?.has(field)}
                                 />
                             ))}
                         </div>

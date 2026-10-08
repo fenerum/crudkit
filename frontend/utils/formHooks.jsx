@@ -8,6 +8,7 @@ import { invalidateModel, invalidateRecords } from '../data/invalidate';
 import { showSuccessToast } from '../components/SuccessToast';
 import generateFieldPairs from './fieldpairs';
 import { url } from './urls';
+import { toFormValue } from '../components/Assistant/openForms';
 
 // "<label> <action> successfully", linking to the record, with Undo when the
 // write reported a change set.
@@ -147,10 +148,11 @@ export function useCreateForm({ type, params = {}, onCreated = null, initialValu
   // `initialValues` win over server prefills, which may send blanks for them.
   useEffect(() => {
     if (!initialQuery.data) return;
+    const fields = metadataQuery.data?.fields || {};
     for (const [key, value] of Object.entries({ ...initialQuery.data, ...initialValues })) {
-      formMethods.setValue(key, value, { shouldValidate: true });
+      formMethods.setValue(key, toFormValue(fields[key], value), { shouldValidate: true });
     }
-  }, [initialQuery.data, initialValues, formMethods]);
+  }, [initialQuery.data, initialValues, formMethods, metadataQuery.data]);
 
   const createMutation = useMutation({
     mutationFn: (data) => {

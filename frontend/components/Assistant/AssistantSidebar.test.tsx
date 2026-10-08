@@ -38,4 +38,12 @@ describe("screenLabel and suggestions", () => {
     expect(screenLabel(screen)).toBe("CUS1 · properties");
     expect(suggestionsFor(screen)).toContain("Summarize this record");
   });
+
+  test("open form", () => {
+    const create = { route: "create", type_id: "BOK", form: { type_id: "BOK", mode: "create" } };
+    expect(screenLabel(create)).toBe("New BOK");
+    expect(suggestionsFor(create)).toContain("Help me fill in this form");
+    const modal = { route: "detail", record_id: "AUT1", form: { type_id: "BOK", mode: "edit", record_id: "BOK3" } };
+    expect(screenLabel(modal)).toBe("Editing BOK3");
+  });
 });

@@ -59,6 +59,7 @@ export default function Edit() {
         deleteHref={url(id, 'delete', nextUrl ? { next: nextUrl } : {})}
         formMethods={formMethods}
         modelType={type}
+        recordId={id}
       />
     </>
   );

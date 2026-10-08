@@ -37,6 +37,13 @@ export type IncomingEvent =
       target_label?: string | null;
     }
   | { type: 'tool_outcome'; id: number | string; ok: boolean; status: string; summary?: string; outcome?: any }
+  | {
+      type: 'form_fill';
+      form: { type_id: string; mode: 'create' | 'edit'; record_id: string };
+      fields: Record<string, unknown>;
+      reasoning?: string;
+    }
+  | { type: 'form_open'; type_id: string; fields: Record<string, unknown>; reasoning?: string }
   | { type: 'error'; message: string };
 
 export type Screen = Record<string, unknown>;

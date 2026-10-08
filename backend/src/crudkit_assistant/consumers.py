@@ -24,6 +24,10 @@ Outbound message types:
 - {"type": "assistant_message", "text": "..."}
 - {"type": "tool_call_pending", id, kind, label, payload, reasoning, target, target_label}
 - {"type": "tool_outcome", id, ok, summary, status}
+- {"type": "form_fill", form: {type_id, mode, record_id}, fields, reasoning}
+                                              — fill the open form in the browser (not saved)
+- {"type": "form_open", type_id, fields, reasoning}
+                                              — open a new create form, pre-filled
 - {"type": "error", "message": "..."}
 """
 
@@ -166,7 +170,8 @@ class AssistantConsumer(AuthenticatedConsumer):
             self.message_history = (self.message_history or []) + (result.new_messages or [])
             for envelope in result.pending_events:
                 await self.send_json(envelope)
-                transcript.append({"role": "proposal", "id": envelope["id"]})
+                if envelope["type"] == "tool_call_pending":
+                    transcript.append({"role": "proposal", "id": envelope["id"]})
             if result.output_text:
                 await self.send_json({"type": "assistant_message", "text": result.output_text})
                 transcript.append({"role": "assistant", "text": result.output_text})

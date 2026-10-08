@@ -230,6 +230,23 @@ and `client`, so it can be undone like any other change. Proposals may only
 target types exposed to the assistant: not CrudKit's own proposals, runs,
 change log or notes.
 
+## Forms and the assistant
+
+When the user has a create or edit form open (the `/<TYPE>/create` and
+`/<CK-ID>/edit` pages, or an inline-create modal over them), the sidebar
+reports it in the `[Screen]` block as `Open form`, with the values typed so
+far; with nested modals it is the innermost one. Instead of proposing, the
+assistant can then fill it in: `fill_form(fields)` sets fields in that form
+and `open_create_form(type, fields)` opens a new create form, pre-filled (or
+fills the create form of that type already open). Both validate like the
+propose tools (field names, choices, foreign keys the user can see, add or
+change permission), then send `form_fill` / `form_open` over the socket; the
+browser applies the values through react-hook-form and outlines the filled
+fields for a moment. Nothing is saved: the user reviews the form and clicks
+Save or Create, which is an ordinary REST write. These tools are chat-only;
+background agents don't get them. Opening a form over one with unsaved
+changes asks the user first.
+
 ## Agents
 
 An `Agent` (TYPE_ID `AGT`, in `crudkit_assistant`) is a set of saved

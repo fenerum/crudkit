@@ -22,8 +22,8 @@ from crudkit_assistant import tools
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import AssistantConversation, AssistantProposal
 from crudkit_assistant.routing import websocket_urlpatterns
-from crudkit_assistant.screen import MAX_IDS, Screen, describe_screen, parse_screen
-from tests.testapp.models import Comment, Customer, Ticket
+from crudkit_assistant.screen import MAX_IDS, FormScreen, Screen, describe_screen, parse_screen, screen_model
+from tests.testapp.models import Comment, Customer, Ticket, Topic
 
 User = get_user_model()
 
@@ -101,6 +101,30 @@ class ParseScreenTests(TestCase):
         screen = parse_screen({"visible_ids": [f"CUS{i}" for i in range(MAX_IDS + 50)]})
         self.assertEqual(len(screen.visible_ids), MAX_IDS)
 
+    def test_open_form(self):
+        screen = parse_screen(
+            {
+                "route": "detail",
+                "record_id": "CUS1",
+                "form": {"type_id": "TIC", "mode": "create", "record_id": "CUS1", "values": {"subject": "x" * 900}},
+            }
+        )
+        self.assertEqual(screen.form, FormScreen(type_id="TIC", mode="create", values={"subject": "x" * 500}))
+        # The form, here a modal over a customer, is what the screen is about.
+        self.assertEqual(screen_model(screen), Ticket)
+        edit = parse_screen({"form": {"type_id": "CUS", "mode": "edit", "record_id": "CUS2", "values": {"a": [1]}}})
+        self.assertEqual(edit.form, FormScreen(type_id="CUS", mode="edit", record_id="CUS2", values={"a": None}))
+
+    def test_drops_malformed_forms(self):
+        for form in (
+            "garbage",
+            {"type_id": "XXX", "mode": "create"},
+            {"type_id": "CUS", "mode": "delete"},
+            {"type_id": "CUS", "mode": "edit"},
+            {"type_id": "CUS", "mode": "edit", "record_id": "TIC1"},
+        ):
+            self.assertIsNone(parse_screen({"form": form}).form, form)
+
 
 class DescribeScreenTests(TestCase):
     def setUp(self):
@@ -127,6 +151,15 @@ class DescribeScreenTests(TestCase):
         with hide(self.customer):
             block = describe_screen(self.user, Screen(route="detail", record_id=self.customer.pk))
         self.assertNotIn("Acme", block)
+
+    def test_open_forms(self):
+        create = FormScreen(type_id="CUS", values={"name": "Beta", "email": "", "status": "active"})
+        block = describe_screen(self.user, Screen(route="create", type_id="CUS", form=create))
+        self.assertIn("Open form: new customer (CUS), not saved yet. Current values: {'name': 'Beta', 'status': 'active'}.", block)
+        grant(self.user, "change_customer")
+        edit = FormScreen(type_id="CUS", mode="edit", record_id=self.customer.pk)
+        block = describe_screen(self.user, Screen(route="edit", record_id=self.customer.pk, form=edit))
+        self.assertIn(f"Open form: editing customer {self.customer.pk} (Acme), not saved yet. Current values: none.", block)
 
 
 class CrossRecordToolTests(TestCase):
@@ -272,6 +305,82 @@ class BulkPatchTests(TestCase):
         self.assertEqual(tools.describe_call("propose_bulk_patch", {"ids": self.ids}), "Drafting changes to 3 records")
 
 
+class FormToolTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="staff", password="x")
+        grant(self.user, "view_customer", "add_customer", "change_customer", "view_topic")
+        self.customer = make_customer(self.user, "Acme")
+        self.topic = Topic.objects.create(name="Billing", created_by=self.user, updated_by=self.user)
+        self.deps = AssistantDeps(
+            user_id=self.user.pk,
+            session_key="s1",
+            screen=Screen(route="create", type_id="CUS", form=FormScreen(type_id="CUS")),
+        )
+        self.deps._outbox = asyncio.Queue()  # type: ignore[attr-defined]
+
+    def run_tool(self, tool, *args, **kwargs):
+        return async_to_sync(tool)(_FakeCtx(self.deps), *args, **kwargs)
+
+    def events(self):
+        out = []
+        while not self.deps._outbox.empty():  # type: ignore[attr-defined]
+            out.append(self.deps._outbox.get_nowait())  # type: ignore[attr-defined]
+        return out
+
+    def test_fill_form_sends_values_for_the_open_form(self):
+        result = self.run_tool(tools.fill_form, {"name": "Beta", "status": "churned", "topic": self.topic.pk})
+        self.assertIn("Filled name, status, topic in the customer form", result)
+        self.assertIn("clicks Create", result)
+        self.assertEqual(
+            self.events(),
+            [
+                {
+                    "type": "form_fill",
+                    "form": {"type_id": "CUS", "mode": "create", "record_id": ""},
+                    "fields": {"name": "Beta", "status": "churned", "topic": {"id": self.topic.pk, "label": "Billing"}},
+                    "reasoning": "",
+                }
+            ],
+        )
+        self.assertEqual(Customer.objects.count(), 1)
+        self.assertFalse(AssistantProposal.objects.exists())
+
+    def test_fill_form_rejects_bad_values(self):
+        for fields in ({"nope": 1}, {"status": "gone"}, {"topic": "TOP999"}, {"created_by": self.user.pk}, {}):
+            self.assertTrue(self.run_tool(tools.fill_form, fields).startswith("ERROR"), fields)
+        self.assertEqual(self.events(), [])
+
+    def test_fill_form_needs_an_open_form(self):
+        self.deps.screen = Screen(route="list", type_id="CUS")
+        self.assertTrue(self.run_tool(tools.fill_form, {"name": "Beta"}).startswith("ERROR: No form is open"))
+
+    def test_fill_form_checks_permissions(self):
+        self.deps.screen.form = FormScreen(type_id="CUS", mode="edit", record_id=self.customer.pk)
+        self.assertIn("clicks Save", self.run_tool(tools.fill_form, {"name": "Acme Inc"}))
+        with hide(self.customer):
+            self.assertTrue(self.run_tool(tools.fill_form, {"name": "Acme Inc"}).startswith("ERROR"))
+        self.user.user_permissions.remove(*Permission.objects.filter(codename__in=["add_customer", "change_customer"]))
+        self.assertTrue(self.run_tool(tools.fill_form, {"name": "Acme Inc"}).startswith("ERROR"))
+        self.deps.screen.form = FormScreen(type_id="CUS")
+        self.assertEqual(self.run_tool(tools.fill_form, {"name": "Beta"}), "ERROR: you may not create CUS records.")
+        self.assertEqual(len(self.events()), 1)
+
+    def test_open_create_form(self):
+        self.deps.screen = Screen(route="detail", record_id=self.customer.pk)
+        result = self.run_tool(tools.open_create_form, "CUS", {"name": "Beta"})
+        self.assertIn("clicks Create", result)
+        self.assertEqual(self.events(), [{"type": "form_open", "type_id": "CUS", "fields": {"name": "Beta"}, "reasoning": ""}])
+        self.assertIn("Opened a new customer form", self.run_tool(tools.open_create_form, "CUS"))
+        for args in (("NOPE",), ("CUS", {"status": "gone"}), ("CUS", "name=Beta")):
+            self.assertTrue(self.run_tool(tools.open_create_form, *args).startswith("ERROR"), args)
+        self.user.user_permissions.remove(Permission.objects.get(codename="add_customer"))
+        self.assertTrue(self.run_tool(tools.open_create_form, "CUS").startswith("ERROR: you may not"))
+
+    def test_labels(self):
+        self.assertEqual(tools.describe_call("fill_form", {}), "Filling in the form")
+        self.assertEqual(tools.describe_call("open_create_form", {"type": "TIC"}), "Opening a new TIC form")
+
+
 class ConversationSocketTests(TransactionTestCase):
     """open_conversation → screen → user_message → proposal → confirm → reopen."""
 
@@ -313,6 +422,8 @@ class ConversationSocketTests(TransactionTestCase):
                         for c in (self.customer, self.other)
                     ]
                 )
+            if "fill it in" in last.content:
+                return ModelResponse(parts=[ToolCallPart("fill_form", {"fields": {"name": "Gamma"}})])
             if "rename" in last.content:
                 return ModelResponse(
                     parts=[ToolCallPart("propose_patch", {"fields": {"name": "Acme Inc"}, "id": self.customer.pk})]
@@ -473,6 +584,30 @@ class ConversationSocketTests(TransactionTestCase):
 
         self.assertEqual([(o["type"], o["ok"]) for o in outcomes], [("tool_outcome", True)] * 2)
         self.assertEqual({c.status async for c in Customer.objects.all()}, {"churned"})
+
+    async def test_fill_form_streams_to_the_browser(self):
+        with patch("tests.testapp.ai.create_model", self.fake_factory):
+            ws = await self.connect()
+            await ws.send_json_to({"type": "open_conversation", "id": None})
+            opened = await ws.receive_json_from()
+            form = {"type_id": "CUS", "mode": "edit", "record_id": self.customer.pk, "values": {"name": "Acme"}}
+            await ws.send_json_to({"type": "screen", "screen": {"route": "edit", "form": form}})
+            await ws.send_json_to({"type": "user_message", "text": "fill it in"})
+            events = await self.receive_turn(ws)
+            await ws.disconnect()
+
+        self.assertIn("Open form: editing customer", self.prompts[0])
+        self.assertIn("fill_form, open_create_form", self.instructions[0])
+        self.assertEqual(
+            [event["type"] for event in events if not event["type"].endswith("_delta")],
+            ["turn_start", "tool_start", "tool_end", "form_fill", "assistant_message", "turn_end"],
+        )
+        fill = next(event for event in events if event["type"] == "form_fill")
+        self.assertEqual(fill["fields"], {"name": "Gamma"})
+        await self.customer.arefresh_from_db()
+        self.assertEqual(self.customer.name, "Acme")
+        conversation = await AssistantConversation.objects.aget(pk=opened["id"])
+        self.assertEqual([item["role"] for item in conversation.transcript], ["user", "activity", "assistant"])
 
     async def test_new_conversation_waits_for_the_running_turn(self):
         self.release = asyncio.Event()

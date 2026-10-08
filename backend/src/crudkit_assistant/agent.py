@@ -10,6 +10,7 @@ from asgiref.sync import sync_to_async
 from django.conf import settings
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.settings import ModelSettings
+from pydantic_ai.tools import ToolDefinition
 
 from crudkit import llm
 from crudkit_assistant.deps import AssistantDeps
@@ -17,6 +18,7 @@ from crudkit_assistant.screen import screen_model
 from crudkit_assistant.tools import (
     describe_object,
     describe_types,
+    fill_form,
     get_changelog,
     get_feed,
     get_object,
@@ -24,6 +26,7 @@ from crudkit_assistant.tools import (
     get_related,
     get_screen_rows,
     list_records,
+    open_create_form,
     propose_action,
     propose_bulk_patch,
     propose_create,
@@ -139,6 +142,18 @@ why customers buy, tone of voice, how we work), propose an edit to the
 relevant document with `propose_patch(id="AIC…")`, keeping the rest of its
 text as it is.
 
+In this chat you also have two form tools, which fill in a form in the
+user's browser; nothing is saved until the user clicks Save/Create:
+  Form tools:    fill_form, open_create_form
+When the `[Screen]` block shows an `Open form` and the user asks to fill in,
+complete or change something in it, call `fill_form` instead of a propose
+tool. When the user wants to start a new record they will review first ("draft
+a new ticket for this customer"), call `open_create_form`; use `propose_create`
+only when they want it created without opening the form. Field names and
+choice values come from `describe_types(type)`, foreign keys take the related
+record's id. Never say a form was saved or a record created; say what you
+filled in and that they can review and save it.
+
 Style:
 - Be concise. Short paragraphs and bullet lists, not essays.
 - Lead with the observation or recommendation. Cite the specific records,
@@ -172,6 +187,15 @@ for _tool in (
     propose_revert,
 ):
     assistant_agent.tool(_tool)
+
+
+async def _chat_only(ctx: RunContext[AssistantDeps], tool_def: ToolDefinition) -> ToolDefinition | None:
+    """Form tools act in the user's browser, which background agents don't have."""
+    return tool_def if ctx.deps.source != "agent" else None
+
+
+for _tool in (fill_form, open_create_form):
+    assistant_agent.tool(_tool, prepare=_chat_only)
 
 
 # One `instructions` function, not `system_prompt`s: each instructions source

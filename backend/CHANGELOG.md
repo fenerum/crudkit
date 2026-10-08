@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- The assistant can work in forms. With a create or edit form open (page or inline-create
+  modal), it sees the form and what has been typed so far, and `fill_form` fills in fields
+  for the user to review; `open_create_form` opens a new create form pre-filled (e.g. "start
+  a reading for Kindred, high priority"). Filled fields are outlined briefly, and nothing is
+  saved until the user clicks Save/Create. Chat only: background agents don't get these
+  tools. The `[Screen]` block reports `/<TYPE>/create` and `/<CK-ID>/edit` as `create` /
+  `edit` routes.
+
 ## 0.6.2 (2026-10-01)
 
 - The assistant and agents can find the records that point at a record (association rows,

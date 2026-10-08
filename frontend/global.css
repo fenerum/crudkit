@@ -878,6 +878,12 @@ div[dir="auto"] > * {
     min-width: 0; min-height: 36px;
   }
   .ck-vt-cell:hover { background: var(--bg-3); }
+  /* Filled in by the assistant: a glow that fades out. */
+  .ck-vt-cell.is-ai-filled { animation: ck-ai-filled 3s ease-out; }
+  @keyframes ck-ai-filled {
+    from { background: var(--primary-glow); box-shadow: inset 0 0 0 1px var(--primary-400); }
+    to { background: var(--bg-2); box-shadow: inset 0 0 0 1px transparent; }
+  }
   .ck-vt-cell-l {
     flex: 0 0 auto;
     min-width: 120px;

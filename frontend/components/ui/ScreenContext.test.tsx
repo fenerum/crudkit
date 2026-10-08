@@ -29,7 +29,14 @@ describe("screenFromLocation", () => {
   test("dashboard, inbox and other pages", () => {
     expect(screenFromLocation("/", "").route).toBe("dashboard");
     expect(screenFromLocation("/inbox", "?tab=all").route).toBe("inbox");
-    expect(screenFromLocation("/CUS/create", "").route).toBe("other");
+    expect(screenFromLocation("/CUS/create", "")).toEqual({ path: "/CUS/create", route: "create", type_id: "CUS" });
+    expect(screenFromLocation("/CUS12/edit", "")).toEqual({
+      path: "/CUS12/edit",
+      route: "edit",
+      record_id: "CUS12",
+      type_id: "CUS",
+    });
+    expect(screenFromLocation("/CUS12/delete", "").route).toBe("other");
   });
 });
 

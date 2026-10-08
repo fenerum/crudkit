@@ -7,6 +7,9 @@ Split into two physically-separate groups:
   (CK-ID) and default to the record open on the user's screen; the
   cross-record tools (search, list_records, …) share their logic with MCP
   via crudkit_api.records.
+- Form tools: do NOT mutate either. They emit a form_fill / form_open WS
+  event that the sidebar applies to the form in the user's browser; the
+  user still saves it.
 - Proposal tools: do NOT mutate. They persist an AssistantProposal row,
   emit a tool_call_pending WS event, and return a "pending" string. The
   actual mutation only runs in AssistantConsumer.confirm_proposal() when
@@ -63,6 +66,8 @@ def describe_call(tool_name: str, args: dict) -> str:
         "propose_create_note": f"Drafting a note on {target}",
         "propose_create": f"Drafting a new {args.get('type') or 'record'}",
         "propose_revert": "Drafting an undo",
+        "fill_form": "Filling in the form",
+        "open_create_form": f"Opening a new {args.get('type') or 'record'} form",
     }
     return labels.get(tool_name, f"Running {tool_name}")
 
@@ -589,3 +594,102 @@ async def propose_revert(ctx: RunContext[AssistantDeps], change_set: str, reason
         return f"ERROR: {error}"
     label = f"Undo change {str(change_set)[:8]}"
     return await _propose(ctx, target, AssistantProposal.Kind.REVERT, label, {"change_set": str(change_set)}, reasoning)
+
+
+# ---------------------------------------------------------------------------
+# Form tools (chat only — fill the form in the user's browser; nothing is saved)
+
+
+def _form_values(model, fields: dict) -> dict:
+    """`fields` as the form holds them: foreign keys as {id, label}."""
+    values = {}
+    for name, value in fields.items():
+        field = model._meta.get_field(name)
+        if isinstance(value, dict) and field.is_relation:
+            value = value.get("id")
+        if field.is_relation and value not in (None, ""):
+            related = field.related_model._default_manager.get(pk=value)
+            value = {"id": str(related.pk), "label": str(related)}
+        values[name] = value
+    return values
+
+
+def _checked_form_fields(user, model, fields: dict) -> dict:
+    if error := _field_errors(model, fields, user):
+        raise ValueError(error)
+    return _form_values(model, fields)
+
+
+def _sent_text(model, fields: dict, mode: str) -> str:
+    button = "Save" if mode == "edit" else "Create"
+    return (
+        f"Filled {', '.join(fields)} in the {model._meta.verbose_name} form on the user's screen. "
+        f"Nothing is saved: the user reviews the form and clicks {button}."
+    )
+
+
+async def fill_form(ctx: RunContext[AssistantDeps], fields: dict[str, Any], reasoning: str = "") -> str:
+    """Fill in fields of the create or edit form open on the user's screen
+    (see `Open form` in the [Screen] block). `fields` is a {field_name: value}
+    dict whose names and choice values come from describe_types(type); foreign
+    keys take the related record's id. Nothing is saved: the user reviews the
+    form and saves it."""
+    form = ctx.deps.screen.form
+    if form is None:
+        return "ERROR: No form is open. Use open_create_form to start a new record."
+    if not isinstance(fields, dict) or not fields:
+        return "ERROR: `fields` must be a non-empty {field_name: value} dict."
+
+    def _run():
+        user = _load_user(ctx.deps)
+        model = records.resolve_type(user, form.type_id)
+        if form.mode == "edit":
+            instance, error = _load_changeable(ctx.deps, form.record_id)
+            if instance is None:
+                raise ValueError(error)
+        elif not has_model_permission(user, model, "add"):
+            raise PermissionDenied
+        return model, _checked_form_fields(user, model, fields)
+
+    try:
+        model, values = await sync_to_async(_run)()
+    except PermissionDenied:
+        return f"ERROR: you may not create {form.type_id} records."
+    except ValueError as exc:
+        return f"ERROR: {exc}"
+    target = {"type_id": form.type_id, "mode": form.mode, "record_id": form.record_id}
+    await _emit(ctx, {"type": "form_fill", "form": target, "fields": values, "reasoning": reasoning})
+    return _sent_text(model, values, form.mode)
+
+
+async def open_create_form(
+    ctx: RunContext[AssistantDeps],
+    type: str,
+    fields: dict[str, Any] | None = None,
+    reasoning: str = "",
+) -> str:
+    """Open a new create form for `type` (a TYPE_ID) on the user's screen,
+    pre-filled with `fields` ({field_name: value}, names and choice values from
+    describe_types(type)). Nothing is created: the user reviews the form and
+    clicks Create."""
+    fields = fields or {}
+    if not isinstance(fields, dict):
+        return "ERROR: `fields` must be a {field_name: value} dict."
+
+    def _run():
+        user = _load_user(ctx.deps)
+        model = records.resolve_type(user, type)
+        if not has_model_permission(user, model, "add"):
+            raise PermissionDenied
+        return model, _checked_form_fields(user, model, fields)
+
+    try:
+        model, values = await sync_to_async(_run)()
+    except PermissionDenied:
+        return f"ERROR: you may not create {type} records."
+    except ValueError as exc:
+        return f"ERROR: {exc}"
+    await _emit(ctx, {"type": "form_open", "type_id": model.TYPE_ID, "fields": values, "reasoning": reasoning})
+    if not values:
+        return f"Opened a new {model._meta.verbose_name} form. Nothing is created until the user clicks Create."
+    return _sent_text(model, values, "create")

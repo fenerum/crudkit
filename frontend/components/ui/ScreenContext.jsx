@@ -28,6 +28,13 @@ export function screenFromLocation(pathname, search) {
     screen.record_id = segment;
     screen.type_id = segment.slice(0, 3);
     if (params.get("tab")) screen.tab = params.get("tab");
+  } else if (CK_ID_RE.test(segment) && sub === "edit") {
+    screen.route = "edit";
+    screen.record_id = segment;
+    screen.type_id = segment.slice(0, 3);
+  } else if (TYPE_RE.test(segment) && sub === "create") {
+    screen.route = "create";
+    screen.type_id = segment;
   } else if (TYPE_RE.test(segment) && (!sub || (sub === "VIW" && viewId))) {
     screen.route = "list";
     screen.type_id = segment;

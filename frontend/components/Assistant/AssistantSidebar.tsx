@@ -1,5 +1,6 @@
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import SafeMarkdown from '../../shared/SafeMarkdown';
 import { Icon, useScreen } from '../ui';
@@ -9,6 +10,7 @@ import { invalidateObject, invalidateRecords } from '../../data/invalidate';
 import { formatApiError } from '../../utils/apiErrors';
 import ActivityBlock from './ActivityBlock';
 import ConfirmCard from './ConfirmCard';
+import { activeForm, formScreen, useActiveForm } from './openForms';
 import { useReconnectingSocket, wsUrl } from '../../hooks/useReconnectingSocket';
 import type { ChatItem, IncomingEvent, OutgoingEvent, Resolution, Screen, TranscriptItem } from './types';
 
@@ -50,6 +52,8 @@ export function fromTranscript(transcript: TranscriptItem[]): ChatItem[] {
 
 export function screenLabel(screen: Screen): string {
   const selected = (screen.selected_ids as string[] | undefined)?.length;
+  const form = screen.form as { type_id: string; mode: string; record_id?: string } | undefined;
+  if (form) return form.mode === 'edit' ? `Editing ${form.record_id}` : `New ${form.type_id}`;
   switch (screen.route) {
     case 'detail':
       return `${screen.record_id}${screen.tab ? ` · ${screen.tab}` : ''}`;
@@ -72,6 +76,7 @@ export function screenLabel(screen: Screen): string {
 }
 
 export function suggestionsFor(screen: Screen): string[] {
+  if (screen.form) return ['Help me fill in this form', 'Which fields are still missing?'];
   if (screen.route === 'detail') return ['Summarize this record', 'What changed recently?', 'What should happen next?'];
   if (screen.route === 'list') {
     return (screen.selected_ids as string[] | undefined)?.length
@@ -84,7 +89,13 @@ export function suggestionsFor(screen: Screen): string[] {
 export default function AssistantSidebar({ onClose }: Props) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const screen = useScreen() as Screen;
+  const navigate = useNavigate();
+  const pageScreen = useScreen() as Screen;
+  const openForm = useActiveForm();
+  const screen = useMemo(
+    () => (openForm ? { ...pageScreen, form: formScreen(openForm) } : pageScreen),
+    [pageScreen, openForm],
+  );
   const assistantName = user?.assistant?.name || 'Assistant';
   const avatarUrl = user?.assistant?.avatar_url || '';
 
@@ -180,13 +191,35 @@ export default function AssistantSidebar({ onClose }: Props) {
         setDeciding((prev) => new Map([...prev].filter(([id]) => id !== evt.id)));
         const target = targetsRef.current.get(evt.id);
         if (evt.ok && target) invalidateObject(queryClient, target);
+      } else if (evt.type === 'form_fill') {
+        const form = activeForm();
+        const { type_id, mode, record_id } = evt.form;
+        if (form && form.type === type_id && form.mode === mode && (form.recordId || '') === record_id) {
+          form.fill(evt.fields);
+        } else {
+          const text = 'The form was closed before it could be filled in.';
+          setItems((prev) => [...prev, { kind: 'system', id: nextItemId(), text }]);
+        }
+      } else if (evt.type === 'form_open') {
+        const form = activeForm();
+        if (form?.mode === 'create' && form.type === evt.type_id) {
+          form.fill(evt.fields);
+        } else if (
+          form?.formMethods.formState.isDirty &&
+          !window.confirm('Open a new form? Your unsaved changes in this form will be lost.')
+        ) {
+          const text = 'Kept your form open; the new form was not opened.';
+          setItems((prev) => [...prev, { kind: 'system', id: nextItemId(), text }]);
+        } else {
+          navigate(`/${evt.type_id}/create`, { state: { assistantFill: evt.fields } });
+        }
       } else if (evt.type === 'error') {
         setItems((prev) => [...prev, { kind: 'system', id: nextItemId(), text: `Error: ${evt.message}` }]);
         setBusy(false);
         setDeciding(new Map());
       }
     },
-    [queryClient, updateLiveActivity],
+    [queryClient, updateLiveActivity, navigate],
   );
 
   const url = useMemo(() => wsUrl('/ws/assistant/'), []);
@@ -218,8 +251,10 @@ export default function AssistantSidebar({ onClose }: Props) {
       setItems((prev) => [...prev, { kind: 'user', id: nextItemId(), text }]);
       setInput('');
       setBusy(true);
-      // Send the screen right away so the turn never sees a debounced, stale one.
-      send({ type: 'screen', screen: JSON.parse(screenJson) });
+      // Send the screen right away so the turn never sees a debounced, stale one,
+      // with what has been typed into the open form so far.
+      const form = activeForm();
+      send({ type: 'screen', screen: { ...JSON.parse(screenJson), ...(form && { form: formScreen(form, true) }) } });
       send({ type: 'user_message', text });
     },
     [state, send, screenJson],

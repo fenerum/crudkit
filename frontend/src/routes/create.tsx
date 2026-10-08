@@ -1,4 +1,4 @@
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useCreateForm } from '../../utils/formHooks';
 import FormContainer from '../../components/FormContainer';
 
@@ -10,6 +10,8 @@ export default function Create() {
 
   const type = (segment || '').substring(0, 3);
   const nextUrl = params.next;
+  // Values the assistant opened this form with (see AssistantSidebar's form_open).
+  const assistantFill: Record<string, unknown> | null = useLocation().state?.assistantFill || null;
 
   const {
     handleSubmit,
@@ -21,7 +23,7 @@ export default function Create() {
     metadataQuery,
     getFieldPairs,
     formMethods,
-  } = useCreateForm({ type, params });
+  } = useCreateForm({ type, params, initialValues: assistantFill });
 
   const initialObject = !initialQuery.isPending ? initialQuery.data : {};
   const metadata = !metadataQuery.isPending ? metadataQuery.data?.fields : {};
@@ -41,6 +43,7 @@ export default function Create() {
       cancelHref={nextUrl || `/${type}/`}
       formMethods={formMethods}
       modelType={type}
+      highlightFields={assistantFill && Object.keys(assistantFill)}
     />
   );
 }

@@ -83,6 +83,10 @@ class AgentTestCase(TestCase):
         parts = info.model_request_parameters.instruction_parts
         self.assertEqual(len(parts), 1)
         self.instructions.append(parts[0].content)
+        # Form tools act in a browser, which agents don't have.
+        tool_names = {tool.name for tool in info.function_tools}
+        self.assertNotIn("fill_form", tool_names)
+        self.assertNotIn("Form tools", parts[0].content)
         last = messages[-1].parts[-1]
         if isinstance(last, UserPromptPart):
             self.prompts.append(last.content)

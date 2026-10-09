@@ -23,6 +23,7 @@ test('creates a filtered saved view and switches to it', async ({ page }) => {
   await expect(page).toHaveURL('/RDG');
   await page.getByRole('banner').getByRole('button', { name }).click();
   await expect(page).toHaveURL(/\/RDG\/VIW\/VIW\d+$/);
+  await expect(page).toHaveTitle(`${name} - CrudKit Demo`);
 
   const main = page.getByRole('main');
   await expect(main.getByText('Book club: Kindred')).toBeVisible();

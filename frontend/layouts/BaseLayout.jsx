@@ -1,12 +1,11 @@
 import * as React from "react";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {useQueries} from "@tanstack/react-query";
-import {fetchObjects} from "@/data/api";
 import {RealtimeProvider, useRealtimeConnected} from "@/data/realtime";
 import {Link, Outlet, useLocation} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
-import {isMine, isVisibleToUser, useMenuViews, useWorkspaces} from "../hooks/useMenuViews";
+import {isMine, isVisibleToUser, useMenuViews, useWorkspaces, viewBadgeQuery} from "../hooks/useMenuViews";
 import {resolveWorkspaceViews} from "../utils/workspaces";
 import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
 import AppLogo from "../components/AppLogo";
@@ -268,11 +267,7 @@ function BaseLayoutInner() {
 
   const realtimeConnected = useRealtimeConnected();
   const badgeQueries = useQueries({
-    queries: viewsWithBadges.map((view) => ({
-      queryKey: ['list', view.model, 'badge', view.id, view.filters],
-      queryFn: () => fetchObjects(view.model, {page_size: 1, _fields: 'id', _view: view.id, ...view.filters}),
-      refetchInterval: realtimeConnected ? false : 60_000,
-    })),
+    queries: viewsWithBadges.map((view) => viewBadgeQuery(view, realtimeConnected)),
   });
   const badgeCounts = Object.fromEntries(viewsWithBadges.map((view, i) => [view.id, badgeQueries[i]?.data?.count]));
   const pendingProposals = usePendingProposals();

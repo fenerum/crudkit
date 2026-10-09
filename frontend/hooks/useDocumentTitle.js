@@ -1,15 +1,27 @@
 import { useEffect } from 'react';
-import { useLocation, useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { useRealtimeConnected } from '../data/realtime';
 import { appConfig } from '../utils/appConfig';
-import { generateBreadcrumbs } from '../utils/breadcrumbs';
+import { useBreadcrumbs } from './useBreadcrumbs';
+import { viewBadgeQuery } from './useMenuViews';
 
 export function useDocumentTitle(prefix = appConfig.app_name) {
-  const { pathname } = useLocation();
-  const params = useParams();
+  const { crumbs, view } = useBreadcrumbs();
+  const last = crumbs[crumbs.length - 1];
+  const onView = !!last?.viewId && !!view;
+
+  const realtimeConnected = useRealtimeConnected();
+  const { data: badge } = useQuery({
+    ...viewBadgeQuery(view || {}, realtimeConnected),
+    enabled: onView && !!view.show_badge_in_menu,
+  });
+
+  let pageTitle = last?.text || '';
+  if (onView && view.show_badge_in_menu && typeof badge?.count === 'number') {
+    pageTitle = `(${badge.count}) ${pageTitle}`;
+  }
 
   useEffect(() => {
-    const breadcrumbs = generateBreadcrumbs(pathname, params);
-    const pageTitle = breadcrumbs.length > 0 ? breadcrumbs[breadcrumbs.length - 1].text : '';
     document.title = pageTitle ? `${pageTitle} - ${prefix}` : prefix;
-  }, [pathname, params, prefix]);
+  }, [pageTitle, prefix]);
 }

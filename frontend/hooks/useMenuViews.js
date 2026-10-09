@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import CrudKitAPIClient from '../data/api';
+import CrudKitAPIClient, { fetchObjects } from '../data/api';
 
 // Shared menu data with a single query key per model so that
 // `invalidateModel(qc, 'VIW')` / `invalidateModel(qc, 'WSP')` (which
@@ -37,4 +37,14 @@ export function isMine(item, userId) {
 // ones plus the current user's own private ones.
 export function isVisibleToUser(item, userId) {
   return item.public || isMine(item, userId);
+}
+
+// Count query behind a view's menu badge. The tab title reuses it so both
+// read the same cache entry.
+export function viewBadgeQuery(view, realtimeConnected) {
+  return {
+    queryKey: ['list', view.model, 'badge', view.id, view.filters],
+    queryFn: () => fetchObjects(view.model, { page_size: 1, _fields: 'id', _view: view.id, ...view.filters }),
+    refetchInterval: realtimeConnected ? false : 60_000,
+  };
 }

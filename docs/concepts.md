@@ -90,10 +90,14 @@ which `fields` to show, `filters` as `[field, comparator, value]` triples
 (values may use variables like `${user}`), `order_by`/`group_by`/`pivot_by`,
 an optional aggregate, and a `layout` (list, kanban, gallery, swimlane,
 conversation, quadrant). Views can be `public`, per-user, marked `default`,
-or pinned to the menu with `show_in_menu`.
+or pinned to the menu with `show_in_menu`. `show_badge_in_menu` adds a count
+next to the menu item and in the browser tab title. By default it counts every
+row in the view. `badge_filters` (same triple format) narrows the count further,
+e.g. a view of open chats whose badge counts only the unread ones.
 
 Requests opt in with the `_view` query param: the API's `BasicFilter` loads
-the view and applies its filters and ordering server-side. Views are
+the view and applies its filters and ordering server-side; adding `_badge`
+also applies its `badge_filters` (this is how the badge count is fetched). Views are
 themselves CrudKit models, so they are managed through the same generic API
 (`/api/v1/VIW/`) — the SPA's "save this view" feature is just a POST.
 

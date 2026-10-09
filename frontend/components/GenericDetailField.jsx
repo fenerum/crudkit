@@ -60,6 +60,9 @@ export default function GenericDetailField({ fieldName, value, form, metadata, m
   if (fieldName === "filters" && modelType === "VIW") {
     return <FiltersEditor {...fieldProps} />;
   }
+  if (fieldName === "badge_filters" && modelType === "VIW") {
+    return <FiltersEditor {...fieldProps} emptyText="No badge filters · counts every record in the view" />;
+  }
 
   // Smart editor for Layout's `inlines` — a list of (related model, fields)
   // tuples. Each row gets its own field picker for its model.

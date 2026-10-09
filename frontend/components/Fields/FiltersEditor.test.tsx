@@ -34,20 +34,20 @@ vi.mock("../../data/api", () => {
 
 let form: UseFormReturn;
 
-function Harness({ filters }: { filters: unknown }) {
+function Harness({ filters, emptyText }: { filters: unknown; emptyText?: string }) {
   form = useForm({ defaultValues: { model: "CUS", filters } });
   return (
     <FormProvider {...form}>
-      <FiltersEditor fieldName="filters" defaultValue={filters} metadata={{}} />
+      <FiltersEditor fieldName="filters" defaultValue={filters} metadata={{}} emptyText={emptyText} />
     </FormProvider>
   );
 }
 
-async function renderEditor(filters: unknown) {
+async function renderEditor(filters: unknown, emptyText?: string) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={queryClient}>
-      <Harness filters={filters} />
+      <Harness filters={filters} emptyText={emptyText} />
     </QueryClientProvider>,
   );
   await waitFor(() =>
@@ -71,6 +71,16 @@ describe("FiltersEditor", () => {
     expect(within(rows()[0]).getByText("Active")).toBeInTheDocument();
     expect(within(rows()[1]).getByLabelText("Filter value")).toHaveValue("100");
     expect(screen.getByText("2 filters · all must match")).toBeInTheDocument();
+  });
+
+  test("shows the empty text when there are no filters", async () => {
+    await renderEditor([]);
+    expect(screen.getByText("No filters · shows every record")).toBeInTheDocument();
+  });
+
+  test("accepts custom empty text", async () => {
+    await renderEditor([], "No badge filters · counts every record in the view");
+    expect(screen.getByText("No badge filters · counts every record in the view")).toBeInTheDocument();
   });
 
   test("adds a filter, sets its comparator and value, and removes it", async () => {

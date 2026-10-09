@@ -41,7 +41,7 @@ describe('useDocumentTitle', () => {
     fetchObject.mockResolvedValue({ id: 6, model: 'OPP', name: 'Open Opportunities', show_badge_in_menu: true, filters: null });
     renderAt('/OPP/VIW/VIW6');
     await waitFor(() => expect(document.title).toBe('(2) Open Opportunities - CRM'));
-    expect(fetchObjects).toHaveBeenCalledWith('OPP', { page_size: 1, _fields: 'id', _view: 6 });
+    expect(fetchObjects).toHaveBeenCalledWith('OPP', { page_size: 1, _fields: 'id', _view: 6, _badge: 1 });
   });
 
   test('uses the verbose plural on a model list', async () => {

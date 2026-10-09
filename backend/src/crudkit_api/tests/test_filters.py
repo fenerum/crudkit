@@ -1,10 +1,11 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.request import Request
-from rest_framework.test import APIRequestFactory
+from rest_framework.test import APIClient, APIRequestFactory
 
 from crudkit.models import View
 from crudkit_api.filters import BasicFilter
+from tests.testapp.models import Customer
 
 
 class MockView:
@@ -237,3 +238,33 @@ class TestBasicFilter(TestCase):
         self.assertEqual(result.applied_order_by[1], "created_at")
         # Third field should be -updated_at
         self.assertEqual(result.applied_order_by[2], "-updated_at")
+
+
+class BadgeFilterTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_superuser(username="admin", password="pw")
+        audit = {"created_by": self.user, "updated_by": self.user}
+        Customer.objects.create(name="Acme", owner=self.user, **audit)
+        Customer.objects.create(name="Globex", **audit)
+        Customer.objects.create(name="Initech", status="churned", owner=self.user, **audit)
+        self.view = View.objects.create(
+            name="Active",
+            model="CUS",
+            fields=["name"],
+            filters=[["status", "!=", "churned"]],
+            badge_filters=[["owner", "=", "${user}"]],
+            **audit,
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(self.user)
+
+    def count(self, params):
+        response = self.client.get("/api/v1/CUS/", {"page_size": 1, **params})
+        self.assertEqual(response.status_code, 200)
+        return response.data["count"]
+
+    def test_view_alone_ignores_badge_filters(self):
+        self.assertEqual(self.count({"_view": self.view.pk}), 2)
+
+    def test_badge_param_applies_badge_filters_on_top(self):
+        self.assertEqual(self.count({"_view": self.view.pk, "_badge": 1}), 1)

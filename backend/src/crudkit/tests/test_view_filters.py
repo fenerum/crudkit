@@ -22,12 +22,13 @@ class ViewFilterTests(TestCase):
             name="Globex", status="churned", owner=self.other, balance=Decimal("50"), **audit
         )
 
-    def make_view(self, filters):
+    def make_view(self, filters, badge_filters=None):
         return View(
             name="Filtered",
             model="CUS",
             fields=["name"],
             filters=filters,
+            badge_filters=badge_filters,
             created_by=self.user,
             updated_by=self.user,
         )
@@ -60,3 +61,15 @@ class ViewFilterTests(TestCase):
 
     def test_filter_resolves_current_user(self):
         self.assertEqual(self.names([["owner", "=", "${user}"]]), ["Acme"])
+
+    def test_clean_validates_badge_filters(self):
+        with self.assertRaises(ValidationError) as ctx:
+            self.make_view([], [["name", "~", "Acme"]]).clean()
+        self.assertIn("badge_filters", ctx.exception.message_dict)
+
+    def test_badge_filter_narrows_the_view(self):
+        request = SimpleNamespace(user=self.user)
+        view = self.make_view([["balance", ">=", 10]], [["owner", "=", "${user}"]])
+        self.assertEqual(view.filter(Customer.objects.all(), request).count(), 2)
+        self.assertEqual([c.name for c in view.badge_filter(Customer.objects.all(), request)], ["Acme"])
+        self.assertEqual(view.get_count(request), 1)

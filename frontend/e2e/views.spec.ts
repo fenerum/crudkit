@@ -11,7 +11,8 @@ test('creates a filtered saved view and switches to it', async ({ page }) => {
   const name = unique('Finished high');
   await page.goto('/VIW/create?model=RDG&next=/RDG');
   await page.locator('input[name="name"]').fill(name);
-  const filters = page.getByTestId('filters-editor');
+  // The form also has a badge_filters editor below this one.
+  const filters = page.getByTestId('filters-editor').first();
   const rows = filters.getByTestId('filter-row');
   for (const [field, value] of [['Status', 'Finished'], ['Priority', 'High']]) {
     await choose(filters.getByLabel('Filter field').last(), field);

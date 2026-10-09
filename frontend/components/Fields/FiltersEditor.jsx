@@ -394,7 +394,7 @@ function AddFilterSelect({ fieldMetaByName, onAdd }) {
   );
 }
 
-function Editor({ value, onChange, metaRef }) {
+function Editor({ value, onChange, metaRef, emptyText }) {
   const modelType = useWatch({ name: "model" });
   const { metadata, isMetadataLoading } = useMetadata(modelType);
   const fieldMetaByName = useMemo(() => metadata?.fields || {}, [metadata]);
@@ -438,7 +438,7 @@ function Editor({ value, onChange, metaRef }) {
       <div className="flex items-center justify-between">
         <span className="text-xs text-fg-3">
           {rows.length === 0
-            ? "No filters · shows every record"
+            ? emptyText
             : `${rows.length} filter${rows.length === 1 ? "" : "s"} · all must match`}
         </span>
         {rows.length > 0 && (
@@ -473,7 +473,13 @@ function Editor({ value, onChange, metaRef }) {
   );
 }
 
-export default function FiltersEditor({ fieldName, defaultValue, metadata, ...rest }) {
+export default function FiltersEditor({
+  fieldName,
+  defaultValue,
+  metadata,
+  emptyText = "No filters · shows every record",
+  ...rest
+}) {
   // Field metadata of the selected model, kept current by the editor so the
   // submit-time validation below can check values against it.
   const metaRef = useRef(null);
@@ -487,7 +493,7 @@ export default function FiltersEditor({ fieldName, defaultValue, metadata, ...re
   };
   return (
     <BaseField fieldName={fieldName} defaultValue={defaultValue} metadata={metadata} rules={rules} {...rest}>
-      {({ value, onChange }) => <Editor value={value} onChange={onChange} metaRef={metaRef} />}
+      {({ value, onChange }) => <Editor value={value} onChange={onChange} metaRef={metaRef} emptyText={emptyText} />}
     </BaseField>
   );
 }

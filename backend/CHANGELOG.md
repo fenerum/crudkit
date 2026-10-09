@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Saved views get `badge_filters`: extra `[field, comparator, value]` filters applied on top
+  of the view's own filters, only for the menu badge and tab-title count. For example, a view
+  of open chats can count just the unread ones. The list API applies them when `_badge` is
+  passed alongside `_view`, and the view form edits them with the filter builder. Needs
+  migration `crudkit.0007_view_badge_filters`.
+
 ## 0.6.3 (2026-10-08)
 
 - The assistant can work in forms. With a create or edit form open (page or inline-create

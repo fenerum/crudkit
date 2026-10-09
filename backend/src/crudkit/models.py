@@ -509,6 +509,15 @@ class View(BaseCrudKitModel):
         help_text=("Format: [[field, comparator, value], [field, comparator, value], ...]"),
         encoder=PrettyJSONEncoder,
     )
+    badge_filters = models.JSONField(
+        null=True,
+        blank=True,
+        help_text=(
+            "Extra filters applied on top of filters when counting the menu badge, e.g. only unread. "
+            "Format: same as filters"
+        ),
+        encoder=PrettyJSONEncoder,
+    )
 
     order_by = models.CharField(
         max_length=128,
@@ -553,22 +562,8 @@ class View(BaseCrudKitModel):
                         {"fields": _(f"Field '{field_name}' does not exist on model '{self.model}'.")}
                     )
 
-        # Validate filter fields exist
-        if self.filters:
-            for field_spec in self.filters:
-                if not isinstance(field_spec, list) or len(field_spec) != 3 or not isinstance(field_spec[0], str):
-                    raise ValidationError(
-                        {"filters": _("Filter format is invalid. Should be [field, comparator, value]")}
-                    )
-
-                field_name, comparator, _value = field_spec
-                # Skip validating field paths with relationships (field__subfield)
-                if "__" not in field_name and field_name not in model_field_names:
-                    raise ValidationError(
-                        {"filters": _(f"Field '{field_name}' does not exist on model '{self.model}'.")}
-                    )
-                if comparator not in self.FILTER_COMPARATORS:
-                    raise ValidationError({"filters": _(f"Unknown comparator '{comparator}'.")})
+        self._validate_filters("filters", self.filters, model_field_names)
+        self._validate_filters("badge_filters", self.badge_filters, model_field_names)
 
         # Validate order_by fields exist
         if self.order_by:
@@ -611,8 +606,28 @@ class View(BaseCrudKitModel):
                     {"fields": _("Quadrant views require at least 2 fields (first=X-axis, second=Y-axis).")}
                 )
 
+    def _validate_filters(self, key, filters, model_field_names):
+        for field_spec in filters or []:
+            if not isinstance(field_spec, list) or len(field_spec) != 3 or not isinstance(field_spec[0], str):
+                raise ValidationError({key: _("Filter format is invalid. Should be [field, comparator, value]")})
+
+            field_name, comparator, _value = field_spec
+            # Skip validating field paths with relationships (field__subfield)
+            if "__" not in field_name and field_name not in model_field_names:
+                raise ValidationError({key: _(f"Field '{field_name}' does not exist on model '{self.model}'.")})
+            if comparator not in self.FILTER_COMPARATORS:
+                raise ValidationError({key: _(f"Unknown comparator '{comparator}'.")})
+
     def filter(self, qs, request=None):
-        for field, comparator, value in self.filters or []:
+        return self._apply_filters(qs, self.filters, request)
+
+    def badge_filter(self, qs, request=None):
+        """The view's filters plus `badge_filters`: what the menu badge counts."""
+        return self._apply_filters(self.filter(qs, request), self.badge_filters, request)
+
+    @staticmethod
+    def _apply_filters(qs, filters, request=None):
+        for field, comparator, value in filters or []:
             # Resolve variables like ${user} if a request is provided
             if request and isinstance(value, str):
                 from crudkit.utils import resolve_variable_value
@@ -639,7 +654,7 @@ class View(BaseCrudKitModel):
         return get_model_types()[self.model]
 
     def get_count(self, request=None):
-        return self.filter(self.get_model().objects.all(), request=request).count()
+        return self.badge_filter(self.get_model().objects.all(), request=request).count()
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         allowed_prefills = ["model", "fields"]

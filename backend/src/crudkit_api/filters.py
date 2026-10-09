@@ -29,7 +29,9 @@ class BasicFilter(filters.BaseFilterBackend):
             model_type_id = getattr(queryset.model, "TYPE_ID", None)
             if model_type_id and view_obj.model != model_type_id:
                 raise ValidationError("Saved view does not match this model.")
-            if view_obj.filters:
+            if "_badge" in request.query_params:
+                queryset = view_obj.badge_filter(queryset, request=request)
+            else:
                 queryset = view_obj.filter(queryset, request=request)
         # Handle standard field filters
         for field in queryset.model._meta.get_fields():

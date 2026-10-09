@@ -43,8 +43,8 @@ export function isVisibleToUser(item, userId) {
 // read the same cache entry.
 export function viewBadgeQuery(view, realtimeConnected) {
   return {
-    queryKey: ['list', view.model, 'badge', view.id, view.filters],
-    queryFn: () => fetchObjects(view.model, { page_size: 1, _fields: 'id', _view: view.id, ...view.filters }),
+    queryKey: ['list', view.model, 'badge', view.id, view.filters, view.badge_filters],
+    queryFn: () => fetchObjects(view.model, { page_size: 1, _fields: 'id', _view: view.id, _badge: 1 }),
     refetchInterval: realtimeConnected ? false : 60_000,
   };
 }

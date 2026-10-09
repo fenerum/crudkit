@@ -26,7 +26,7 @@ function renderAt(path) {
 describe('useDocumentTitle', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    fetchMetadata.mockResolvedValue({ verbose_name_plural: 'Opportunities' });
+    fetchMetadata.mockResolvedValue({ verbose_name_plural: 'opportunities' });
     fetchObjects.mockResolvedValue({ count: 2, results: [] });
   });
 

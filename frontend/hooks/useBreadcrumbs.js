@@ -2,6 +2,7 @@ import { useLocation } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { fetchMetadata, fetchObject } from "../data/api";
 import { generateBreadcrumbs } from "../utils/breadcrumbs";
+import { capitalize } from "../utils/urls";
 
 // Breadcrumb trail with display text resolved: the model crumb gets the
 // verbose plural and a `/VIW/<id>` crumb gets the view's name once loaded.
@@ -27,7 +28,7 @@ export function useBreadcrumbs() {
   });
 
   const resolved = crumbs.map((crumb) => {
-    if (crumb.modelType && metadata?.verbose_name_plural) return { ...crumb, text: metadata.verbose_name_plural };
+    if (crumb.modelType && metadata?.verbose_name_plural) return { ...crumb, text: capitalize(metadata.verbose_name_plural) };
     if (crumb.viewId && view?.name) return { ...crumb, text: view.name };
     return crumb;
   });

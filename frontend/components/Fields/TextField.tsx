@@ -36,7 +36,6 @@ export default function TextField({
           ref={ref}
           required={metadata.required}
           maxLength={metadata.max_length}
-          placeholder={metadata.help_text}
           rows={5}
           className={`block w-full rounded-md border-0 py-1.5 text-fg-1 bg-bg-2 ring-1 ring-inset ${
             hasError ? 'ring-danger' : 'ring-border-1'

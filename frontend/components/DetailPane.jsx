@@ -19,6 +19,9 @@ function Cell({ fieldName, form, value, metadata, errors, modelType, highlighted
                     modelType={modelType}
                 />
             </div>
+            {form && metadata.help_text && (
+                <div className="ck-vt-cell-help">{metadata.help_text}</div>
+            )}
             {fieldErr && (
                 <div className="ck-vt-cell-error">
                     {Array.isArray(fieldErr) ? fieldErr[0] : (fieldErr.non_field_errors?.[0] || String(fieldErr))}

@@ -7,6 +7,9 @@
   of open chats can count just the unread ones. The list API applies them when `_badge` is
   passed alongside `_view`, and the view form edits them with the filter builder. Needs
   migration `crudkit.0007_view_badge_filters`.
+- Create and edit forms show each field's `help_text` as a line under the field. It was only
+  a placeholder before, so it disappeared once the field had a value. The email composer
+  shows it as the field's hint.
 
 ## 0.6.3 (2026-10-08)
 

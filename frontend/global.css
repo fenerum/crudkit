@@ -971,6 +971,8 @@ div[dir="auto"] > * {
     text-align: left;
   }
   .ck-vt-cell-error { font-size: 11px; color: var(--danger); margin-left: auto; max-width: 60%; }
+  .ck-vt-cell.is-form { flex-wrap: wrap; }
+  .ck-vt-cell-help { width: 100%; font-size: 11px; color: var(--fg-3); white-space: pre-line; }
   /* Reset framing on inputs dropped into cells so they read as inline edit. */
   .ck-vt-cell input[type="text"],
   .ck-vt-cell input[type="email"],

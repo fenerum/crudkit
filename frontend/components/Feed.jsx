@@ -446,7 +446,7 @@ function EmailFieldRow({ label, hint, required, fieldName, action, emailMetadata
         <div className="ck-cmp-row">
             <div className="ck-cmp-label">
                 <span>{label}{required && <span className="ck-req"> *</span>}</span>
-                {hint && <span className="ck-cmp-hint">{hint}</span>}
+                {(hint || meta.help_text) && <span className="ck-cmp-hint">{hint || meta.help_text}</span>}
             </div>
             <div className="ck-cmp-field">
                 <GenericDetailField

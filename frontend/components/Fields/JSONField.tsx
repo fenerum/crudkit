@@ -57,7 +57,7 @@ export default function JSONField({
             rows={8}
             className={`ck-input font-mono ${hasError ? 'is-error' : ''}`}
             style={{ width: '100%', resize: 'vertical', minHeight: 160, lineHeight: 1.45 }}
-            placeholder={metadata.help_text || "Enter valid JSON"}
+            placeholder="Enter valid JSON"
           />
         );
       }}

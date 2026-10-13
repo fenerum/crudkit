@@ -1,15 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.6.4 (2026-10-13)
 
+- The browser tab title on a saved view shows the view's name instead of its id, prefixed
+  with the badge count when the view has `show_badge_in_menu`. (#69)
 - Saved views get `badge_filters`: extra `[field, comparator, value]` filters applied on top
   of the view's own filters, only for the menu badge and tab-title count. For example, a view
   of open chats can count just the unread ones. The list API applies them when `_badge` is
   passed alongside `_view`, and the view form edits them with the filter builder. Needs
-  migration `crudkit.0007_view_badge_filters`.
+  migration `crudkit.0007_view_badge_filters`. (#70)
 - Create and edit forms show each field's `help_text` as a line under the field. It was only
   a placeholder before, so it disappeared once the field had a value. The email composer
-  shows it as the field's hint.
+  shows it as the field's hint. (#71)
 
 ## 0.6.3 (2026-10-08)
 

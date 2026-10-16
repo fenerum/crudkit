@@ -12,6 +12,8 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.core.exceptions import PermissionDenied
 from django.db import models
+from django.db.models import Avg, Count, Max, Min, Sum
+from django.db.models.functions import Trunc
 from django.utils import translation
 
 from crudkit.authorization import (
@@ -35,6 +37,15 @@ CHANGELOG_LIMIT = 10
 SKIPPED_APP_LABELS = {"admin", "auth", "contenttypes", "sessions"}
 SKIPPED_FIELDS = {"deleted", "merged_into"}
 AUDIT_FIELDS = {"created_by", "updated_by", "created_at", "updated_at"}
+NUMERIC_FIELDS = (models.IntegerField, models.DecimalField, models.FloatField)
+RANGE_FIELDS = (models.DateField, *NUMERIC_FIELDS)
+# get_record's `fields` may also name these, which are not columns.
+RECORD_EXTRAS = ("feed", "changelog")
+PERIODS = ("day", "week", "month", "quarter", "year")
+AGGREGATES = {"sum": Sum, "avg": Avg, "min": Min, "max": Max}
+MAX_GROUP_BY = 2
+DEFAULT_GROUPS = 100
+MAX_GROUPS = 500
 
 
 def get_exposed_models(mcp_allowlist: bool = True) -> list[type[models.Model]]:
@@ -127,22 +138,49 @@ def writable_fields(model) -> list[tuple[models.Field, dict]]:
     ]
 
 
+def readable_fields(model) -> dict[str, models.Field]:
+    """{name: field} of the columns a caller may ask for by name. Password
+    fields stay out, as they do in the serializer."""
+    return {f.name: f for f, _ in _schema_fields(model) if not f.name.lower().endswith("password")}
+
+
+def _numeric(f) -> bool:
+    return isinstance(f, NUMERIC_FIELDS) and not f.choices
+
+
 def _filters(model) -> tuple[dict, dict[str, str]]:
     """The accepted `filters` keys and the ORM lookup each maps to."""
     described, lookups = {}, {}
+
+    def add(key, lookup, schema):
+        described[key], lookups[key] = schema, lookup
+
     for f, schema in _schema_fields(model):
         if isinstance(f, models.JSONField):
             continue
         if isinstance(f, models.DateField):
-            for suffix, lookup, label in (("from", "gte", "on or after"), ("to", "lte", "on or before")):
-                described[f"{f.name}_{suffix}"] = {**schema, "description": f"{schema['description']} ({label})"}
-                lookups[f"{f.name}_{suffix}"] = f"{f.name}__{lookup}"
+            pass  # Dates only filter by range.
         elif schema.get("type") == "string" and "enum" not in schema and not f.is_relation:
-            described[f.name] = {**schema, "description": f"{schema['description']} (contains, case-insensitive)"}
-            lookups[f.name] = f"{f.name}__icontains"
+            add(
+                f.name,
+                f"{f.name}__icontains",
+                {**schema, "description": f"{schema['description']} (contains, case-insensitive)"},
+            )
         else:
-            described[f.name] = schema
-            lookups[f.name] = f.name
+            add(f.name, f.name, schema)
+        if isinstance(f, RANGE_FIELDS) and not f.choices:
+            for suffix, lookup, label in (("from", "gte", "on or after"), ("to", "lte", "on or before")):
+                add(
+                    f"{f.name}_{suffix}",
+                    f"{f.name}__{lookup}",
+                    {**schema, "description": f"{schema['description']} ({label})"},
+                )
+        if f.null:
+            add(
+                f"{f.name}_isnull",
+                f"{f.name}__isnull",
+                {"type": "boolean", "description": f"{schema['description']} is empty"},
+            )
     return described, lookups
 
 
@@ -179,6 +217,8 @@ def _type_detail(user, model) -> dict:
         "searchable": bool(services.get_search_fields(model)),
         "fields": {f.name: schema for f, schema in writable_fields(model)},
         "required_on_create": [f.name for f, _ in writable_fields(model) if not f.blank and not f.has_default()],
+        "columns": list(readable_fields(model)),
+        "aggregatable": [name for name, f in readable_fields(model).items() if _numeric(f)],
         "actions": {
             name: {"label": label, "requires_approval": requires_approval(model, action=name)}
             for name, label in action_names(model).items()
@@ -205,8 +245,113 @@ def list_records(
     order_by: str | None = None,
     limit: int | None = None,
     offset: int | None = None,
+    fields: list[str] | None = None,
 ) -> dict:
-    """Records of one type, or of a saved view (its filters, ordering and columns)."""
+    """Records of one type, or of a saved view (its filters, ordering and columns).
+    `fields` picks the columns, overriding the view's."""
+    model, view_obj, qs = _queryset(user, type_id, view, filters, query)
+    if order_by and order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields}:
+        raise ValueError(f"Cannot order by {order_by!r}")
+    qs = order_queryset(qs, get_order_fields(view_obj, order_by))
+    limit = min(max(int(limit or DEFAULT_LIMIT), 1), MAX_LIMIT)
+    offset = max(int(offset or 0), 0)
+    if fields:
+        columns = _with_id_label(_checked_columns(model, fields))
+    else:
+        columns = _with_id_label(view_obj.fields) if view_obj else "__all__"
+    return {"total": qs.count(), "results": serialize(model, qs[offset : offset + limit], depth=0, fields=columns)}
+
+
+def aggregate_records(
+    user,
+    type_id: str | None = None,
+    view: str | None = None,
+    filters: dict | None = None,
+    query: str | None = None,
+    group_by: list[str] | None = None,
+    metrics: list[str] | None = None,
+    order_by: str | None = None,
+    limit: int | None = None,
+) -> dict:
+    """Count, sum, average, min or max over the records list_records would
+    return, grouped by up to MAX_GROUP_BY fields or date periods
+    (`created_at:month`)."""
+    model, _, qs = _queryset(user, type_id, view, filters, query)
+    columns = readable_fields(model)
+    plain, truncated = [], {}
+    for entry in _names(group_by, "group_by"):
+        name, _, period = entry.partition(":")
+        f = columns.get(name)
+        if f is None or isinstance(f, models.JSONField):
+            raise ValueError(f"Cannot group by {name!r}. Valid: {list(columns)}")
+        if not period:
+            plain.append(name)
+        elif isinstance(f, models.DateField) and period in PERIODS:
+            truncated[f"{name}_{period}"] = Trunc(name, period, output_field=models.DateField())
+        else:
+            raise ValueError(f"Cannot group by {entry!r}: date fields take :{'|:'.join(PERIODS)}")
+    keys = [*plain, *truncated]
+    if len(keys) > MAX_GROUP_BY:
+        raise ValueError(f"Group by at most {MAX_GROUP_BY} fields")
+
+    annotations = {}
+    for entry in _names(metrics, "metrics") or ["count"]:
+        func, _, name = entry.partition(":")
+        f = columns.get(name)
+        if entry == "count":
+            annotations["count"] = Count("pk")
+        elif func not in AGGREGATES or f is None:
+            raise ValueError(f"Unknown metric {entry!r}: use count, or sum|avg|min|max:<field>")
+        elif not (_numeric(f) if func in ("sum", "avg") else isinstance(f, RANGE_FIELDS)):
+            raise ValueError(
+                f"Cannot {func} {name!r}: needs a {'numeric' if func in ('sum', 'avg') else 'numeric or date'} field"
+            )
+        else:
+            annotations[f"{func}_{name}"] = AGGREGATES[func](name)
+
+    qs = qs.order_by()
+    total = qs.count()
+    if not keys:
+        return {"total": total, "groups": [_jsonable(qs.aggregate(**annotations))], "truncated": False}
+    if order_by and order_by.lstrip("-") not in [*keys, *annotations]:
+        raise ValueError(f"Cannot order by {order_by!r}. Valid: {[*keys, *annotations]}")
+    rows = qs.values(*plain, **truncated).annotate(**annotations).order_by(*([order_by] if order_by else []), *keys)
+    limit = min(max(int(limit or DEFAULT_GROUPS), 1), MAX_GROUPS)
+    rows = list(rows[: limit + 1])
+    groups = [_jsonable(row) for row in rows[:limit]]
+    for name in plain:
+        if columns[name].is_relation:
+            labels = _labels(user, columns[name].related_model, {group[name] for group in groups})
+            for group in groups:
+                group[f"{name}_label"] = labels.get(group[name])
+    return {"total": total, "groups": groups, "truncated": len(rows) > limit}
+
+
+def get_record(user, object_id: str, fields: list[str] | None = None) -> dict:
+    """One record with its recent feed, change log and the actions `user` may
+    run. `fields` picks the columns, and `feed`/`changelog` only if named."""
+    model, instance = get_instance(user, object_id, "view")
+    if fields:
+        wanted = _checked_columns(model, fields, RECORD_EXTRAS)
+        columns = _with_id_label([name for name in wanted if name not in RECORD_EXTRAS])
+    else:
+        wanted, columns = RECORD_EXTRAS, "__all__"
+    data = serialize(model, [instance], depth=1, fields=columns)[0]
+    if "feed" in wanted:
+        data["feed"] = services.get_feed(instance, FEED_LIMIT)
+    if "changelog" in wanted and has_model_permission(user, ChangeLog, "view"):
+        data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT)
+    data["actions"] = [name for name in action_names(model) if has_action_permission(user, instance, name)]
+    return data
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+
+
+def _queryset(user, type_id, view, filters, query):
+    """`(model, view, queryset)`: the visible records of `type_id` or of the
+    saved `view`, narrowed by `filters` and the free-text `query`."""
     view_obj = get_view(user, view) if view else None
     model = resolve_type(user, view_obj.model if view_obj else type_id)
     if view_obj and type_id not in (None, view_obj.model):
@@ -221,34 +366,58 @@ def list_records(
 
     qs = visible(model, user, "view")
     for name, value in filters.items():
-        if value not in (None, ""):
-            qs = qs.filter(**{lookups[name]: value})
+        if value in (None, ""):
+            continue
+        lookup = lookups[name]
+        if isinstance(value, list):
+            if "__" in lookup:
+                raise ValueError(f"Filter {name!r} takes one value, not a list")
+            lookup += "__in"
+        qs = qs.filter(**{lookup: value})
     if query:
         qs = qs.filter(services.search_filter(model, query))
     if view_obj:
         qs = view_obj.filter(qs, request=services.RequestShim(user))
-    if order_by and order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields}:
-        raise ValueError(f"Cannot order by {order_by!r}")
-    qs = order_queryset(qs, get_order_fields(view_obj, order_by))
-    limit = min(max(int(limit or DEFAULT_LIMIT), 1), MAX_LIMIT)
-    offset = max(int(offset or 0), 0)
-    fields = ["id", "label", *view_obj.fields] if view_obj else "__all__"
-    return {"total": qs.count(), "results": serialize(model, qs[offset : offset + limit], depth=0, fields=fields)}
+    return model, view_obj, qs
 
 
-def get_record(user, object_id: str) -> dict:
-    """One record with its recent feed, change log and the actions `user` may run."""
-    model, instance = get_instance(user, object_id, "view")
-    data = serialize(model, [instance], depth=1)[0]
-    data["feed"] = services.get_feed(instance, FEED_LIMIT)
-    if has_model_permission(user, ChangeLog, "view"):
-        data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT)
-    data["actions"] = [name for name in action_names(model) if has_action_permission(user, instance, name)]
-    return data
+def _names(value, argument: str) -> list[str]:
+    """A list of names; a lone string counts as a list of one."""
+    if value in (None, ""):
+        return []
+    if isinstance(value, str):
+        return [value]
+    if not isinstance(value, list) or not all(isinstance(name, str) for name in value):
+        raise ValueError(f"`{argument}` must be a list of names")
+    return value
 
 
-# ---------------------------------------------------------------------------
-# Helpers
+def _checked_columns(model, fields, extras=()) -> list[str]:
+    names = _names(fields, "fields")
+    valid = ["id", "label", *readable_fields(model), *extras]
+    unknown = sorted(set(names) - set(valid))
+    if unknown:
+        raise ValueError(f"Unknown field(s): {unknown}. Valid: {valid}")
+    return names
+
+
+def _with_id_label(columns) -> list[str]:
+    return list(dict.fromkeys(["id", "label", *columns]))
+
+
+def _jsonable(row: dict) -> dict:
+    return {key: value.isoformat() if hasattr(value, "isoformat") else value for key, value in row.items()}
+
+
+def _related_queryset(user, related):
+    if getattr(related, "TYPE_ID", None):
+        return get_authorized_queryset(user, related.objects.all(), "view")
+    return related._default_manager.all()
+
+
+def _labels(user, related, pks) -> dict:
+    """{pk: label} of the `related` rows among `pks` that `user` may see."""
+    return {obj.pk: str(obj) for obj in _related_queryset(user, related).filter(pk__in=pks - {None})}
 
 
 def resolve_type(user, type_id):
@@ -312,12 +481,7 @@ def check_values(user, writable: dict, fields: dict) -> dict:
             value = value.get("id")
         if f.is_relation and value not in (None, ""):
             related = f.related_model
-            qs = (
-                get_authorized_queryset(user, related.objects.all(), "view")
-                if getattr(related, "TYPE_ID", None)
-                else related._default_manager.all()
-            )
-            if not qs.filter(pk=value).exists():
+            if not _related_queryset(user, related).filter(pk=value).exists():
                 raise ValueError(f"{name}: {related._meta.verbose_name} {value!r} not found")
     return fields
 

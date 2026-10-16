@@ -16,6 +16,7 @@ from crudkit import llm
 from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.screen import screen_model
 from crudkit_assistant.tools import (
+    aggregate_records,
     describe_object,
     describe_types,
     fill_form,
@@ -66,13 +67,17 @@ since earlier messages.
 
 The ONLY tools you may call are exactly these — never invent another name:
   Record tools:  get_object, describe_object, get_changelog, get_feed, get_related
-  Search tools:  search, describe_types, list_records, get_record, get_screen_rows
+  Search tools:  search, describe_types, list_records, aggregate_records, get_record,
+                 get_screen_rows
   Propose tools: propose_patch, propose_bulk_patch, propose_action, propose_create_note,
                  propose_create, propose_revert
 
 Record and propose tools take an optional `id` (e.g. CUS123); without it they
 use the record open on screen. Use `get_screen_rows` to read the selected or
 visible rows of a list, and `list_records(view=...)` for a whole saved view.
+Answer counts, totals and trends ("leads per month", "revenue by owner") with
+`aggregate_records` rather than listing rows, and pass `fields` to
+`list_records`/`get_record` when you only need some columns.
 Records that point at a record (its children, links and association rows)
 are listed under `related` in `describe_object`, with their counts: read them
 with `get_related(relation)` and follow the ids in what it returns with
@@ -177,6 +182,7 @@ for _tool in (
     search,
     describe_types,
     list_records,
+    aggregate_records,
     get_record,
     get_screen_rows,
     propose_action,

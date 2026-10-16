@@ -58,6 +58,7 @@ def describe_call(tool_name: str, args: dict) -> str:
         "search": f"Searching for “{args.get('query')}”",
         "describe_types": f"Looking up {args.get('type') or 'the record types'}",
         "list_records": f"Listing {args.get('view') or args.get('type') or 'records'}",
+        "aggregate_records": f"Counting {args.get('view') or args.get('type') or 'records'}",
         "get_record": f"Reading {args.get('id')}",
         "get_screen_rows": f"Reading the {args.get('which') or 'selected'} rows",
         "propose_patch": f"Drafting a change to {target}",
@@ -225,9 +226,14 @@ async def list_records(
     order_by: str | None = None,
     limit: int = 20,
     offset: int = 0,
+    fields: list[str] | None = None,
 ) -> dict:
     """List records of one type, or of a saved view (e.g. the view on screen).
-    Returns {total, results}. `filters` keys come from describe_types."""
+    Returns {total, results}. `filters` keys come from describe_types:
+    <field>_from/_to for date and number ranges, <field>_isnull, and a list
+    value matches any of its values. `fields` picks the columns (describe_types
+    `columns`); pass only those you need. For counts, totals or trends use
+    aggregate_records instead."""
     return await _records_call(
         ctx,
         records.list_records,
@@ -238,12 +244,47 @@ async def list_records(
         order_by=order_by,
         limit=limit,
         offset=offset,
+        fields=fields,
     )
 
 
-async def get_record(ctx: RunContext[AssistantDeps], id: str) -> dict:
-    """One record by id, with its recent feed, change log and available actions."""
-    return await _records_call(ctx, records.get_record, id)
+async def aggregate_records(
+    ctx: RunContext[AssistantDeps],
+    type: str | None = None,
+    view: str | None = None,
+    filters: dict[str, Any] | None = None,
+    query: str | None = None,
+    group_by: list[str] | None = None,
+    metrics: list[str] | None = None,
+    order_by: str | None = None,
+    limit: int = 100,
+) -> dict:
+    """Count, sum, average, min or max records of one type or saved view,
+    optionally grouped by up to two fields or date periods. `group_by` entries
+    are describe_types `columns`, a date field with a period as
+    <field>:day|week|month|quarter|year (e.g. ['created_at:month']). `metrics`
+    defaults to ['count']; also sum:<field>, avg:<field> (describe_types
+    `aggregatable`), min:<field>, max:<field>. `order_by` is a group key or
+    metric, e.g. '-count'. Returns {total, groups, truncated}; foreign key
+    groups also get <field>_label. Takes the same `filters` as list_records."""
+    return await _records_call(
+        ctx,
+        records.aggregate_records,
+        type_id=type,
+        view=view,
+        filters=filters,
+        query=query,
+        group_by=group_by,
+        metrics=metrics,
+        order_by=order_by,
+        limit=limit,
+    )
+
+
+async def get_record(ctx: RunContext[AssistantDeps], id: str, fields: list[str] | None = None) -> dict:
+    """One record by id, with its recent feed, change log and available actions.
+    `fields` picks the columns; with it, feed and changelog are only included if named."""
+    return await _records_call(ctx, records.get_record, id, fields=fields)
 
 
 async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected") -> list[dict[str, Any]]:

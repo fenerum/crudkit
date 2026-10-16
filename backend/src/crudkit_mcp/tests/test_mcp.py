@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
@@ -14,6 +15,7 @@ from crudkit_mcp.server import PROTOCOL_VERSION, MCPServer
 from crudkit_mcp.tools import Tool
 from tests.testapp.models import Customer, Topic
 
+READ_TOOLS = ["describe_types", "search", "list_records", "aggregate_records", "get_record"]
 EXTRA_TOOL = Tool("list_records", "Overridden", lambda user, arguments: "custom")
 EXTRA_WRITE_TOOL = Tool("sync_now", "Sync", lambda user, arguments: "synced", scope="write")
 
@@ -112,7 +114,7 @@ class MCPServerProtocolTest(MCPTestCase):
 
 class ReadToolsTest(MCPTestCase):
     def test_tool_set_is_fixed(self):
-        self.assertEqual(self.tool_names(), ["describe_types", "search", "list_records", "get_record"])
+        self.assertEqual(self.tool_names(), READ_TOOLS)
 
     def test_read_tools_are_annotated_read_only(self):
         result = self.server().handle_message({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
@@ -277,6 +279,135 @@ class SavedViewTest(MCPTestCase):
         self.assertEqual(self.call("describe_types", {"type": "CUS"})["views"], {self.view.id: "Churned"})
 
 
+class QueryToolsTest(MCPTestCase):
+    """aggregate_records, `fields` and the filter operators."""
+
+    def setUp(self):
+        super().setUp()
+        self.customer.balance = 100
+        self.customer.save()
+        self.churned = Customer.objects.create(
+            name="Beta", status="churned", balance=50, created_by=self.user, updated_by=self.user
+        )
+        Customer.objects.create(name="Cyan", status="churned", created_by=self.user, updated_by=self.user)
+        Customer.objects.filter(pk=self.churned.pk).update(created_at=timezone.now() - timedelta(days=60))
+
+    def aggregate(self, **arguments):
+        return self.call("aggregate_records", {"type": "CUS", **arguments})
+
+    def test_count(self):
+        self.assertEqual(self.aggregate(), {"total": 3, "groups": [{"count": 3}], "truncated": False})
+        self.assertEqual(self.aggregate(filters={"status": "churned"})["groups"], [{"count": 2}])
+
+    def test_group_by_field_with_metrics(self):
+        data = self.aggregate(group_by=["status"], metrics=["count", "sum:balance", "max:created_at"])
+        # Decimal("100") on SQLite, Decimal("100.00") on Postgres.
+        self.assertEqual(
+            [(g["status"], g["count"], Decimal(g["sum_balance"])) for g in data["groups"]],
+            [("active", 1, 100), ("churned", 2, 50)],
+        )
+        self.assertIn("max_created_at", data["groups"][0])
+
+    def test_group_by_date_period(self):
+        groups = self.aggregate(group_by="created_at:month")["groups"]
+        now, then = timezone.localdate(), timezone.localdate() - timedelta(days=60)
+        self.assertEqual(
+            groups,
+            [
+                {"created_at_month": then.replace(day=1).isoformat(), "count": 1},
+                {"created_at_month": now.replace(day=1).isoformat(), "count": 2},
+            ],
+        )
+
+    def test_group_by_foreign_key_has_labels(self):
+        groups = self.aggregate(group_by=["topic"], order_by="-count")["groups"]
+        self.assertEqual(
+            groups,
+            [
+                {"topic": None, "count": 2, "topic_label": None},
+                {"topic": self.topic.id, "count": 1, "topic_label": "Billing"},
+            ],
+        )
+
+    def test_order_and_limit(self):
+        data = self.aggregate(group_by=["status"], order_by="-count", limit=1)
+        self.assertEqual(data["groups"], [{"status": "churned", "count": 2}])
+        self.assertTrue(data["truncated"])
+
+    def test_respects_row_permissions_and_views(self):
+        other = User.objects.create_user("other")
+        self.assertEqual(self.call("aggregate_records", {"type": "CUS"}, user=other), {"error": "Permission denied"})
+        grant(self.user, View, "view")
+        view = View.objects.create(
+            name="Churned",
+            model="CUS",
+            fields=["name"],
+            filters=[["status", "=", "churned"]],
+            created_by=self.user,
+            updated_by=self.user,
+        )
+        self.assertEqual(self.call("aggregate_records", {"view": view.id})["groups"], [{"count": 2}])
+
+    def test_respects_row_rules_and_hides_labels_of_rows_the_user_cannot_see(self):
+        hidden = staticmethod(lambda user, queryset, action: queryset.exclude(pk=self.churned.pk))
+        with patch.object(Customer.CrudKitSettings, "get_authorized_queryset", hidden, create=True):
+            [group] = self.aggregate(metrics=["count", "sum:balance"])["groups"]
+        self.assertEqual((group["count"], Decimal(group["sum_balance"])), (2, 100))
+        self.user.user_permissions.remove(*Permission.objects.filter(codename="view_topic"))
+        groups = self.aggregate(group_by=["topic"], filters={"topic_isnull": False})["groups"]
+        self.assertEqual(groups, [{"topic": self.topic.id, "count": 1, "topic_label": None}])
+
+    def test_rejects_bad_arguments(self):
+        for arguments, error in (
+            ({"group_by": ["nope"]}, "Cannot group by"),
+            ({"group_by": ["name:month"]}, "Cannot group by"),
+            ({"group_by": ["created_at:hour"]}, "Cannot group by"),
+            ({"group_by": ["status", "topic", "owner"]}, "at most 2"),
+            ({"metrics": ["sum:name"]}, "needs a numeric field"),
+            ({"metrics": ["median:balance"]}, "Unknown metric"),
+            ({"group_by": ["status"], "order_by": "name"}, "Cannot order by"),
+            ({"filters": {"nope": 1}}, "Unknown filter"),
+        ):
+            self.assertIn(error, self.aggregate(**arguments)["error"], arguments)
+
+    def test_describe_types_lists_columns(self):
+        data = self.call("describe_types", {"type": "CUS"})
+        self.assertIn("created_at", data["columns"])
+        self.assertEqual(data["aggregatable"], ["balance"])
+        self.assertIn("balance_from", data["filters"])
+        self.assertIn("topic_isnull", data["filters"])
+
+    def test_filter_operators(self):
+        def total(**filters):
+            return self.call("list_records", {"type": "CUS", "filters": filters})["total"]
+
+        self.assertEqual(total(status=["active", "churned"]), 3)
+        self.assertEqual(total(topic=[self.topic.id]), 1)
+        self.assertEqual(total(balance_from=60), 1)
+        self.assertEqual(total(balance_to=60), 1)
+        self.assertEqual(total(topic_isnull=True), 2)
+        self.assertEqual(total(topic_isnull=False), 1)
+        self.assertIn("one value", self.call("list_records", {"type": "CUS", "filters": {"name": ["a"]}})["error"])
+
+    def test_list_records_fields(self):
+        rows = self.call("list_records", {"type": "CUS", "fields": ["status"]})["results"]
+        self.assertEqual(set(rows[0]), {"id", "label", "status"})
+        self.assertIn("Unknown field", self.call("list_records", {"type": "CUS", "fields": ["nope"]})["error"])
+
+    def test_list_records_fields_override_view_columns(self):
+        grant(self.user, View, "view")
+        view = View.objects.create(name="All", model="CUS", fields=["name"], created_by=self.user, updated_by=self.user)
+        rows = self.call("list_records", {"view": view.id, "fields": ["balance"]})["results"]
+        self.assertEqual(set(rows[0]), {"id", "label", "balance"})
+
+    def test_get_record_fields(self):
+        data = self.call("get_record", {"id": self.customer.id, "fields": ["status"]})
+        self.assertEqual(set(data), {"id", "label", "status", "actions"})
+        data = self.call("get_record", {"id": self.customer.id, "fields": ["topic", "feed"]})
+        self.assertEqual(set(data), {"id", "label", "topic", "feed", "actions"})
+        self.assertEqual(data["topic"]["name"], "Billing")
+
+
 class WriteToolsTest(MCPTestCase):
     WRITE = ("read", "write")
 
@@ -291,7 +422,7 @@ class WriteToolsTest(MCPTestCase):
     def test_write_tools_need_write_scope(self):
         self.assertNotIn("update_record", self.tool_names())
         self.assertEqual(
-            self.tool_names(scopes=self.WRITE)[4:],
+            self.tool_names(scopes=self.WRITE)[len(READ_TOOLS) :],
             ["create_record", "update_record", "run_action", "add_note", "undo"],
         )
 
@@ -600,7 +731,9 @@ class ProposeScopeTest(MCPTestCase):
         return proposal
 
     def test_write_tools_listed_without_write_setting(self):
-        self.assertEqual(self.tool_names()[4:], ["create_record", "update_record", "run_action", "add_note", "undo"])
+        self.assertEqual(
+            self.tool_names()[len(READ_TOOLS) :], ["create_record", "update_record", "run_action", "add_note", "undo"]
+        )
 
     @override_settings(CRUDKIT_MCP_EXTRA_TOOLS=["crudkit_mcp.tests.test_mcp.EXTRA_WRITE_TOOL"])
     def test_extra_write_tools_need_write(self):
@@ -608,7 +741,7 @@ class ProposeScopeTest(MCPTestCase):
 
     def test_propose_scope_needs_the_assistant_app(self):
         with patch("crudkit_mcp.conf.apps.is_installed", return_value=False):
-            self.assertEqual(self.tool_names(), ["describe_types", "search", "list_records", "get_record"])
+            self.assertEqual(self.tool_names(), READ_TOOLS)
 
     def test_update_is_proposed(self):
         result = self.call("update_record", {"id": self.customer.id, "fields": {"name": "Acme Inc"}})

@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
@@ -300,9 +301,10 @@ class QueryToolsTest(MCPTestCase):
 
     def test_group_by_field_with_metrics(self):
         data = self.aggregate(group_by=["status"], metrics=["count", "sum:balance", "max:created_at"])
+        # Decimal("100") on SQLite, Decimal("100.00") on Postgres.
         self.assertEqual(
-            [(g["status"], g["count"], g["sum_balance"]) for g in data["groups"]],
-            [("active", 1, "100"), ("churned", 2, "50")],
+            [(g["status"], g["count"], Decimal(g["sum_balance"])) for g in data["groups"]],
+            [("active", 1, 100), ("churned", 2, 50)],
         )
         self.assertIn("max_created_at", data["groups"][0])
 
@@ -349,9 +351,8 @@ class QueryToolsTest(MCPTestCase):
     def test_respects_row_rules_and_hides_labels_of_rows_the_user_cannot_see(self):
         hidden = staticmethod(lambda user, queryset, action: queryset.exclude(pk=self.churned.pk))
         with patch.object(Customer.CrudKitSettings, "get_authorized_queryset", hidden, create=True):
-            self.assertEqual(
-                self.aggregate(metrics=["count", "sum:balance"])["groups"], [{"count": 2, "sum_balance": "100"}]
-            )
+            [group] = self.aggregate(metrics=["count", "sum:balance"])["groups"]
+        self.assertEqual((group["count"], Decimal(group["sum_balance"])), (2, 100))
         self.user.user_permissions.remove(*Permission.objects.filter(codename="view_topic"))
         groups = self.aggregate(group_by=["topic"], filters={"topic_isnull": False})["groups"]
         self.assertEqual(groups, [{"topic": self.topic.id, "count": 1, "topic_label": None}])

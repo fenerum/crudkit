@@ -219,6 +219,12 @@ class CrossRecordToolTests(TestCase):
         listed = self.run_tool(tools.list_records, type="CUS")
         self.assertEqual(listed["total"], 2)
         self.assertIn("error", self.run_tool(tools.list_records, type="NOPE"))
+        rows = self.run_tool(tools.list_records, type="CUS", fields=["name"])["results"]
+        self.assertEqual(set(rows[0]), {"id", "label", "name"})
+
+    def test_aggregate(self):
+        self.assertEqual(self.run_tool(tools.aggregate_records, type="CUS")["groups"], [{"count": 2}])
+        self.assertIn("error", self.run_tool(tools.aggregate_records, type="CUS", group_by=["nope"]))
 
     def test_propose_patch_on_another_record(self):
         result = self.run_tool(tools.propose_patch, {"name": "Renamed"}, id=self.other.pk)

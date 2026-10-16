@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- MCP clients and the assistant can ask questions without fetching every row. New read tool
+  `aggregate_records` counts, sums, averages or takes the min/max of a type's or saved view's
+  records, grouped by up to two fields or date periods (`group_by: ["created_at:month"]`),
+  with foreign key groups labelled. `list_records` and `get_record` take `fields` to return
+  only the named columns (`get_record` then only includes `feed`/`changelog` if named), and
+  the tool descriptions steer the AI to use both. Filters gain `<field>_from`/`<field>_to`
+  for numbers, `<field>_isnull`, and list values matching any of them. `describe_types(type)`
+  reports `columns` and `aggregatable` fields.
+
 ## 0.6.4 (2026-10-13)
 
 - The browser tab title on a saved view shows the view's name instead of its id, prefixed

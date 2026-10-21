@@ -6,13 +6,13 @@ import { url, valid_url } from "../utils/urls";
 import { Icon } from "./ui";
 
 export default function ReadOnlyField({ field, value, metadata, link = true }) {
-    if (metadata === undefined) {
-        return <>[undefined]</>;
-    }
-
     const iframeRef = useRef();
     const iframeDefaultHeight = "140px";
     const [iframeHeight, setIframeHeight] = useState(iframeDefaultHeight);
+
+    if (metadata === undefined) {
+        return <>[undefined]</>;
+    }
 
     const toggleSize = () => {
         if (iframeRef.current) {

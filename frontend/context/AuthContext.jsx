@@ -8,7 +8,7 @@ const AuthContext = createContext({
   user: null,
   loading: true,
   isAuthenticated: false,
-  login: async () => {
+  login: async (_username, _password) => {
     throw new Error('AuthProvider not mounted');
   },
   logout: async () => {},

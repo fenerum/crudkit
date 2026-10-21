@@ -179,11 +179,14 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
               object={object}
               metadata={metadata.fields}
               form={null}
+              errors={null}
+              modelType={type}
             />
             {feedInline && (() => {
               const [mdl, fields, , inlineMetadata, , parent_object_id, related_field_name] = feedInline;
               return (
                 <Feed
+                  view={null}
                   fields={fields}
                   model={mdl}
                   parent_object_id={parent_object_id}

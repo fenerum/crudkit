@@ -186,6 +186,7 @@ export default function Merge() {
                             />
                             <div className="flex-1 min-w-0">
                               <ReadOnlyField
+                                field={field}
                                 value={object[field]}
                                 metadata={metadata.fields[field]}
                               />

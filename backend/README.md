@@ -71,6 +71,7 @@ permission and can be narrowed further with
 |---|---|
 | `CRUDKIT_AI_MODEL` | pydantic-ai model string (e.g. `"mistral:mistral-large-latest"`) enabling AI fields/assistant |
 | `CRUDKIT_AI_MODEL_FACTORY` | dotted path to an async context manager yielding a pydantic-ai `Model` (advanced) |
+| `CRUDKIT_AI_FOREIGN_KEY_CHOICES_LIMIT` | maximum related records considered for each AI foreign-key field (default `50`) |
 | `CRUDKIT_USER_PROFILE_ADAPTER` | dotted path to a class supplying preferred language + avatar images for users |
 | `CRUDKIT_EXTRA_GENERIC_RELATIONS` | project models surfaced as generic relations in object metadata |
 | `CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_CURRENCY_CHOICES` | currency configuration for `MoneyField` |

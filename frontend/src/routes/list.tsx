@@ -12,6 +12,7 @@ import { OverflowMenu, Icon, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
+import { listQueryKey } from '../../utils/queryKeys';
 
 export default function List() {
   const { segment: type, view: viewId } = useParams() as { segment: string; view?: string };
@@ -22,7 +23,8 @@ export default function List() {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const pageParam = searchParams.get('page');
-  const [currentPage, setCurrentPage] = useState(pageParam ? parseInt(pageParam, 10) : 1);
+  const parsedPage = pageParam ? parseInt(pageParam, 10) : 1;
+  const currentPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const qStr = searchParams.get('q') || '';
   const pageSizeParam = searchParams.get('page_size');
   const pageSize = pageSizeParam ? parseInt(pageSizeParam, 10) : null;
@@ -78,7 +80,7 @@ export default function List() {
     data: objectList,
     refetch,
   } = useQuery({
-    queryKey: ['list', type, currentView?.id, currentPage, qStr, pageSize],
+    queryKey: listQueryKey(type, currentView?.id, currentPage, qStr, pageSize, extraQuery),
     queryFn: async () => {
       let filters: Record<string, any> = { ...extraQuery };
       if (currentPage > 1) filters.page = currentPage;
@@ -144,7 +146,6 @@ export default function List() {
         },
         { replace: true },
       );
-      setCurrentPage(newPage);
     } catch (error) {
       console.error('Error navigating to page:', error);
     }
@@ -162,7 +163,6 @@ export default function List() {
       },
       { replace: true },
     );
-    setCurrentPage(1);
   }, [setSearchParams]);
 
   const view = currentView;
@@ -198,7 +198,6 @@ export default function List() {
               type="button"
               className={`ck-gf flex-shrink-0 ${view?.id === v.id ? 'is-on' : ''}`}
               onClick={() => {
-                setCurrentPage(1);
                 navigate(url(type, null, {}, v.id));
               }}
             >

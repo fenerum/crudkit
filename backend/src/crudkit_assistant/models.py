@@ -3,10 +3,11 @@ import logging
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField
+from crudkit_assistant.execution import execute_proposal
 
 logger = logging.getLogger(__name__)
 
@@ -64,24 +65,41 @@ class AssistantProposal(BaseCrudKitModel):
         ordering = ["-created_at"]
 
     def apply(self, user, request=None):
-        """Execute the proposed mutation. Imported lazily to avoid app-loading cycles."""
-        from crudkit_assistant.execution import execute_proposal
+        with transaction.atomic():
+            proposal = type(self).objects.select_for_update().get(pk=self.pk)
+            if proposal.status != self.Status.PENDING:
+                self._copy_resolution(proposal)
+                return self.outcome
 
-        try:
-            outcome = execute_proposal(self, user, request=request)
-            self.outcome = outcome
-            self.status = self.Status.CONFIRMED
-        except Exception as exc:
-            logger.exception("AssistantProposal %s apply failed", self.pk)
-            self.outcome = {"error": str(exc)}
-            self.status = self.Status.FAILED
-        self.confirmed_at = timezone.now()
-        self.confirmed_by = user
-        self.save(update_fields=["outcome", "status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+            try:
+                proposal.outcome = execute_proposal(proposal, user, request=request)
+                proposal.status = self.Status.CONFIRMED
+            except Exception as exc:
+                logger.exception("AssistantProposal %s apply failed", proposal.pk)
+                proposal.outcome = {"error": str(exc)}
+                proposal.status = self.Status.FAILED
+            proposal.confirmed_at = timezone.now()
+            proposal.confirmed_by = user
+            proposal.updated_by = user
+            proposal.save(
+                update_fields=["outcome", "status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"]
+            )
+            self._copy_resolution(proposal)
         return self.outcome
 
     def skip(self, user):
-        self.status = self.Status.SKIPPED
-        self.confirmed_at = timezone.now()
-        self.confirmed_by = user
-        self.save(update_fields=["status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+        with transaction.atomic():
+            proposal = type(self).objects.select_for_update().get(pk=self.pk)
+            if proposal.status == self.Status.PENDING:
+                proposal.status = self.Status.SKIPPED
+                proposal.confirmed_at = timezone.now()
+                proposal.confirmed_by = user
+                proposal.updated_by = user
+                proposal.save(update_fields=["status", "confirmed_at", "confirmed_by", "updated_at", "updated_by"])
+            self._copy_resolution(proposal)
+
+    def _copy_resolution(self, proposal):
+        self.outcome = proposal.outcome
+        self.status = proposal.status
+        self.confirmed_at = proposal.confirmed_at
+        self.confirmed_by = proposal.confirmed_by

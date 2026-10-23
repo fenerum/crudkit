@@ -359,7 +359,7 @@ class BaseCrudKitModel(models.Model):
                     setattr(instance, field.name, params[field.name])
         return instance
 
-    def _merge_relations(self):
+    def get_merge_relations(self):
         """The reverse foreign keys and one-to-ones that point at this object, bar merge
         bookkeeping and multi-table-inheritance parent links."""
         return [
@@ -389,7 +389,7 @@ class BaseCrudKitModel(models.Model):
                 changes["updated_at"] = now
             model._base_manager.filter(**lookup).update(**changes)
 
-        for relation in self._merge_relations():
+        for relation in self.get_merge_relations():
             # Many-to-many through rows may collide with the kept object's own; the guard reports them.
             if relation.one_to_many and not relation.related_model._meta.auto_created:
                 name = relation.field.name
@@ -408,7 +408,7 @@ class BaseCrudKitModel(models.Model):
 
         left_behind = [
             f"{relation.related_model._meta.label}.{relation.field.name}"
-            for relation in self._merge_relations()
+            for relation in self.get_merge_relations()
             if relation.related_model._base_manager.filter(**{relation.field.name: self}).exists()
         ]
         if left_behind:

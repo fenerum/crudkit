@@ -3,6 +3,7 @@ import functools
 import json
 import re
 
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
@@ -29,6 +30,17 @@ def get_accepted_type_ids(model):
     """The TYPE_IDs that address a row of `model`: its own, plus those of its
     multi-table-inheritance children, which share the parent's pk column."""
     return frozenset(type_id for type_id, mdl in get_model_types().items() if issubclass(mdl, model))
+
+
+def get_generic_foreign_keys():
+    """(model, field) for every GenericForeignKey of an installed model."""
+    return [
+        (model, field)
+        for model in apps.get_models()
+        if not model._meta.proxy
+        for field in model._meta.private_fields
+        if isinstance(field, GenericForeignKey)
+    ]
 
 
 def parse_ck_id(ck_id: str) -> tuple[str, int]:
@@ -347,36 +359,60 @@ class BaseCrudKitModel(models.Model):
                     setattr(instance, field.name, params[field.name])
         return instance
 
+    def _merge_relations(self):
+        """The reverse foreign keys and one-to-ones that point at this object, bar merge
+        bookkeeping and multi-table-inheritance parent links."""
+        return [
+            relation
+            for relation in self._meta.get_fields(include_hidden=True)
+            if (relation.one_to_many or relation.one_to_one)
+            and relation.auto_created
+            and not relation.concrete
+            and not relation.parent_link
+            and relation.field.name != "merged_into"
+        ]
+
     def delete_and_merge_with(self, other_object):
         """
-        This functions moves any related object to the `other_object`. It should not
-        move field content, as this is handled by the merge view where the user
-        may pick how the fields are merged
+        Moves every row pointing at this object, by foreign key or generic foreign key, to
+        `other_object` and soft-deletes this one. It does not move field content: the merge
+        view lets the user pick that. The change log stays, as the history of this object.
+
+        Override it for side effects (e.g. a rollup on `other_object`) or to deal with a
+        relation that can't simply be repointed before calling super(). Rows that are left
+        pointing here (a one-to-one, many-to-many rows) fail the merge with a ValidationError.
         """
-        self.externalobject_set.all().update(related_object_id=other_object.pk)
-        FeedItem.objects.filter(
-            related_content_type=ContentType.objects.get_for_model(self.__class__),
-            related_object_id=self.pk,
-        ).update(related_object_id=other_object.pk)
-        FeedItem.objects.filter(
-            parent_content_type=ContentType.objects.get_for_model(self.__class__),
-            parent_object_id=self.pk,
-        ).update(parent_object_id=other_object.pk)
+        now = timezone.now()
+
+        def repoint(model, lookup, changes):
+            if issubclass(model, BaseCrudKitModel):
+                changes["updated_at"] = now
+            model._base_manager.filter(**lookup).update(**changes)
+
+        for relation in self._merge_relations():
+            # Many-to-many through rows may collide with the kept object's own; the guard reports them.
+            if relation.one_to_many and not relation.related_model._meta.auto_created:
+                name = relation.field.name
+                repoint(relation.related_model, {name: self}, {name: other_object})
+        content_type = ContentType.objects.get_for_model(self.__class__)
+        for model, field in get_generic_foreign_keys():
+            if model is not ChangeLog:
+                repoint(
+                    model,
+                    {field.ct_field: content_type, field.fk_field: self.pk},
+                    {field.fk_field: other_object.pk},
+                )
 
         # Update objects merged into the current object to point to the new object, to empty any relations
         self.__class__.objects.filter(merged_into=self).update(merged_into=other_object)
 
-        from django.contrib.admin.utils import NestedObjects
-        from django.db import DEFAULT_DB_ALIAS
-
-        collector = NestedObjects(using=DEFAULT_DB_ALIAS)
-        collector.collect([self])
-        related_objects = collector.nested()
-        if len(related_objects) != 1:
-            raise ValidationError(
-                "Cascading object deletes not handled by delete_and_merge_with: %s" % related_objects,
-                params=related_objects,
-            )
+        left_behind = [
+            f"{relation.related_model._meta.label}.{relation.field.name}"
+            for relation in self._merge_relations()
+            if relation.related_model._base_manager.filter(**{relation.field.name: self}).exists()
+        ]
+        if left_behind:
+            raise ValidationError(f"Cannot merge {self}: still referenced by {', '.join(left_behind)}")
         before = copy.copy(self)
         self.soft_delete(merged_into=other_object)
         ChangeLog.objects.create_from_objects(

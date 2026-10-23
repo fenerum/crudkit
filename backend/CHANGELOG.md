@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+- Merge moves everything that points at a merged record to the one kept: every reverse
+  foreign key, whatever its `on_delete`, and every generic foreign key (feed items, external
+  ids, work logs, a project's own GFKs). The change log stays with the merged record. Before,
+  only feed items and external ids moved; SET_NULL and PROTECT rows stayed on the deleted
+  record without an error, because the guard (a delete collector dry run) only saw CASCADE
+  children. Those children used to block the merge and now move too. Anything still pointing
+  at the merged record afterwards (a one-to-one, many-to-many rows) fails the merge with a
+  ValidationError naming the relation, and the merge rolls back. A project's
+  `delete_and_merge_with` overrides that only repoint foreign keys can be deleted.
+
 ## 0.6.5 (2026-10-21)
 
 - MCP clients and the assistant can ask questions without fetching every row. New read tool

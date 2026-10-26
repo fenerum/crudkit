@@ -56,7 +56,7 @@ Feature: Describe a record type
     And the description says feed items point at it through "parent object"
     And the description says external objects point at it through "related object"
 
-  @known-bug
+ 
   Scenario: A one-way link from another record type is not described
     When Alice looks up the description of customers
     Then the description does not say tickets point at it through "watchers"

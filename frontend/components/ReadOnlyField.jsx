@@ -102,7 +102,7 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
         ) : value && metadata.type === "MoneyField" ? (
             <span>
                 {typeof value === 'object' && value !== null && 'amount' in value
-                    ? (value.currency === value.default_currency
+                    ? (value.currency === value.default_currency || value.amount_default_currency == null
                         ? `${value.amount} ${value.currency}`
                         : `${value.amount} ${value.currency} (${value.amount_default_currency} ${value.default_currency})`)
                     : value}

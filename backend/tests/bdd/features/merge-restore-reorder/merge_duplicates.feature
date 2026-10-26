@@ -80,13 +80,13 @@ Feature: Merge duplicate records
     Then it is rejected with "Customers are frozen"
     And "Acme dup" is not deleted
 
-  @known-bug
+ 
   Scenario: A merge without any duplicates is refused
     When Alice merges nothing into "Acme"
     Then it is rejected with "No objects to merge"
     And the change log of "Acme" has 0 entries
 
-  @known-bug
+ 
   Scenario: Records of different types cannot be merged
     Given Alice can view topics
     And a topic "Acme support"

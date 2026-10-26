@@ -36,7 +36,7 @@ Creating and editing
 - `When Alice creates a reminder "Read up" with the target written as "XYZ1"` (sent exactly as typed)
 - `When Alice replaces "Acme" with:` (every field the form sends)
 - `When Alice points the topic of "Acme" at a topic that does not exist`
-- `Then Alice is recorded as the creator of "Acme"` / `... as the last editor of "Acme"`
+- `Then Alice is recorded as the creator of "Acme"` / `... as the last editor of "Acme"` / `... as the owner of "Acme"`
 
 Starting a new record (the values a new form opens with)
 - `When Alice starts a new customer prefilled with name "Acme"` / `When Alice starts a new customer`
@@ -331,6 +331,11 @@ def recorded_creator(world, name, label):
 @then(phrase('{name:Actor} is recorded as the last editor of "{label:Q}"'))
 def recorded_editor(world, name, label):
     assert _record_called(world, label).updated_by == world.user(name)
+
+
+@then(phrase('{name:Actor} is recorded as the owner of "{label:Q}"'))
+def recorded_owner(world, name, label):
+    assert _record_called(world, label).owner == world.user(name)
 
 
 # Starting a new record

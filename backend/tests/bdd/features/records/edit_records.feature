@@ -46,7 +46,7 @@ Feature: Edit records
     Then it is rejected with "is not a valid choice"
     And "Acme" still has status "active"
 
-  @known-bug
+ 
   Scenario: Linking to a record that does not exist is refused and keeps the old link
     Given Alice can view topics
     And a topic "Billing"
@@ -55,7 +55,7 @@ Feature: Edit records
     Then it is rejected with "not found"
     And "Acme" still has topic "Billing"
 
-  @known-bug
+ 
   Scenario: A link to a record the person may not see is refused as if it did not exist
     Given a topic "Billing"
     And a topic "Internal"
@@ -64,7 +64,7 @@ Feature: Edit records
     Then it is rejected with "not found"
     And "Acme" still has topic "Billing"
 
-  @known-bug
+ 
   Scenario: A link only accepts a record of the type it points at
     Given Alice can view topics
     And a topic "Billing"
@@ -73,6 +73,12 @@ Feature: Edit records
     When Alice changes the topic of "Acme" to "Globex"
     Then it is rejected
     And "Acme" still has topic "Billing"
+
+  Scenario: A person can be made the owner without permission to view people
+    Given Bob is a user without any permissions
+    When Alice changes the owner of "Acme" to "Bob"
+    Then it succeeds
+    And Bob is recorded as the owner of "Acme"
 
   Scenario: Who created a record cannot be changed
     Given Alice owns a customer "Globex"

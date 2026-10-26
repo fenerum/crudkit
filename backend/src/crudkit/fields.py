@@ -97,9 +97,9 @@ class CurrencyField(models.CharField):
 
             # Get amount either from parameter or model's amount field
             if amount is None:
-                if not hasattr(model_instance, "amount"):
-                    return "N/A"
-                amount = model_instance.amount
+                amount = getattr(model_instance, "amount", None)
+            if amount is None:
+                return "N/A"
 
             symbol = CURRENCY_SYMBOLS.get(currency_code, "")
 

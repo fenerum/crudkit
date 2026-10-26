@@ -26,7 +26,7 @@ Feature: Track time spent on a record
     Then a second timer for Alice on "Globex" is refused
     And Alice is tracking time on "Acme"
 
-  @known-bug
+ 
   Scenario: Starting a second timer from the app is refused and the first keeps running
     Given Alice is tracking time on "Acme"
     When Alice starts tracking time on "Globex"

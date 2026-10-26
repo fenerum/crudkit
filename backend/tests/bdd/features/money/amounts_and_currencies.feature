@@ -25,7 +25,7 @@ Feature: Show and convert amounts in a record's currency
   Scenario: A missing amount is shown as N/A
     Then "Acme" shows a missing amount as "N/A"
 
-  @known-bug
+ 
   Scenario: A record whose own amount is empty shows it as N/A
     Then "Acme" shows its own empty amount as "N/A"
 

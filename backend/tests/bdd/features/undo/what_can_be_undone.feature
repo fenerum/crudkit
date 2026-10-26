@@ -10,7 +10,8 @@ Feature: What an undo puts back, and what it refuses
     And a customer "Acme" with status "active"
 
   Scenario Outline: Undo puts back the previous <field>
-    Given a topic "Billing"
+    Given Alice can view topics
+    And a topic "Billing"
     And a topic "Support"
     And the <field> of "Acme" is "<before>"
     And Alice changed the <field> of "Acme" to "<after>"

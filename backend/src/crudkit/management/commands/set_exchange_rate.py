@@ -1,6 +1,7 @@
 import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 
@@ -31,7 +32,10 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         currency = options["currency"].upper()
-        rate = Decimal(options["rate"])
+        try:
+            rate = Decimal(options["rate"])
+        except InvalidOperation as e:
+            raise CommandError(f"Invalid rate: {options['rate']}") from e
 
         # Parse dates
         from_date = None
@@ -85,7 +89,7 @@ class Command(BaseCommand):
                 )
         else:
             # Create a new exchange rate
-            exchange_rate = ExchangeRate.objects.create(
+            exchange_rate = ExchangeRate(
                 currency=currency,
                 rate=rate,
                 from_date=from_date,
@@ -93,6 +97,11 @@ class Command(BaseCommand):
                 created_by=system_user,
                 updated_by=system_user,
             )
+            try:
+                exchange_rate.full_clean()
+            except ValidationError as e:
+                raise CommandError(" ".join(e.messages)) from e
+            exchange_rate.save()
             self.stdout.write(
                 self.style.SUCCESS(
                     f'Created exchange rate: 1 {DEFAULT_CURRENCY} = {rate} {currency} '

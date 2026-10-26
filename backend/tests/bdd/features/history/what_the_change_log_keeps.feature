@@ -16,7 +16,8 @@ Feature: What the change log keeps
     And the latest change to "Acme" changed the name from "Acme" to "Acme Inc"
 
   Scenario: A link to another record is logged as that record
-    Given a topic "Billing"
+    Given Alice can view topics
+    And a topic "Billing"
     When Alice changes the topic of "Acme" to "Billing"
     Then the latest change to "Acme" changed the topic from "" to "Billing"
 

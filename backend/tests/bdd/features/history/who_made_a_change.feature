@@ -15,7 +15,7 @@ Feature: Who made a change
     And the latest change to "Acme" came from the app
     And the latest change to "Acme" was made by Alice
 
-  @known-bug
+ 
   Scenario: Deleting a record in the app records the person as its last editor
     Given Alice can delete customers
     When Alice deletes "Acme"

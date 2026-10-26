@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+Fixes for the open bugs the behaviour spec recorded. Bad input is now refused with a 400
+instead of a 500:
+
+- Foreign key fields check what they link to. A missing id is refused as "not found" and
+  keeps the old link (it used to clear the link silently). An id of the wrong type is
+  refused (it used to crash). A record the person may not view is refused as "not found",
+  as generic links already were. Links to non-CrudKit models such as users only check that
+  the row exists, so setting an owner still doesn't need permission to view users.
+- `?_fields=` naming a field the type doesn't have is refused, naming the field.
+- Merging with no duplicates, or across record types, is refused.
+- An action that returns nothing answers `{}` instead of crashing. The run is still logged.
+- Starting a second running timer through the API is refused ("already tracking time")
+  instead of hitting the database constraint.
+- Model metadata no longer lists hidden reverse relations (`related_name="+"`).
+- Searching everything for a child type's id (e.g. an URG id) finds the record once, as its
+  own type, instead of again as its parent type.
+- Money fields report `amount_default_currency: null` when there is no exchange rate,
+  instead of the unconverted foreign amount. The read-only field then shows just the amount.
+  `format_amount` returns "N/A" when the record's own `amount` is empty instead of crashing.
+- `set_exchange_rate` refuses a rate that overlaps an existing one and a rate that isn't a
+  number.
+- Deleting a record through the app sets "updated by", so history and live updates name the
+  person who deleted it.
+- An AI foreign-key answer that isn't a record id leaves the field empty instead of failing
+  the whole AI job.
+
 ## 0.6.5 (2026-10-21)
 
 - MCP clients and the assistant can ask questions without fetching every row. New read tool

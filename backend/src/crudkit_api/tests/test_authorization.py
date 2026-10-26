@@ -1,18 +1,11 @@
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from crudkit.models import View, Workspace
 from crudkit.utils import get_model_types
+from tests.support import grant
 from tests.testapp.models import Customer, Ticket
-
-
-def grant(user, model, *actions):
-    permissions = Permission.objects.filter(
-        content_type__app_label=model._meta.app_label,
-        codename__in=[f"{action}_{model._meta.model_name}" for action in actions],
-    )
-    user.user_permissions.add(*permissions)
 
 
 class GenericAPIAuthorizationTests(TestCase):

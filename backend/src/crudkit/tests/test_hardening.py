@@ -16,8 +16,9 @@ from crudkit import llm
 from crudkit.audit import audit
 from crudkit.decorators import crm_action
 from crudkit.models import AIContext, ChangeLog
-from crudkit.tests.test_audit import entries, grant
+from crudkit.tests.test_audit import entries
 from crudkit_api import services
+from tests.support import grant
 from tests.testapp.models import Customer, Ticket
 
 

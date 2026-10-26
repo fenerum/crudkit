@@ -31,7 +31,8 @@ from crudkit_assistant.models import Agent, AgentRun, AssistantProposal
 from crudkit_assistant.proposals import create_proposal
 from crudkit_assistant.runner import _load_extra_tools, run_turn
 from crudkit_assistant.screen import Screen
-from crudkit_assistant.tests.test_agents import AgentTestCase, User, _FakeCtx, grant
+from crudkit_assistant.tests.test_agents import AgentTestCase, User, _FakeCtx
+from tests.support import grant
 from tests.testapp.models import Customer, Ticket, Topic
 
 

@@ -3,8 +3,8 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from crudkit.models import ChangeLog
-from crudkit_api.tests.test_authorization import grant
 from crudkit_api.views import CHANGE_SET_HEADER
+from tests.support import grant
 from tests.testapp.models import Topic
 
 

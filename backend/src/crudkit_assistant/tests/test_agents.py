@@ -24,18 +24,11 @@ from crudkit_assistant.deps import AssistantDeps
 from crudkit_assistant.models import Agent, AgentRun, AssistantProposal
 from crudkit_assistant.screen import Screen
 from crudkit_assistant.tasks import run_scheduled_agents
+from tests.support import grant
 from tests.testapp.models import Customer
 
 User = get_user_model()
 
-
-def grant(user, model, *actions):
-    user.user_permissions.add(
-        *Permission.objects.filter(
-            content_type__app_label=model._meta.app_label,
-            codename__in=[f"{action}_{model._meta.model_name}" for action in actions],
-        )
-    )
 
 
 def changes(instance):

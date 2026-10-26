@@ -36,6 +36,11 @@ command = '''cd examples/demo && uv run manage.py migrate --noinput && uv run ma
 available_in = ["local"]
 icon = "flame"
 
+# The backend BDD behaviour spec and its coverage guard.
+[scripts.run.test-bdd]
+command = "cd backend && uv run pytest"
+icon = "test-tube"
+
 [scripts.run.test-frontend]
 command = "cd frontend && npm run test:watch"
 icon = "test-tube"

@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 
-from crudkit_api.tests.test_authorization import grant
+from tests.support import grant
 from tests.testapp.models import Comment, Customer, Ticket
 
 

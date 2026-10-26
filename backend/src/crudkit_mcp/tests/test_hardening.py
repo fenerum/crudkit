@@ -9,7 +9,8 @@ from django.test import override_settings
 from crudkit.models import ChangeLog
 from crudkit_assistant.models import AssistantProposal
 from crudkit_mcp.checks import check_write_rate
-from crudkit_mcp.tests.test_mcp import MCPTestCase, grant
+from crudkit_mcp.tests.test_mcp import MCPTestCase
+from tests.support import grant
 from tests.testapp.models import Customer
 
 WRITE = ("read", "write")

@@ -14,3 +14,6 @@ uv.lock
 # Vite build output shipped inside the wheel (built in CI, not committed)
 backend/src/crudkit_frontend/static/
 backend/src/crudkit_frontend/templates/
+
+# pytest-playwright failure artifacts of the BDD journey suite
+examples/demo/test-results/

@@ -4,7 +4,6 @@ the Inbox, CREATE proposals, owner access to ASP rows, and approval rules."""
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
 from django.test import TestCase
 from rest_framework.test import APIClient
@@ -13,6 +12,7 @@ from crudkit.authorization import requires_approval
 from crudkit.models import ChangeLog
 from crudkit_api.metadata import build_model_metadata
 from crudkit_assistant.proposals import create_proposal
+from tests.support import grant
 from tests.testapp.models import Customer, Topic
 
 User = get_user_model()
@@ -23,14 +23,6 @@ def changes(instance):
         related_content_type=ContentType.objects.get_for_model(instance), related_object_id=instance.pk
     )
 
-
-def grant(user, model, *actions):
-    user.user_permissions.add(
-        *Permission.objects.filter(
-            content_type__app_label=model._meta.app_label,
-            codename__in=[f"{action}_{model._meta.model_name}" for action in actions],
-        )
-    )
 
 
 class ApprovalTestCase(TestCase):

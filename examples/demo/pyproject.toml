@@ -6,3 +6,14 @@ dependencies = ["crudkit[assistant]", "daphne>=4.1", "pydantic-ai-slim[openai]"]
 
 [tool.uv.sources]
 crudkit = { path = "../../backend", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-bdd>=9.0.0",
+    "pytest-playwright>=0.10.0",
+]
+
+[tool.pytest.ini_options]
+# `uv run pytest` drives the built SPA through the journeys in bdd/.
+testpaths = ["bdd"]

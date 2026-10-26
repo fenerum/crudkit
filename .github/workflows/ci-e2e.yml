@@ -92,6 +92,16 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:8000
         run: npm run e2e
+      # Runs after the TS specs: they assume the seeded data is still near-pristine.
+      - name: Install the BDD journey suite
+        run: |
+          uv pip install --python /tmp/e2e pytest pytest-bdd pytest-playwright
+          /tmp/e2e/bin/python -m playwright install --with-deps chromium
+      - name: BDD journeys
+        working-directory: examples/demo
+        env:
+          E2E_BASE_URL: http://127.0.0.1:8000
+        run: /tmp/e2e/bin/python -m pytest -q --screenshot only-on-failure --tracing retain-on-failure
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -99,5 +109,6 @@ jobs:
           path: |
             frontend/playwright-report/
             frontend/test-results/
+            examples/demo/test-results/
             /tmp/server.log
           retention-days: 7

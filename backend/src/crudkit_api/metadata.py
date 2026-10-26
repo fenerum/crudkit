@@ -113,7 +113,7 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
     """Return the model-level metadata payload served at /api/v1/<type>/metadata/."""
     mfc = _model_field_choices()
     fields = OrderedDict((field.name, _field_metadata(field, mfc)) for field in model._meta.fields)
-    relations = [_relation_metadata(rel) for rel in model._meta.related_objects]
+    relations = [_relation_metadata(rel) for rel in model._meta.related_objects if not rel.hidden]
     for gen in _generic_relations():
         rm = gen["related_model_cls"]
         relations.append(

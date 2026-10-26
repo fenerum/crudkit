@@ -40,7 +40,8 @@ Feature: Setting up an agent
       | tickets   | record changed |          | watchers      |
 
   Scenario: An agent's saved view must list the record type it works on
-    Given Alice has a saved view "Open tickets" listing tickets
+    Given Alice can view views
+    And Alice has a saved view "Open tickets" listing tickets
     When Alice sets up an agent "Checker" with:
       | record type | customers    |
       | saved view  | Open tickets |

@@ -21,7 +21,7 @@ Feature: Amounts in the app
     When Alice looks at "Acme"
     Then the balance reads "1000.00" DKK, which is "1000.00" DKK
 
-  @known-bug
+ 
   Scenario: Without an exchange rate, an amount's worth in the default currency is unknown
     Given a customer "Globex" with:
       | currency | USD |

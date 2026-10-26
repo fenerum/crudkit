@@ -4,7 +4,7 @@ import { appConfig } from "../../utils/appConfig";
 interface MoneyFieldValue {
   currency: string;
   amount: string;
-  amount_default_currency: string;
+  amount_default_currency: string | null;
   default_currency: string;
 }
 

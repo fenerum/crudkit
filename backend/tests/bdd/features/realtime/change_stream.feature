@@ -30,7 +30,7 @@ Feature: Live change hints
     When Bob deletes "Acme"
     Then Alice hears that "Acme" was saved
 
-  @known-bug
+ 
   Scenario: Watchers hear who deleted a record through the app
     Given Bob can view, change and delete customers
     And Alice is watching the change stream

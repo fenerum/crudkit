@@ -83,7 +83,7 @@ Feature: Manage exchange rates from the command line
     Then the command fails with "End date must be after start date."
     And there is no EUR rate
 
-  @command:set_exchange_rate @known-bug
+  @command:set_exchange_rate
   Scenario: A rate overlapping an existing one is refused
     Given an operator ran "set_exchange_rate EUR 0.13 --from-date 2024-01-01"
     When an operator runs "set_exchange_rate EUR 0.14 --from-date 2024-06-01"
@@ -91,7 +91,7 @@ Feature: Manage exchange rates from the command line
     And there is 1 EUR rate
     And the EUR rate on "2024-06-01" is "0.13"
 
-  @command:set_exchange_rate @known-bug
+  @command:set_exchange_rate
   Scenario: A rate that is not a number is refused
     When an operator runs "set_exchange_rate EUR lots"
     Then the command fails with "Invalid rate"

@@ -27,7 +27,7 @@ Feature: Run an action on a record
     When Alice uses the "Check credit" action on "Acme"
     Then Alice gets the answer "Credit OK"
 
-  @known-bug
+ 
   Scenario: An action that gives no answer still runs and is recorded
     Given customers have an action "Quietly churn" that sets the status to "churned" and answers nothing
     When Alice uses the "Quietly churn" action on "Acme"

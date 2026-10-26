@@ -109,7 +109,7 @@ Feature: List records
     When Alice lists the customers showing only name and status
     Then every row of the list shows only name and status
 
-  @known-bug
+ 
   Scenario: Asking for a field the record type does not have is refused, naming the field
     Given a customer "Acme"
     When Alice lists the customers showing only name and colour

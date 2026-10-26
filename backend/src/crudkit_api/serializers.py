@@ -238,15 +238,14 @@ class MoneyFieldSerializer(serializers.Field):
             # Get the currency
             currency = getattr(instance, currency_field_name, DEFAULT_CURRENCY)
 
-            # Calculate amount in default currency if it's different
+            # Calculate amount in default currency if it's different; unknown without an exchange rate
             amount_default_currency = value
             if currency != DEFAULT_CURRENCY and hasattr(instance, "convert_to"):
-                default_amount = instance.convert_to(DEFAULT_CURRENCY, amount=value)
-                if default_amount is not None:
-                    amount_default_currency = default_amount
+                amount_default_currency = instance.convert_to(DEFAULT_CURRENCY, amount=value)
 
-            # Format default currency amount as string with 2 decimal places
-            amount_default_currency_str = f"{amount_default_currency:.2f}"
+            amount_default_currency_str = (
+                f"{amount_default_currency:.2f}" if amount_default_currency is not None else None
+            )
 
             return {
                 "currency": currency,
@@ -306,14 +305,24 @@ class GenericRelationField(serializers.Field):
         model = get_model_types().get(mdl)
         if model is None:
             raise serializers.ValidationError(f"Model {mdl} not found")
-        queryset = model.objects.all()
-        request = self.context.get("request")
-        if request is not None:
-            queryset = get_authorized_queryset(request.user, queryset, "view")
+        return _get_viewable(model, pk, self.context, data)
+
+
+def _get_viewable(model, pk, context, data):
+    """The `model` row `pk` that the requesting user may view, else a "not found"
+    ValidationError, so a link can't reach (or probe for) records the user can't see.
+    Models without a TYPE_ID (e.g. User) are not CrudKit records: only existence is checked."""
+    queryset = model.objects.all()
+    request = context.get("request")
+    if request is not None and getattr(model, "TYPE_ID", None):
+        queryset = get_authorized_queryset(request.user, queryset, "view")
+    try:
         instance = queryset.filter(pk=pk).first()
-        if instance is None:
-            raise serializers.ValidationError(f"{data} not found")
-        return instance
+    except (ValueError, TypeError):
+        instance = None
+    if instance is None:
+        raise serializers.ValidationError(f"{data} not found")
+    return instance
 
 
 class GenericSerializer(serializers.ModelSerializer):
@@ -342,7 +351,7 @@ class GenericSerializer(serializers.ModelSerializer):
             fields = request.GET.get("_fields").split(",") if request.GET.get("_fields") else self.fields
             for field in fields:
                 if field not in self.fields:
-                    raise Exception(f"Field {field} not found in model serializer {self.__class__.__name__}")
+                    raise serializers.ValidationError(f"Field {field} not found")
             for field in self.fields:
                 if field not in fields:
                     to_be_removed.append(field)
@@ -449,14 +458,9 @@ def _nested_relation_field(related_model, nested_depth):
             return self._nested.to_representation(value)
 
         def to_internal_value(self, data):
-            if data is not None:
-                try:
-                    # if issubclass(related_model, BaseCrudKitModel):
-                    # mdl, pk = parse_ck_id(data)
-                    # related_model.objects.get(id=pk)
-                    return related_model.objects.get(id=data)
-                except related_model.DoesNotExist:
-                    pass
+            if data in (None, ""):
+                return None
+            return _get_viewable(related_model, data, self.context, data)
 
     return RelatedField
 

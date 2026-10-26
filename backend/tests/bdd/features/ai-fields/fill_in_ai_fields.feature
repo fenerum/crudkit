@@ -62,7 +62,7 @@ Feature: AI fields are filled in by the AI
     Then "Refund please" has topic ""
     And "Refund please" has summary "The parcel never arrived."
 
-  @known-bug
+ 
   Scenario: A topic answer that is not one of the topics leaves the topic empty
     Given the AI answers:
       | field   | value                        |

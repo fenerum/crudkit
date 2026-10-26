@@ -43,7 +43,7 @@ Feature: Search everything
     When Alice searches for the ID of "Acme Corp" in lower case
     Then the search finds "Acme Corp"
 
-  @known-bug
+ 
   Scenario: A record of a type that extends another is found once by its ID, as its own type
     Given Alice can view comments
     And Alice can view urgent comments

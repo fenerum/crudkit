@@ -65,13 +65,15 @@ def get_search_fields(model) -> list[str]:
     return list(getattr(getattr(model, "CrudKitSettings", None), "search_fields", None) or [])
 
 
-def search_filter(model, query: str) -> Q:
+def search_filter(model, query: str, include_subtypes: bool = True) -> Q:
     """Case-insensitive match of `query` against the model's CRM ID (exact) and its
-    `CrudKitSettings.search_fields` (substring). Matches nothing if neither applies."""
+    `CrudKitSettings.search_fields` (substring). Matches nothing if neither applies.
+    Without `include_subtypes`, an ID of a multi-table child type doesn't match the parent."""
     query = query.strip()
     q = Q(pk__in=[])
     ck_id = query.upper()
-    if ck_id_regex.fullmatch(ck_id) and ck_id[:3] in get_accepted_type_ids(model):
+    type_ids = get_accepted_type_ids(model) if include_subtypes else {model.TYPE_ID}
+    if ck_id_regex.fullmatch(ck_id) and ck_id[:3] in type_ids:
         q |= Q(pk=parse_ck_id(ck_id)[1])
     for field in get_search_fields(model):
         q |= Q(**{f"{field}__icontains": query})
@@ -87,7 +89,9 @@ def search_objects(user, query: str, models_to_search=None, limit_per_model: int
         if not has_model_permission(user, mdl, "view"):
             continue
         serializer_cls = get_serializer(mdl, depth=0, fields=["id", "label", "object_images"])
-        qs = get_authorized_queryset(user, mdl.objects.all(), "view").filter(search_filter(mdl, query))
+        qs = get_authorized_queryset(user, mdl.objects.all(), "view").filter(
+            search_filter(mdl, query, include_subtypes=False)
+        )
         if "deleted" in [field.name for field in mdl._meta.fields]:
             qs = qs.filter(deleted=False)
         results += [serializer_cls(obj).data for obj in qs[0:limit_per_model]]

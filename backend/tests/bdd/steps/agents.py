@@ -22,7 +22,6 @@ Agents (created directly, as their owner's)
 - `Given the record type of the agent "Broken" no longer exists`
 - `Given Alice has a saved view "Open tickets" listing tickets`
 - `Given Bob has permission to view agents and agent runs` / `Given Alice has permission to delete notes`
-  (`Alice can view agent runs` does not parse: the shared phrase reads "view agent" as the actions)
 
 Runs (as setup)
 - `Given the agent "Fixer" has already worked on "Acme"`: a finished run, known as the record "Fixer on Acme"
@@ -230,7 +229,7 @@ def switched_off_after_failures(world, label, count):
 
 @given(phrase('the record type of the agent "{label:Q}" no longer exists'))
 def record_type_gone(world, label):
-    Agent.objects.filter(pk=world.records[label].pk).update(model_type="GONE")
+    Agent.objects.filter(pk=world.records[label].pk).update(model_type="XYZ")
 
 
 @given(phrase("{name:Actor} has permission to view agents and agent runs"))

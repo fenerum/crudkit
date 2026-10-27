@@ -101,7 +101,7 @@ def process_ai_fields(app_label: str, model_name: str, pk: int) -> None:
         if isinstance(field, AIForeignKeyField):
             try:
                 related_obj = field.related_model.objects.get(pk=value)
-            except field.related_model.DoesNotExist:
+            except (field.related_model.DoesNotExist, ValueError):
                 logger.warning(f"Related object pk={value} not found for {name}, skipping")
                 continue
             setattr(instance, name, related_obj)

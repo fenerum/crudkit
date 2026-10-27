@@ -115,6 +115,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
     @transaction.atomic
     def perform_destroy(self, instance: BaseCrudKitModel):
         ChangeLog.objects.create_from_objects(instance, None, user=self.request.user)
+        instance.updated_by = self.request.user
         instance.soft_delete()
 
     def create(self, request, *args, **kwargs):
@@ -205,15 +206,20 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
             with transaction.atomic():
                 to_stay_obj = get_object_or_404(self.filter_queryset(self.get_queryset()), pk=post_data.pop("id", pk))
                 self.check_object_permissions(request, to_stay_obj)
-                other_objects = self.get_queryset().filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
+                try:
+                    other_objects = list(
+                        self.get_queryset().filter(id__in=post_data.pop("merge")).exclude(id=to_stay_obj.id)
+                    )
+                except ValueError as e:  # an ID of another record type
+                    raise ValidationError(f"Cannot merge: {e}") from e
 
                 if not all([x.TYPE_ID == to_stay_obj.TYPE_ID for x in other_objects]):
-                    raise Exception(
+                    raise ValidationError(
                         "Cannot merge objects of different types %s"
                         % ([x.TYPE_ID for x in other_objects] + [to_stay_obj.TYPE_ID])
                     )
                 if not other_objects:
-                    raise Exception("No objects to merge")
+                    raise ValidationError("No objects to merge")
 
                 merge_fields = post_data
                 objects_by_id = {obj.id: obj for obj in [to_stay_obj, *other_objects]}
@@ -288,6 +294,8 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
             return Response({"redirect": response.url})
         if isinstance(response, models.Model):
             return Response({"redirect": response.id})
+        if response is None:
+            return Response({})
         return response
 
     @action(detail=True)

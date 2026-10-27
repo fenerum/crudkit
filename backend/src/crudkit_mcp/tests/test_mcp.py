@@ -13,19 +13,13 @@ from crudkit_assistant.models import AssistantProposal
 from crudkit_mcp.models import AccessToken, OAuthClient
 from crudkit_mcp.server import PROTOCOL_VERSION, MCPServer
 from crudkit_mcp.tools import Tool
+from tests.support import grant
 from tests.testapp.models import Customer, Topic
 
 READ_TOOLS = ["describe_types", "search", "list_records", "aggregate_records", "get_record"]
 EXTRA_TOOL = Tool("list_records", "Overridden", lambda user, arguments: "custom")
 EXTRA_WRITE_TOOL = Tool("sync_now", "Sync", lambda user, arguments: "synced", scope="write")
 
-
-def grant(user, model, *actions):
-    permissions = Permission.objects.filter(
-        content_type__app_label=model._meta.app_label,
-        codename__in=[f"{action}_{model._meta.model_name}" for action in actions],
-    )
-    user.user_permissions.add(*permissions)
 
 
 class MCPTestCase(TestCase):

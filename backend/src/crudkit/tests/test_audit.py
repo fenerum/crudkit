@@ -1,7 +1,7 @@
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import User
 from django.test import TestCase
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -11,16 +11,8 @@ from crudkit.models import ChangeLog
 from crudkit.utils import get_system_user
 from crudkit_api import services
 from crudkit_assistant.models import AssistantProposal
+from tests.support import grant
 from tests.testapp.models import Customer, Topic
-
-
-def grant(user, model, *actions):
-    user.user_permissions.add(
-        *Permission.objects.filter(
-            content_type__app_label=model._meta.app_label,
-            codename__in=[f"{action}_{model._meta.model_name}" for action in actions],
-        )
-    )
 
 
 def entries(instance):

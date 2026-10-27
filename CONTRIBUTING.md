@@ -22,8 +22,14 @@ Backend (Python ≥ 3.12, [uv](https://docs.astral.sh/uv/)):
 cd backend
 uv sync --all-extras
 uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend crudkit_mcp tests
+uv run pytest                    # the BDD behaviour spec, see tests/bdd/README.md
 uv run ruff check src tests
 ```
+
+The behaviour spec (`backend/tests/bdd/` and `examples/demo/bdd/`) is the
+readable specification of everything CrudKit does, executed with pytest-bdd.
+A change in behaviour comes with its scenarios in the same PR; see
+[backend/tests/bdd/README.md](backend/tests/bdd/README.md).
 
 Frontend (Node 22):
 
@@ -45,6 +51,15 @@ automatically on port 8765 (`E2E_PORT`) against a throwaway SQLite DB; your
 cd frontend
 npx playwright install chromium   # once
 npm run e2e                       # headless; `npm run e2e:ui` for the UI runner
+```
+
+The same journeys as readable BDD features run with pytest-playwright; they
+boot the demo the same way (or use `--base-url` for a running server):
+
+```bash
+cd examples/demo
+uv sync --group dev && uv run playwright install chromium   # once
+uv run pytest
 ```
 
 ## Workflow

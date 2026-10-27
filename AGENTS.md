@@ -24,6 +24,7 @@ uv sync --all-extras
 uv run manage.py test crudkit crudkit_api crudkit_assistant crudkit_frontend crudkit_mcp tests
 uv run ruff check src tests
 uv run manage.py makemigrations --check --dry-run   # must stay clean
+uv run pytest                     # BDD spec (tests/bdd) + its coverage guard
 
 # Frontend (cd frontend; Node 22)
 npm install
@@ -32,7 +33,27 @@ npm run lint
 npm run build
 npm run e2e    # Playwright against the demo + built SPA (build first;
                # `npx playwright install chromium` once)
+
+# Browser BDD journeys (cd examples/demo; build the SPA first)
+uv sync --group dev && uv run playwright install chromium   # once
+uv run pytest
 ```
+
+## Behaviour spec (BDD) — mandatory
+
+The Gherkin features in `backend/tests/bdd/` (backend) and
+`examples/demo/bdd/` (browser journeys) are the product's spec: together they
+cover **every** public behaviour of the codebase, in plain language a
+non-developer can read. Read [backend/tests/bdd/README.md](backend/tests/bdd/README.md)
+before changing behaviour or writing a scenario. Every PR that adds or changes
+behaviour updates the spec in the same PR:
+
+- Add or adjust scenarios for each behaviour touched: the happy path, the
+  refusals, the limits.
+- Tag new public surface (`@endpoint:`, `@mcp-tool:`, `@page:`, ...); the
+  coverage guard (`test_coverage.py`) fails on untagged surface and on stale tags.
+- Write steps in product language: people, records by name, outcomes like
+  "it is forbidden". URLs, status codes, JSON and IDs live in step code.
 
 ## Workflow
 

@@ -299,7 +299,9 @@ class BaseCrudKitModel(models.Model):
             self.merged_into = merged_into
         self.deleted = True
         self.save(
-            update_fields=["deleted", "updated_at"] if not merged_into else ["deleted", "merged_into", "updated_at"]
+            update_fields=["deleted", "updated_by", "updated_at"]
+            if not merged_into
+            else ["deleted", "merged_into", "updated_by", "updated_at"]
         )
 
     @property
@@ -1028,6 +1030,18 @@ class WorkLog(BaseCrudKitModel):
 
     def __str__(self):
         return f"Work log on {self.related_object} from {self.created_at}"
+
+    def clean(self):
+        if self.end_at is not None or not self.created_by_id:
+            return
+        running = (
+            WorkLog.objects.filter(created_by_id=self.created_by_id, end_at__isnull=True).exclude(pk=self.pk).first()
+        )
+        if running:
+            raise ValidationError(
+                _("You are already tracking time on %(object)s. Stop that timer first."),
+                params={"object": running.related_object},
+            )
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         allowed_prefills = ["related_content_type", "related_object_id"]

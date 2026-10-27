@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import AccessToken
 
 from crudkit.realtime import broadcast_change
 from crudkit_api.consumers import ChangesConsumer
-from crudkit_api.tests.test_authorization import grant
+from tests.support import grant
 from tests.testapp.models import Customer, Topic
 
 IN_MEMORY_LAYER = {"default": {"BACKEND": "channels.layers.InMemoryChannelLayer"}}

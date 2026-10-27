@@ -67,11 +67,18 @@ Feature: Merge duplicate records
     And the latest change to "Acme" is labelled "Merged 1 record(s) into Acme"
     And the latest change to "Acme dup" is labelled "Merged into Acme"
 
-  Scenario: A duplicate with records that depend on it cannot be merged
+  Scenario: Records that belong to a duplicate move to the kept record
     Given a ticket "Printer broken" with:
       | customer | Acme dup |
     When Alice merges "Acme dup" into "Acme"
-    Then it is rejected with "Cascading object deletes"
+    Then it succeeds
+    And "Printer broken" has customer "Acme"
+
+  Scenario: A duplicate still referenced in a way that cannot be moved cannot be merged
+    Given a ticket "Printer broken"
+    And "Acme dup" is a watcher of "Printer broken"
+    When Alice merges "Acme dup" into "Acme"
+    Then it is rejected with "still referenced by"
     And "Acme dup" is not deleted
 
   Scenario: A merge the record type's own checks refuse changes nothing

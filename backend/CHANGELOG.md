@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-10-27)
 
 - Merge moves everything that points at a merged record to the one kept: every reverse
   foreign key, whatever its `on_delete`, and every generic foreign key (feed items, external
@@ -12,8 +12,8 @@
   ValidationError naming the relation, and the merge rolls back. A project's
   `delete_and_merge_with` overrides that only repoint foreign keys can be deleted. (#75)
 
-Fixes for the open bugs the behaviour spec recorded. Bad input is now refused with a 400
-instead of a 500:
+Fixes for the open bugs the behaviour spec recorded (#77). Bad input is now refused with a
+400 instead of a 500:
 
 - Foreign key fields check what they link to. A missing id is refused as "not found" and
   keeps the old link (it used to clear the link silently). An id of the wrong type is
@@ -37,6 +37,9 @@ instead of a 500:
   person who deleted it.
 - An AI foreign-key answer that isn't a record id leaves the field empty instead of failing
   the whole AI job.
+
+- The behaviour spec: plain-language Gherkin scenarios for every public behaviour, run with
+  pytest-bdd, with a coverage guard in CI that fails on untagged surface. (#76)
 
 ## 0.6.5 (2026-10-21)
 

@@ -46,6 +46,9 @@ AGGREGATES = {"sum": Sum, "avg": Avg, "min": Min, "max": Max}
 MAX_GROUP_BY = 2
 DEFAULT_GROUPS = 100
 MAX_GROUPS = 500
+# Natural-key field names on related models we treat as a human-readable
+# display value (in priority order).
+FK_DISPLAY_FIELDS = ("name", "slug", "code", "title", "label")
 
 
 def get_exposed_models(mcp_allowlist: bool = True) -> list[type[models.Model]]:
@@ -409,7 +412,15 @@ def _jsonable(row: dict) -> dict:
     return {key: value.isoformat() if hasattr(value, "isoformat") else value for key, value in row.items()}
 
 
-def _related_queryset(user, related):
+def fk_display_field(related_model) -> str | None:
+    names = {f.name for f in related_model._meta.fields}
+    for cand in FK_DISPLAY_FIELDS:
+        if cand in names:
+            return cand
+    return None
+
+
+def viewable_queryset(user, related):
     if getattr(related, "TYPE_ID", None):
         return get_authorized_queryset(user, related.objects.all(), "view")
     return related._default_manager.all()
@@ -417,7 +428,7 @@ def _related_queryset(user, related):
 
 def _labels(user, related, pks) -> dict:
     """{pk: label} of the `related` rows among `pks` that `user` may see."""
-    return {obj.pk: str(obj) for obj in _related_queryset(user, related).filter(pk__in=pks - {None})}
+    return {obj.pk: str(obj) for obj in viewable_queryset(user, related).filter(pk__in=pks - {None})}
 
 
 def resolve_type(user, type_id):
@@ -481,7 +492,7 @@ def check_values(user, writable: dict, fields: dict) -> dict:
             value = value.get("id")
         if f.is_relation and value not in (None, ""):
             related = f.related_model
-            if not _related_queryset(user, related).filter(pk=value).exists():
+            if not viewable_queryset(user, related).filter(pk=value).exists():
                 raise ValueError(f"{name}: {related._meta.verbose_name} {value!r} not found")
     return fields
 

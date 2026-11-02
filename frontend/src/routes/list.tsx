@@ -196,8 +196,11 @@ export default function List() {
         onSelect: () => navigate(url('VIW', 'create', { model: metadata.type, next: currentUrl })),
       });
     }
+    if (metadata?.can_create) {
+      items.push({ label: 'Import…', icon: 'upload', onSelect: () => navigate(url(metadata.type, 'import')) });
+    }
     return items;
-  }, [view, metadata?.type, currentUrl, navigate]);
+  }, [view, metadata?.type, metadata?.can_create, currentUrl, navigate]);
 
   useTopbarSlots(() => {
     if (!metadata) return {};

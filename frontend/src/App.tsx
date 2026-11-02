@@ -26,6 +26,7 @@ import Create from './routes/create';
 import Edit from './routes/edit';
 import DeleteRoute from './routes/delete';
 import Merge from './routes/merge';
+import Import from './routes/import';
 import NotFound from './routes/not-found';
 
 const queryClient = new QueryClient({
@@ -94,6 +95,7 @@ export default function App() {
               <Route path=":segment/edit" element={<Edit />} />
               <Route path=":segment/delete" element={<DeleteRoute />} />
               <Route path=":segment/merge" element={<Merge />} />
+              <Route path=":segment/import" element={<Import />} />
               <Route path=":segment/VIW/:view" element={<SegmentIndex />} />
               <Route path=":segment" element={<SegmentIndex />} />
 

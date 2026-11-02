@@ -79,3 +79,9 @@ Feature: Describe a record type
     Given Carol is a user without any permissions
     When Carol looks up the description of customers
     Then it is forbidden
+
+  @endpoint:records.import
+  Scenario: The description says which fields an import can find existing records by
+    Given customers can also be matched on email
+    When Alice looks up the description of customers
+    Then the description says customers can be matched on their ID and email

@@ -30,6 +30,7 @@ api = [
     "djangorestframework>=3.15",
     "djangorestframework-simplejwt>=5.4",
     "drf-extra-fields>=3.7",
+    "openpyxl>=3.1",
 ]
 realtime = [
     "crudkit[api]",

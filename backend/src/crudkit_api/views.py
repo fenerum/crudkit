@@ -1,4 +1,5 @@
 import copy
+import json
 import re
 
 from django.contrib.auth.models import User
@@ -13,6 +14,7 @@ from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import get_object_or_404
+from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -26,6 +28,7 @@ from crudkit.authorization import (
 )
 from crudkit.models import BaseCrudKitModel, ChangeLog, ck_id_regex
 from crudkit.utils import get_model_types
+from crudkit_api import imports
 from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
@@ -279,6 +282,26 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
                 obj.save()
                 ChangeLog.objects.create_from_objects(before, obj)
         return Response(status=204)
+
+    @action(["POST"], detail=False, url_path="import", parser_classes=[MultiPartParser])
+    def import_records(self, request):
+        """Create or update records from an uploaded spreadsheet (see
+        crudkit_api.imports). With `dry_run`, report what would happen and save nothing."""
+        dry_run = request.data.get("dry_run", "") in ("1", "true")
+        try:
+            mapping = json.loads(request.data["mapping"]) if request.data.get("mapping") else None
+            report = imports.run_import(
+                self.queryset.model,
+                request.user,
+                request.FILES.get("file"),
+                mapping=mapping,
+                match_on=request.data.get("match_on") or None,
+                mode=request.data.get("mode") or "create",
+                dry_run=dry_run,
+            )
+        except ValueError as exc:
+            return Response({"errors": [str(exc)]}, status=400)
+        return Response(report, status=200 if dry_run or report["saved"] else 400)
 
     @action(["POST"], detail=True, url_path="action")
     def call_action(self, request, pk=None):

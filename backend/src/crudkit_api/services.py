@@ -313,10 +313,14 @@ def _validated_serializer(model, instance, fields: dict[str, Any], user, request
     return serializer
 
 
-def patch_fields(instance, fields: dict[str, Any], user, request=None) -> dict[str, Any]:
+def patch_fields(
+    instance, fields: dict[str, Any], user, request=None, label: str = "", skip_unchanged: bool = False
+) -> dict[str, Any]:
     """Apply a partial update through the same DRF serializer the REST API
     uses. The serializer turns FK PKs (ints or numeric strings) into model
-    instances, runs `clean()`, and surfaces validation errors as ValueError."""
+    instances, runs `clean()`, and surfaces validation errors as ValueError.
+    With `skip_unchanged`, values equal to the stored ones save and log
+    nothing, and `applied` comes back empty."""
     if not isinstance(fields, dict) or not fields:
         raise ValueError("No fields to patch")
     serializer = _validated_serializer(instance.__class__, instance, fields, user, request, partial=True)
@@ -324,21 +328,35 @@ def patch_fields(instance, fields: dict[str, Any], user, request=None) -> dict[s
     # Mirror GenericViewSet.perform_update — snapshot the pre-save state for
     # ChangeLog, save, log the diff.
     old_instance = _refetch(instance)
+    if skip_unchanged and not _changes(old_instance, serializer.validated_data):
+        return {"kind": "patch", "applied": []}
     with transaction.atomic():
         serializer.save()
-        ChangeLog.objects.create_from_objects(old_instance, serializer.instance, user=user)
+        ChangeLog.objects.create_from_objects(old_instance, serializer.instance, user=user, label=label)
 
     logger.info("Patched %s.%s fields=%s", instance.__class__.__name__, instance.pk, list(fields))
     return {"kind": "patch", "applied": list(fields.keys())}
 
 
-def create_object(model, fields: dict[str, Any], user, request=None):
+def _changes(instance, validated_data) -> bool:
+    """Whether writing `validated_data` would change any stored value of `instance`."""
+    candidate = copy.copy(instance)
+    for name, value in validated_data.items():
+        setattr(candidate, name, value)
+    return any(
+        not same_value(field, field_value(instance, field), field_value(candidate, field))
+        for field in instance._meta.fields
+        if field.name in validated_data
+    )
+
+
+def create_object(model, fields: dict[str, Any], user, request=None, label: str = ""):
     """Mirror GenericViewSet.create + perform_create."""
     serializer = _validated_serializer(model, None, fields, user, request, partial=False)
     serializer.initial_instance = model.from_query_params({}, {"created_by": user, "updated_by": user})
     with transaction.atomic():
         instance = serializer.save()
-        ChangeLog.objects.create_from_objects(None, instance, user=user)
+        ChangeLog.objects.create_from_objects(None, instance, user=user, label=label)
     logger.info("Created %s.%s", model.__name__, instance.pk)
     return instance
 

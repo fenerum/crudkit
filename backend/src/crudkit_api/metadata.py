@@ -7,7 +7,7 @@ tool result, plus instance-level enrichments (current values, FK choices).
 from collections import OrderedDict
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from django.apps import apps
@@ -18,15 +18,12 @@ from crudkit.authorization import get_authorized_queryset, has_model_permission
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem
 from crudkit.utils import get_model_types
-from crudkit_api.records import SKIPPED_FIELDS
+from crudkit_api import imports
+from crudkit_api.records import SKIPPED_FIELDS, fk_display_field
 
 # Fields that are housekeeping/audit — never useful patch targets and not
 # worth showing the LLM.
 NON_PATCHABLE_FIELDS = frozenset({"id", "created_at", "updated_at", "created_by", "updated_by", "deleted"})
-
-# Natural-key field names on related models we treat as a human-readable
-# display value (in priority order).
-FK_DISPLAY_FIELDS = ("name", "slug", "code", "title", "label")
 
 # Soft cap for FK row enumeration in `build_instance_metadata`. Wider FK
 # targets (e.g. Person, Company) are summarised rather than dumped.
@@ -137,6 +134,7 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
         "can_create": has_model_permission(user, model, "add"),
         "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
         "default_inlines": list(getattr(model.CrudKitSettings, "default_inlines", [])),
+        "import_match_fields": imports.match_fields(model),
         "fields": fields,
         "relations": relations,
         "actions": [
@@ -150,20 +148,12 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
     }
 
 
-def _fk_display_field(related_model) -> Optional[str]:
-    names = {f.name for f in related_model._meta.fields}
-    for cand in FK_DISPLAY_FIELDS:
-        if cand in names:
-            return cand
-    return None
-
-
 def _fk_choices(field, user=None) -> dict[str, Any]:
     """List the rows the LLM can refer to for a ForeignKey. Returns
     `{"options": [...], "truncated": bool}` or `{"options": None, "reason": str}`
     when the table is too wide to enumerate."""
     related_model = field.related_model
-    display = _fk_display_field(related_model)
+    display = fk_display_field(related_model)
     qs = related_model._default_manager.all()
     if user is not None:
         qs = get_authorized_queryset(user, qs, "view")
@@ -200,7 +190,7 @@ def _coerce_current_value(value: Any) -> Any:
     if value is None or isinstance(value, _JSON_PRIMITIVES):
         return value
     if isinstance(value, Model):
-        display = _fk_display_field(type(value))
+        display = fk_display_field(type(value))
         return {
             "id": value.pk,
             "display": getattr(value, display) if display else str(value),

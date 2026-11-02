@@ -168,7 +168,7 @@ pytest markers.
 
 | Kind | Names | Comes from |
 |---|---|---|
-| `@endpoint:records.<action>` | `list`, `create`, `retrieve`, `update`, `partial_update`, `destroy`, `initial`, `metadata`, `history`, `restore`, `merge`, `reorder`, `action` | the generic record API every type gets |
+| `@endpoint:records.<action>` | `list`, `create`, `retrieve`, `update`, `partial_update`, `destroy`, `initial`, `metadata`, `history`, `restore`, `merge`, `reorder`, `action`, `import` | the generic record API every type gets |
 | `@endpoint:<url name>` | e.g. `changeset_revert`, `search-list`, `token_obtain_pair`, `crudkit_mcp` | every other named route |
 | `@mcp-tool:<name>` | e.g. `list_records` | the MCP tool registry |
 | `@assistant-tool:<name>` | e.g. `propose_patch` | the assistant's tools |

@@ -234,6 +234,53 @@ tab, MCP `get_record`'s `changelog`, the assistant's `get_changelog`) needs the
 and who changed what. Syncs through `update_or_create_external` log only
 when something changed.
 
+## Importing from a spreadsheet
+
+Every list's actions menu offers **Import…** (`/<TYPE>/import`): upload an
+Excel workbook (`.xlsx`, first sheet) or a CSV file whose first row names the
+columns. Columns go into the field with that name or label. The person can
+change that and preview the result before anything is saved. The page
+re-runs the same `POST /api/v1/<TYPE>/import/` with `dry_run` on every change.
+
+Each row goes through the same serializer, `clean()` and permission checks as a
+REST create or PATCH (`crudkit_api.imports`, on top of
+`crudkit_api.services`). Cells are read the way a person would type them:
+
+- Linked records: give the ID (`AUT7`) or, when the type has a name field, the
+  name. Only records the person may view are found.
+- Choices: give the value or its label.
+- Yes/no fields: `yes`/`no`, `true`/`false`, `1`/`0` or `x`.
+- Dates: Excel dates or ISO text.
+
+The whole import runs in one transaction. A preview rolls back and so does an
+import with any bad row, so nothing is half imported. The person sees every
+problem by row and column first. A successful import is one change set
+labelled "Imported from <file>", so it can be undone in one go, and agents
+react to it as to any other write. The commit is reported as a task with a
+progress bar (see [Progress of long-running actions](#progress-of-long-running-actions)).
+`CRUDKIT_IMPORT_MAX_ROWS` caps the rows (default 5000).
+
+Existing records can be updated instead of duplicated. An import can match
+rows on:
+
+- the record's ID;
+- any unique field;
+- the fields a model lists for this:
+
+```python
+class Lead(BaseCrudKitModel):
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        import_match_fields = ["email"]
+```
+
+Text is matched ignoring case. A key that matches several records is an
+error. The import can update matches and create the rest, only update matches,
+or skip matches. An update writes only the cells that are filled in, so a blank
+cell never clears a value, and a row that changes nothing is not logged.
+Importing needs the add permission, and updating also needs the change
+permission on each matched record. The metadata endpoint lists a type's
+`import_match_fields`.
+
 ## Approvals
 
 Some changes should only happen once a person has agreed to them. A model

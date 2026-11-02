@@ -17,6 +17,7 @@ describe('isFrontendPath', () => {
       ['/COM/edit'],
       ['/COM/delete'],
       ['/COM/merge'],
+      ['/COM/import'],
       ['/COM123/edit'],
       ['/COM/VIW/my-view'],
       ['/COM123/VIW/kanban'],

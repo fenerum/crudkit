@@ -27,8 +27,8 @@ export const url = (
         returnURL = `/${obj}/`;
         if (action === 'create') {
             returnURL += `create`;
-        } else if (action === 'merge') {
-            returnURL += `merge`;
+        } else if (action === 'merge' || action === 'import') {
+            returnURL += action;
         } else if (action !== null) {
             throw Error(`Invalid action: ${action}`);
         } else if (view !== "") {

@@ -12,7 +12,8 @@ test('selecting rows shows the bulk bar with a merge link', async ({ page, reque
   await expect(main.getByText('Showing 1–3 of 3')).toBeVisible();
 
   await main.getByRole('checkbox', { name: `Select ${books[0].id}` }).check();
-  await expect(main.getByText(/\d+ selected/)).toBeHidden();
+  await expect(main.getByText('1 selected')).toBeVisible();
+  await expect(main.getByRole('link', { name: 'Merge' })).toHaveCount(0);
 
   await main.getByRole('checkbox', { name: `Select ${books[1].id}` }).check();
   await main.getByRole('checkbox', { name: `Select ${books[2].id}` }).check();

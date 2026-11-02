@@ -4,6 +4,7 @@ They route through the same serializers and permission checks as the REST
 API so validation, FK coercion and ChangeLog behave identically everywhere.
 """
 
+import contextlib
 import copy
 import logging
 from typing import Any
@@ -391,6 +392,98 @@ def create_note(instance, body: str, user) -> dict[str, Any]:
         ChangeLog.objects.create_from_objects(None, _refetch(fei), user=user)
     logger.info("Created FeedItem %s on %s.%s", fei.pk, instance.__class__.__name__, instance.pk)
     return {"kind": "note", "feeditem_id": fei.id}
+
+
+def delete_record(instance, user) -> None:
+    """Soft-delete a record and log who deleted it."""
+    with transaction.atomic():
+        ChangeLog.objects.create_from_objects(instance, None, user=user)
+        instance.updated_by = user
+        instance.soft_delete()
+
+
+# ---------------------------------------------------------------------------
+# Bulk changes
+
+BULK_LIMIT = 500
+BULK_ERRORS = (ValueError, ValidationError, DRFValidationError, PermissionDenied, IntegrityError, models.ProtectedError)
+
+
+def bulk_apply(model, ids, user, permission: str, change, label: str | None = None) -> dict[str, Any]:
+    """Run `change(instance)` on each record of `ids` (CK-IDs of `model`) the
+    person may `permission`, each in its own savepoint. A record that is
+    refused or fails is skipped with the reason; the others are kept. With a
+    `label`, the run reports its progress as one task."""
+    if not isinstance(ids, list) or not ids:
+        raise ValueError("Choose at least one record")
+    if len(ids) > BULK_LIMIT:
+        raise ValueError(f"At most {BULK_LIMIT} records can be changed at once")
+    if not all(isinstance(pk, str) and ck_id_regex.fullmatch(pk) and pk[:3] == model.TYPE_ID for pk in ids):
+        raise ValueError(f"Only {model._meta.verbose_name_plural} can be changed here")
+    if not has_model_permission(user, model, permission):
+        raise PermissionDenied
+
+    ids = list(dict.fromkeys(ids))
+    live = model._default_manager.filter(deleted=False, pk__in=ids)
+    allowed = {obj.pk: obj for obj in get_authorized_queryset(user, live, permission)}
+    visible = {obj.pk: obj for obj in get_authorized_queryset(user, live, "view")}
+    done, skipped = 0, []
+    with jobs.track(label, user) if label else contextlib.nullcontext() as tracker:
+        for position, pk in enumerate(ids, 1):
+            instance = allowed.get(pk)
+            if instance is None:
+                seen = visible.get(pk)
+                reason = f"You may not {permission} it" if seen else "Not found"
+                skipped.append({"id": pk, "label": str(seen or pk), "reason": reason})
+            else:
+                try:
+                    with transaction.atomic():
+                        change(instance)
+                    done += 1
+                except BULK_ERRORS as e:
+                    skipped.append({"id": pk, "label": str(instance), "reason": _error_text(e)})
+            jobs.progress(position, total=len(ids))
+    result = {"done": done, "skipped": skipped}
+    if tracker is not None and tracker.job is not None:
+        result["job"] = tracker.job.pk
+    return result
+
+
+def _error_text(error) -> str:
+    if isinstance(error, PermissionDenied):
+        return "You may not do that"
+    if isinstance(error, ValidationError):
+        return "; ".join(error.messages)
+    return str(error)
+
+
+def bulk_patch(model, ids, fields, user) -> dict[str, Any]:
+    """Set the same `fields` on every record of `ids`. Values that are wrong
+    for any record (unknown fields, links to missing records) are refused
+    before anything changes."""
+    if not isinstance(fields, dict) or not fields:
+        raise ValueError("No fields to change")
+    _validated_serializer(model, None, fields, user, None, partial=True)
+    return bulk_apply(model, ids, user, "change", lambda instance: patch_fields(instance, fields, user))
+
+
+def bulk_delete(model, ids, user) -> dict[str, Any]:
+    return bulk_apply(model, ids, user, "delete", lambda instance: delete_record(instance, user))
+
+
+def bulk_action(model, ids, action_name: str, user, request=None) -> dict[str, Any]:
+    """Run one @crm_action on every record of `ids`, as one task."""
+    action = model()._actions.get(action_name) if isinstance(action_name, str) else None
+    if action is None:
+        raise ValueError(f"Action {action_name!r} not available on {model._meta.verbose_name_plural}")
+
+    def run(instance):
+        response, _ = perform_tracked_action(instance, action_name, user, request)
+        if getattr(response, "status_code", 200) >= 400:
+            raise ValueError(_response_errors(response))
+
+    label = getattr(action, "verbose_name", None) or action_name
+    return bulk_apply(model, ids, user, "change", run, label=label)
 
 
 def _refetch(instance):

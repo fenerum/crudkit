@@ -27,7 +27,10 @@ Celery task under ``resume(job_id)``::
 The current task is held in a ContextVar, like ``crudkit.audit``'s context:
 each thread, asyncio task and Celery task has its own, so actions running at
 the same time never report into each other's bar. Outside an action or
-``resume()``, ``progress()`` does nothing.
+``resume()``, ``progress()`` does nothing. An action run inside another task
+(e.g. once per record of a bulk run) reports into that task's bar instead:
+its own ``progress()`` calls are ignored, while ``hand_off()`` still gives it
+a task of its own.
 """
 
 import time
@@ -48,8 +51,9 @@ SAVE_EVERY = 1.0
 class _Tracker:
     """The task an action is reporting into; its Job row is created on first use."""
 
-    def __init__(self, label, user, target=None, job=None):
+    def __init__(self, label, user, target=None, job=None, muted=False):
         self.label = label
+        self.muted = muted
         self.user = user
         self.target = target
         self.job = job
@@ -122,7 +126,7 @@ def progress(done: int, total: int | None = None, message: str | None = None) ->
     """Report that `done` of `total` steps are done; `total` may stay unknown.
     `message` (e.g. the item being worked on) shows under the bar."""
     tracker = _current.get()
-    if tracker is not None:
+    if tracker is not None and not tracker.muted:
         tracker.update(done, total, message)
 
 
@@ -143,7 +147,7 @@ class track:
     action. perform_action wraps every action in one."""
 
     def __init__(self, label, user, target=None):
-        self.tracker = _Tracker(label, user, target)
+        self.tracker = _Tracker(label, user, target, muted=_current.get() is not None)
 
     def __enter__(self) -> _Tracker:
         self._token = _current.set(self.tracker)

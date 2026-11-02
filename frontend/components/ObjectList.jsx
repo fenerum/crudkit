@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import BulkBar from "./BulkBar.jsx";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
 import { Icon, PageRange, PageSizeSelect, useScreenContext } from "./ui";
@@ -32,33 +33,41 @@ export default function ObjectList({
         );
     };
 
+    const pageIds = items.map(object => object.id);
+    const pageSelected = pageIds.length > 0 && pageIds.every(id => selectedRows.includes(id));
+    const togglePage = () => {
+        setSelectedRows(prev =>
+            pageSelected
+                ? prev.filter(id => !pageIds.includes(id))
+                : [...prev, ...pageIds.filter(id => !prev.includes(id))]
+        );
+    };
+
     return (
         <form
             id="bulk"
             className="ck-fullbleed flex flex-col"
             style={{ minHeight: 'calc(100vh - var(--topbar-h))' }}
         >
-            {selectedRows.length > 1 && (
-                <div className="flex items-center gap-2.5 rounded-md border border-border-1 bg-bg-2 px-3 py-2">
-                    <span className="text-sm text-fg-2">{selectedRows.length} selected</span>
-                    <span className="flex-1" />
-                    <Link
-                        to={(() => {
-                            const params = new URLSearchParams();
-                            selectedRows.forEach(id => params.append('object_id', id));
-                            return `${url(model, 'merge')}?${params.toString()}`;
-                        })()}
-                        className="ck-btn ck-btn-secondary ck-btn-sm"
-                    >
-                        Merge
-                    </Link>
-                </div>
+            {selectedRows.length > 0 && (
+                <BulkBar
+                    model={model}
+                    metadata={metadata}
+                    selected={selectedRows}
+                    onClear={() => setSelectedRows([])}
+                />
             )}
 
             <div className="bg-bg-1 flex-1">
                 <div className="ck-list-head">
                     <div className="ck-lh-c" style={{ flex: '0 0 28px' }}>
-                        <span className="sr-only">Select</span>
+                        <input
+                            type="checkbox"
+                            className="ck-checkbox"
+                            checked={pageSelected}
+                            onChange={togglePage}
+                            aria-label="Select all on this page"
+                        />
                     </div>
                     <div className="ck-lh-c" style={{ flex: '0 0 80px' }}>ID</div>
                     {fieldKeys ? fieldKeys.map((field, i) => (

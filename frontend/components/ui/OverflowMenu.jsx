@@ -7,8 +7,8 @@ import { useHotkeys } from "react-hotkeys-hook";
 // `shortcut` is the single-key trigger shown as a Kbd hint. If omitted, the
 // item is auto-assigned the next available digit (1–9). Pass an empty string
 // to opt out of any shortcut.
-// Renders a labeled "Actions" button with a keyboard shortcut and a menu
-// anchored below-right.
+// Renders a labeled "Actions" button with a keyboard shortcut (pass
+// `shortcut={null}` for none) and a menu anchored below-right.
 export default function OverflowMenu({
   items,
   label = "Actions",
@@ -35,11 +35,11 @@ export default function OverflowMenu({
     });
   }, []);
 
-  useHotkeys(shortcut, (e) => {
+  useHotkeys(shortcut || "", (e) => {
     if (!items || items.length === 0) return;
     e?.preventDefault?.();
     toggle();
-  }, { preventDefault: true });
+  }, { preventDefault: true, enabled: !!shortcut });
 
   useEffect(() => {
     if (!open) return;

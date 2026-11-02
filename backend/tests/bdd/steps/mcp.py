@@ -36,6 +36,7 @@ import json
 import re
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
+from types import SimpleNamespace
 
 from django.contrib.contenttypes.models import ContentType
 from django.core import checks
@@ -49,10 +50,11 @@ from crudkit.utils import get_model_types, get_system_user
 from crudkit_api import records
 from crudkit_api.services import action_for_label
 from crudkit_assistant.models import Agent, AssistantProposal
-from crudkit_mcp import conf
+from crudkit_mcp import conf, server
 from crudkit_mcp.models import AccessToken, OAuthClient
 from crudkit_mcp.server import PROTOCOL_VERSION
 from crudkit_mcp.tools import Tool
+from tests.bdd.steps.permissions import patch_for_scenario
 from tests.bdd.world import label_field, missing_id, model_named, phrase, split_list
 
 MCP_PATH = "/api/v1/mcp/"
@@ -405,15 +407,23 @@ def writes_enabled(settings):
     settings.CRUDKIT_MCP_WRITE_ENABLED = True
 
 
+def _stop_the_clock(request):
+    """Writes are counted per fixed period (e.g. per calendar minute); keep the
+    scenario's writes inside one, however slow the test run."""
+    patch_for_scenario(request, server, "time", SimpleNamespace(time=lambda: 1_800_000_000.0))
+
+
 @given(phrase("MCP clients may make {count:d} writes per minute"))
 @given(phrase("MCP clients may make {count:d} write per minute"))
-def write_rate(settings, count):
+def write_rate(request, settings, count):
     settings.CRUDKIT_MCP_WRITE_RATE = f"{count}/min"
+    _stop_the_clock(request)
 
 
 @given(phrase('the MCP write limit is "{rate:Q}"'))
-def write_rate_text(settings, rate):
+def write_rate_text(request, settings, rate):
     settings.CRUDKIT_MCP_WRITE_RATE = rate
+    _stop_the_clock(request)
 
 
 @given("there is no MCP write limit")

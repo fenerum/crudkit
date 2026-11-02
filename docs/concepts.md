@@ -72,7 +72,8 @@ Project-wide configuration lives in ordinary Django settings with the
 without compile-time knowledge: `verbose_name`, the `fields` map (type,
 choices, required, editable, related model and its TYPE_ID, …), reverse and
 generic `relations`, `allowed_prefills`, `search_fields`, `actions`, and
-for the requesting user `can_create` (add permission) plus `inline_create`.
+for the requesting user `can_create`, `can_change` and `can_delete` (the
+model permissions) plus `inline_create`.
 
 Actions are model methods decorated with `@crm_action("Verbose name")`
 (`crudkit.decorators`); they show up as buttons in the UI and are invoked via
@@ -129,6 +130,24 @@ reloads and polling clients catch up. People only ever see their own tasks.
 The action's response carries the task's id as `job`. Progress pushed from a
 Celery worker needs a channel layer shared between processes (e.g.
 `channels_redis`).
+
+### Changing many records at once
+
+`POST /api/v1/<TYPE_ID>/bulk/` changes up to 500 records of one type in one
+request: `{"ids": [...], "operation": "update", "fields": {...}}` sets the
+same fields on each, `"operation": "delete"` soft-deletes them and
+`"operation": "action", "action": "<name>"` runs a `@crm_action` on each. The
+values are checked once up front, so a value no record could take is refused
+before anything changes. After that each record is changed in its own
+savepoint: a record the person may not change (or delete), or that fails its
+own validation or the action's checks, is skipped and listed with the reason
+under `skipped`, and the rest are kept. The answer is
+`{"done": n, "skipped": [{id, label, reason}]}`, plus `job` for actions.
+Everything one request changed is one change set, so one undo reverses it. An
+action run on many records shows one progress bar, a step per record; the
+action's own `progress()` calls are ignored inside it, while `hand_off()`
+still gives the action a task of its own. The list's selection bar in the SPA
+uses this endpoint for Edit field, Run action and Delete.
 
 The SPA is built entirely on this endpoint — every list, detail view, and form
 is rendered from metadata at runtime. That is what makes the frontend generic:

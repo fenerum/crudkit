@@ -72,6 +72,9 @@ application = ProtocolTypeRouter({
 })
 ```
 
+Change hints and task progress from other processes (Celery workers, several
+web processes) need a channel layer they share, such as `channels_redis`.
+
 The sidebar sees what the user has on screen — the open record, or the list
 with its saved view, search, filters, visible and selected rows — and can
 search and read across record types. It only *proposes* changes (to any record

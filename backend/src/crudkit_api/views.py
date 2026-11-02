@@ -31,7 +31,7 @@ from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
 from crudkit_api.services import (
     get_history,
-    perform_action,
+    perform_tracked_action,
     restore_object,
     revert_change_set,
     search_filter,
@@ -289,13 +289,15 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
             return Response({"error": f"Action {action_name} not found"}, status=400)
         if not has_action_permission(request.user, instance, action_name):
             raise PermissionDenied
-        response = perform_action(instance, action_name, request.user, request=self.request)
+        response, job = perform_tracked_action(instance, action_name, request.user, request=self.request)
         if isinstance(response, HttpResponseRedirect):
-            return Response({"redirect": response.url})
-        if isinstance(response, models.Model):
-            return Response({"redirect": response.id})
-        if response is None:
-            return Response({})
+            response = Response({"redirect": response.url})
+        elif isinstance(response, models.Model):
+            response = Response({"redirect": response.id})
+        elif response is None:
+            response = Response({})
+        if job is not None and isinstance(getattr(response, "data", None), dict):
+            response.data["job"] = job.pk
         return response
 
     @action(detail=True)

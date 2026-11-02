@@ -15,6 +15,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
+from crudkit import jobs
 from crudkit.audit import audit
 from crudkit.authorization import (
     get_authorized_queryset,
@@ -27,6 +28,7 @@ from crudkit.authorization import (
 from crudkit.models import (
     ChangeLog,
     FeedItem,
+    Job,
     ck_id_regex,
     field_value,
     get_accepted_type_ids,
@@ -209,13 +211,23 @@ def check_action(instance, action_name: str, user) -> None:
 def perform_action(instance, action_name: str, user, request=None):
     """Invoke a @crm_action method bound to the instance, log what it changed,
     and return whatever the action returned."""
+    return perform_tracked_action(instance, action_name, user, request)[0]
+
+
+def perform_tracked_action(instance, action_name: str, user, request=None) -> tuple[Any, Job | None]:
+    """perform_action, plus the task the action reported progress into (see
+    crudkit.jobs), or None if it reported none."""
     check_action(instance, action_name, user)
     if request is None:
         request = RequestShim(user)
     logger.info("Running action %s on %s.%s", action_name, instance.__class__.__name__, instance.pk)
     action = instance._actions[action_name]
+    label = getattr(action, "verbose_name", None) or action_name
     before = _refetch(instance)
-    response = action(request)
+    with jobs.track(label, user, target=instance) as tracker:
+        response = action(request)
+        if getattr(response, "status_code", 200) >= 400:
+            tracker.finish(RuntimeError(_response_errors(response)))
     # An action may delete its own record; log that as a delete.
     after = instance.__class__._base_manager.filter(pk=instance.pk).first()
     ChangeLog.objects.create_from_objects(
@@ -223,14 +235,26 @@ def perform_action(instance, action_name: str, user, request=None):
         after,
         user=user,
         action=ChangeLog.Action.ACTION if after is not None else ChangeLog.Action.DELETE,
-        label=getattr(action, "verbose_name", None) or action_name,
+        label=label,
     )
-    return response
+    return response, tracker.job
+
+
+def _response_errors(response) -> str:
+    data = getattr(response, "data", None)
+    if isinstance(data, dict):
+        errors = data.get("errors") or [data.get("error")]
+        return "; ".join(str(e) for e in errors if e)
+    return f"The action answered {response.status_code}."
 
 
 def run_action(instance, action_name: str, user, request=None) -> dict[str, Any]:
     """Like perform_action, with the result normalised to a JSON-safe outcome."""
-    return _serialize_action_response(perform_action(instance, action_name, user, request))
+    response, job = perform_tracked_action(instance, action_name, user, request)
+    outcome = _serialize_action_response(response)
+    if job is not None:
+        outcome["job"] = job.pk
+    return outcome
 
 
 def _serialize_action_response(response) -> dict[str, Any]:

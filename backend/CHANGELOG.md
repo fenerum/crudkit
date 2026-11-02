@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- Import records from a spreadsheet. Every list's actions menu offers "Import…", which
+  opens `/<TYPE>/import`. There you upload an `.xlsx` or `.csv` file, match its columns to
+  fields and preview every row before saving. The import is all or nothing and is one change
+  set, labelled "Imported from <file>", so one Undo removes it. Linked records can be given by
+  ID (`CUS12`) or by name. Choices can be given by label. Existing records can be updated,
+  only updated or skipped when they match on their ID, a unique field or a field listed in
+  the new `CrudKitSettings.import_match_fields`. Blank cells never clear a value. The commit
+  shows as a task with a progress bar. The endpoint is
+  `POST /api/v1/<TYPE>/import/` (multipart; `dry_run` previews). It needs the add
+  permission, plus change for updates. The model metadata lists `import_match_fields`.
+  `openpyxl` is now a dependency of the `api` extra. `CRUDKIT_IMPORT_MAX_ROWS` caps the rows
+  (default 5000).
+- `crudkit_api.services.create_object` and `patch_fields` take a ChangeLog `label`, and
+  `patch_fields` takes `skip_unchanged`.
+
 - Progress bars for long-running actions. An action calls `crudkit.jobs.progress(done,
   total)` and the person who ran it sees the bar move live, in a task tray on every page and
   on the record. `jobs.hand_off()` plus `jobs.resume(job_id)` carry a task on in a Celery

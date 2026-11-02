@@ -443,6 +443,9 @@ class BaseCrudKitModel(models.Model):
         # Let any signed-in user view and change the rows they created, without
         # the Django model permission.
         owner_access = False
+        # Fields a spreadsheet import may match existing rows on, besides the
+        # type's own IDs and its unique fields (e.g. ["email"]).
+        import_match_fields = []
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

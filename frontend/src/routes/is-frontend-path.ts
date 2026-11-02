@@ -11,7 +11,7 @@ const FRONTEND_ROUTE_RES: RegExp[] = [
   /^\/profile\/?$/,
   /^\/search\/?$/,
   new RegExp(`^\\/${SEGMENT}\\/?$`),
-  new RegExp(`^\\/${SEGMENT}\\/(create|edit|delete|merge)\\/?$`),
+  new RegExp(`^\\/${SEGMENT}\\/(create|edit|delete|merge|import)\\/?$`),
   new RegExp(`^\\/${SEGMENT}\\/VIW\\/[^/]+\\/?$`),
 ];
 

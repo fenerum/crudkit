@@ -41,6 +41,13 @@ const getDefaultBaseUrl = (): string => {
 // `api/v1/changesets/<id>/revert/` undoes it.
 export const CHANGE_SET_HEADER = 'X-CrudKit-Change-Set';
 
+export type ImportOptions = {
+  mode: 'create' | 'update' | 'upsert';
+  match_on?: string | null;
+  mapping?: Record<string, string> | null;
+  dry_run: boolean;
+};
+
 export function changeSetOf(response: Response): string | null {
   return response.headers.get(CHANGE_SET_HEADER);
 }
@@ -420,6 +427,20 @@ export default class CrudKitAPIClient {
   // Sets the numeric `field` of each record in `ids` to its position.
   async reorder(modelName: string, field: string, ids: Array<string | number>) {
     return changeSetOf(await this.httpPost(`api/v1/${modelName}/reorder/`, { field, ids }));
+  }
+
+  // Previews (`dry_run`) or runs an import of a spreadsheet into `modelName`.
+  // Resolves to the import report, with `_change_set` once saved. An import
+  // refused because of bad rows rejects with a ValidationError whose `errors`
+  // is that report.
+  async importRecords(modelName: string, file: File, options: ImportOptions) {
+    const body = new FormData();
+    body.append('file', file);
+    body.append('mode', options.mode);
+    body.append('dry_run', options.dry_run ? '1' : '');
+    if (options.match_on) body.append('match_on', options.match_on);
+    if (options.mapping) body.append('mapping', JSON.stringify(options.mapping));
+    return await this.fetch(`api/v1/${modelName}/import/`, { method: 'POST', body }).then(withChangeSet);
   }
 
   async merge(modelName: string, id: string, data: Record<string, any>) {

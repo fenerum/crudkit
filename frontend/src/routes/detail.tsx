@@ -16,6 +16,9 @@ import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui'
 import { isFrontendPath } from './is-frontend-path';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
+import ProgressBar from '../../components/ProgressBar';
+import { jobProgressText } from '../../components/JobTray';
+import { JOBS_KEY, useJobsFor } from '../../data/jobs';
 
 function truncateLabel(s: string, max = 18) {
   if (typeof s !== 'string') return '';
@@ -236,6 +239,25 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
   );
 }
 
+// The tasks still working on this record; the tray also lists them.
+function RunningJobs({ id }: { id: string }) {
+  const jobs = useJobsFor(id).filter((job) => job.status === 'running');
+  if (jobs.length === 0) return null;
+  return (
+    <div className="mb-4 flex flex-col gap-2">
+      {jobs.map((job) => (
+        <div key={job.id} role="status" className="rounded-md border border-border-1 bg-bg-2 px-3 py-2">
+          <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
+            <span className="font-medium text-fg-1">{job.label}</span>
+            <span className="truncate text-xs text-fg-3">{jobProgressText(job)}</span>
+          </div>
+          <ProgressBar done={job.done} total={job.total} label={job.label} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function DeletedBanner({ object, onRestore, isRestoring }: any) {
   return (
     <div
@@ -305,6 +327,9 @@ export default function Detail() {
             toast.info(linkify(displayMessage));
           }
         });
+      } else if (response.job) {
+        // Its progress shows in the task tray; fetch it in case the socket is down.
+        queryClient.invalidateQueries({ queryKey: JOBS_KEY });
       } else {
         toast.success('Action completed successfully');
       }
@@ -323,7 +348,7 @@ export default function Detail() {
         } else {
           navigate(url(response.redirect));
         }
-      } else if (!response.messages || response.messages.length === 0) {
+      } else if (!response.job && (!response.messages || response.messages.length === 0)) {
         toast.warn('Action did not return redirect');
       }
     },
@@ -469,6 +494,7 @@ export default function Detail() {
           isRestoring={restoreMutation.isPending}
         />
       )}
+      <RunningJobs id={id} />
       <DetailWebTabs
         fieldPairs={fieldPairs}
         object={object}

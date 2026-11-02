@@ -137,5 +137,5 @@ class APIRootAuthorizationTests(TestCase):
         response = self.client.get("/api/v1/")
 
         self.assertEqual(response.status_code, 200)
-        # Proposals and agents use owner_access: everyone may list their own.
-        self.assertEqual(set(response.data) & set(get_model_types()), {"ASP", "AGT", "AGR"})
+        # Proposals, agents and tasks use owner_access: everyone may list their own.
+        self.assertEqual(set(response.data) & set(get_model_types()), {"ASP", "AGT", "AGR", "JOB"})

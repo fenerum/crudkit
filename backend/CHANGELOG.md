@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Progress bars for long-running actions. An action calls `crudkit.jobs.progress(done,
+  total)` and the person who ran it sees the bar move live, in a task tray on every page and
+  on the record. `jobs.hand_off()` plus `jobs.resume(job_id)` carry a task on in a Celery
+  task. Tasks are stored as `Job` (TYPE_ID `JOB`, migration `crudkit.0008_job`), visible only
+  to the person who started them, and pushed over `ws/changes/` to that person alone. The
+  action endpoint's answer, and MCP/assistant action outcomes, carry the task id as `job`.
+  `crudkit_api.services.perform_tracked_action` returns the action's answer with its task.
+
 ## 0.7.0 (2026-10-27)
 
 - Merge moves everything that points at a merged record to the one kept: every reverse

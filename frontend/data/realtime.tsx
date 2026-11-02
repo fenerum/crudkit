@@ -4,6 +4,7 @@
 // is down, callers fall back to polling and focus refetches.
 import { createContext, ReactNode, useCallback, useContext, useEffect, useRef } from 'react';
 import { QueryClient, useQueryClient } from '@tanstack/react-query';
+import { Job, receiveJob } from './jobs';
 import { invalidateModel } from './invalidate';
 import { useReconnectingSocket, wsUrl } from '../hooks/useReconnectingSocket';
 
@@ -15,6 +16,9 @@ export type ChangeEvent = {
   action: 'saved' | 'deleted';
   by: number | null;
 };
+
+// Progress of a task the signed-in person started; carries the task itself.
+export type JobEvent = { type: 'job'; job: Job };
 
 // Coalesces bursts (bulk imports, cascades) into one invalidation per model.
 const BATCH_MS = 300;
@@ -56,7 +60,11 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
   const flushTimer = useRef<number | null>(null);
 
   const onMessage = useCallback(
-    (msg: ChangeEvent) => {
+    (msg: ChangeEvent | JobEvent) => {
+      if (msg.type === 'job') {
+        receiveJob(qc, msg.job);
+        return;
+      }
       if (msg.type !== 'change') return;
       pendingModels.current.add(msg.model);
       if (flushTimer.current != null) return;
@@ -70,7 +78,7 @@ export function RealtimeProvider({ children }: { children: ReactNode }) {
     [qc],
   );
 
-  const { state } = useReconnectingSocket<ChangeEvent>({
+  const { state } = useReconnectingSocket<ChangeEvent | JobEvent>({
     url: wsUrl('/ws/changes/'),
     onMessage,
     terminalCloseCodes: TERMINAL_CLOSE_CODES,

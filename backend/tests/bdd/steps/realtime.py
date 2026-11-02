@@ -87,7 +87,9 @@ async def _cancel_other_tasks():
 
 
 def _open(world, request, settings, key, cookies=""):
-    if not getattr(world, "live_updates_off", False):
+    live = not getattr(world, "live_updates_off", False)
+    # Setting it again would swap in a fresh layer that earlier streams aren't on.
+    if live and getattr(django_settings, "CHANNEL_LAYERS", None) != IN_MEMORY_LAYER:
         settings.CHANNEL_LAYERS = IN_MEMORY_LAYER
     stream = ChangeStream(cookies)
     request.addfinalizer(stream.close)

@@ -14,6 +14,7 @@ import {appConfig} from "../utils/appConfig";
 import TimeTracker from "../components/TimeTracker";
 import Breadcrumbs from "../components/Breadcrumbs";
 import CommandPalette from "../components/CommandPalette";
+import JobTray from "../components/JobTray";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
@@ -471,6 +472,7 @@ function BaseLayoutInner() {
         </div>
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+        <JobTray />
       </div>
       </TopbarSlotsProvider>
       </ScreenProvider>

@@ -79,6 +79,57 @@ Actions are model methods decorated with `@crm_action("Verbose name")`
 `POST /api/v1/<TYPE_ID>/<pk>/action/`. Each action in the metadata carries
 `requires_approval` (see [Approvals](#approvals)).
 
+### Progress of long-running actions
+
+An action that takes a while reports how far it got with `crudkit.jobs`. The
+person who ran it sees a progress bar in a task tray that stays on screen as
+they move around, and on the record while it runs:
+
+```python
+from crudkit import jobs
+
+@crm_action("Recalculate invoices")
+def recalculate(self, request):
+    for i, invoice in enumerate(invoices, 1):
+        invoice.recalculate()
+        jobs.progress(i, total=len(invoices), message=invoice.number)
+```
+
+The first `progress()` call creates a task, a `Job` (TYPE_ID `JOB`), labelled
+with the action's name and pointing at the record. The task succeeds when the
+action returns and fails, with the reason, if it raises or answers with an
+error status. An action that never calls `progress()` creates no task. `total`
+may be left out while unknown; the bar then sweeps.
+
+To carry on after the click, `hand_off()` the task to a Celery task and finish
+it there under `resume()`, which marks it succeeded or failed when the block
+exits:
+
+```python
+@crm_action("Import contacts")
+def import_contacts(self, request):
+    import_contacts_task.delay(jobs.hand_off().pk)
+
+@shared_task
+def import_contacts_task(job_id):
+    with jobs.resume(job_id):
+        for i, row in enumerate(rows, 1):
+            ...
+            jobs.progress(i, total=len(rows))
+```
+
+`progress()` looks global but isn't: the current task lives in a ContextVar,
+as the [audit context](#history-and-undo) does, so each thread, asyncio task
+and Celery task reports into its own. `jobs.current()` returns it. Outside an
+action or `resume()`, `progress()` does nothing, so shared helpers can call it.
+
+Progress is pushed over the `ws/changes/` socket to the person who started the
+task only, at most four times a second, and saved at most once a second, so
+reloads and polling clients catch up. People only ever see their own tasks.
+The action's response carries the task's id as `job`. Progress pushed from a
+Celery worker needs a channel layer shared between processes (e.g.
+`channels_redis`).
+
 The SPA is built entirely on this endpoint — every list, detail view, and form
 is rendered from metadata at runtime. That is what makes the frontend generic:
 it ships in the wheel yet works for any project's models.

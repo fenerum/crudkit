@@ -1178,3 +1178,64 @@ class AIContext(BaseCrudKitModel):
         unknown = sorted(set(self.model_types) - set(get_model_types()))
         if unknown:
             raise ValidationError({"model_types": f"Unknown record types: {unknown}"})
+
+
+class Job(BaseCrudKitModel):
+    """A long-running action's progress, shown to the person who started it.
+    Written through crudkit.jobs; nobody edits one by hand."""
+
+    TYPE_ID = "JOB"
+
+    class Status(models.TextChoices):
+        RUNNING = "running", "Running"
+        SUCCEEDED = "succeeded", "Succeeded"
+        FAILED = "failed", "Failed"
+
+    label = models.CharField(max_length=255, editable=False)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.RUNNING, editable=False)
+    done = models.PositiveIntegerField(default=0, editable=False)
+    total = models.PositiveIntegerField(null=True, blank=True, editable=False, help_text="Empty while unknown.")
+    message = models.CharField(max_length=255, blank=True, default="", editable=False)
+    error = models.TextField(blank=True, default="", editable=False)
+    target_content_type = models.ForeignKey(
+        ContentType, on_delete=models.CASCADE, null=True, blank=True, related_name="+", editable=False
+    )
+    target_object_id = CrudKitPositiveIntegerField(null=True, blank=True, editable=False)
+    target = GenericForeignKey("target_content_type", "target_object_id")
+    # Handed off to a background task, which finishes it, rather than the action.
+    detached = models.BooleanField(default=False, editable=False)
+    started_at = models.DateTimeField(default=timezone.now, editable=False)
+    finished_at = models.DateTimeField(null=True, blank=True, editable=False)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [models.Index(fields=["created_by", "status"])]
+
+    def __str__(self):
+        return self.label
+
+    def as_event(self) -> dict:
+        target = self.target
+        return {
+            "id": self.pk,
+            "label": self.label,
+            "status": self.status,
+            "done": self.done,
+            "total": self.total,
+            "message": self.message,
+            "error": self.error,
+            # The same `target` the REST API lists, plus its label for the tray.
+            "target": target.pk if target else None,
+            "target_label": str(target) if target else "",
+            "started_at": self.started_at.isoformat(),
+            "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+        }
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        owner_access = True
+        inline_create = False
+        mcp_exclude = True
+
+        @staticmethod
+        def get_authorized_queryset(user, queryset, action):
+            return queryset.filter(created_by=user)

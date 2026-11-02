@@ -1,8 +1,12 @@
+import time
+
 from django.db import models
 from rest_framework.response import Response
 
+from crudkit import jobs
 from crudkit.decorators import crm_action
 from crudkit.models import BaseCrudKitModel
+from library.tasks import fetch_reviews
 
 
 class Author(BaseCrudKitModel):
@@ -60,6 +64,20 @@ class Reading(BaseCrudKitModel):
         self.status = self.Status.FINISHED
         self.save(update_fields=["status", "updated_at"])
         return Response({"messages": [f"{self} marked finished"]})
+
+    # Show off task progress: one runs during the click, one in the background.
+    @crm_action(verbose_name="Count pages")
+    def count_pages(self, request):
+        steps = 8
+        for step in range(1, steps + 1):
+            time.sleep(0.4)
+            jobs.progress(step, total=steps, message=f"Chapter {step}")
+        self.pages = steps * 40
+        self.save(update_fields=["pages", "updated_at"])
+
+    @crm_action(verbose_name="Look up reviews")
+    def look_up_reviews(self, request):
+        fetch_reviews.delay(jobs.hand_off().pk)
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name"]

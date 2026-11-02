@@ -10,9 +10,15 @@ Feature: Selecting and merging records
     And a book "Twin copy" with author "Octavia E. Butler"
     And a book "Twin draft" with author "Octavia E. Butler"
 
-  Scenario: Selecting a single record shows no bulk bar
+  Scenario: A single selected record cannot be merged
     When Alice selects "Twin" in the books list
-    Then no bulk bar is shown
+    Then the bulk bar shows 1 selected
+    And the bulk bar does not offer to merge
+
+  Scenario: Every record on the page can be selected at once
+    When Alice selects "Twin" in the books list
+    And she selects everything on the page
+    Then the bulk bar shows 3 selected
 
   Scenario: The bulk bar counts the selected records
     When Alice selects "Twin", "Twin copy" and "Twin draft" in the books list

@@ -33,6 +33,10 @@ from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
 from crudkit_api.serializers import GenericSerializer, get_serializer
 from crudkit_api.services import (
+    bulk_action,
+    bulk_delete,
+    bulk_patch,
+    delete_record,
     get_history,
     perform_tracked_action,
     restore_object,
@@ -115,11 +119,8 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
         serializer.save()
         ChangeLog.objects.create_from_objects(old_object, serializer.instance)
 
-    @transaction.atomic
     def perform_destroy(self, instance: BaseCrudKitModel):
-        ChangeLog.objects.create_from_objects(instance, None, user=self.request.user)
-        instance.updated_by = self.request.user
-        instance.soft_delete()
+        delete_record(instance, self.request.user)
 
     def create(self, request, *args, **kwargs):
         self.initial_instance = self.queryset.model.from_query_params(
@@ -302,6 +303,25 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
         except ValueError as exc:
             return Response({"errors": [str(exc)]}, status=400)
         return Response(report, status=200 if dry_run or report["saved"] else 400)
+
+    @action(["POST"], detail=False)
+    def bulk(self, request):
+        """Change many records at once: `{ids, operation, fields | action}`,
+        where `operation` is "update", "delete" or "action". Records that are
+        refused or fail are skipped with the reason; the rest share one change set."""
+        model, data, user = self.queryset.model, request.data, request.user
+        operations = {
+            "update": lambda: bulk_patch(model, data.get("ids"), data.get("fields"), user),
+            "delete": lambda: bulk_delete(model, data.get("ids"), user),
+            "action": lambda: bulk_action(model, data.get("ids"), data.get("action"), user, request=request),
+        }
+        operation = operations.get(data.get("operation"))
+        if operation is None:
+            return Response({"errors": [f"Unknown operation {data.get('operation')!r}"]}, status=400)
+        try:
+            return Response(operation())
+        except ValueError as e:
+            return Response({"errors": [str(e)]}, status=400)
 
     @action(["POST"], detail=True, url_path="action")
     def call_action(self, request, pk=None):

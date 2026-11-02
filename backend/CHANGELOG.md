@@ -17,6 +17,15 @@
 - `crudkit_api.services.create_object` and `patch_fields` take a ChangeLog `label`, and
   `patch_fields` takes `skip_unchanged`.
 
+- Change many records at once. `POST /api/v1/<TYPE>/bulk/` sets the same fields on, deletes,
+  or runs an action on up to 500 selected records. Records the person may not touch, or that
+  fail their own checks, are skipped and named; the rest change together as one change set,
+  so one Undo reverses them. An action run on many records shows one progress bar. In the
+  SPA, the list's selection bar gains a select-all-on-page checkbox, Clear, Edit field, Run
+  action and Delete, and shows from one selected record (Merge still needs two). Model
+  metadata gains `can_change` and `can_delete`. `crudkit_api.services` gains `bulk_patch`,
+  `bulk_delete`, `bulk_action`, `bulk_apply` and `delete_record`.
+
 - Progress bars for long-running actions. An action calls `crudkit.jobs.progress(done,
   total)` and the person who ran it sees the bar move live, in a task tray on every page and
   on the record. `jobs.hand_off()` plus `jobs.resume(job_id)` carry a task on in a Celery

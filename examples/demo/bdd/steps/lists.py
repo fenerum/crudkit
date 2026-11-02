@@ -8,8 +8,11 @@
 - `When she shows 10 records per page` / `Then the list shows 10 records per page`
 - `When Alice selects "A", "B" and "C" in the books list` (this scenario's
   records) / `When she selects "Kindred" in the list` (the list on screen)
+- `When she selects everything on the page`
 - `When she unselects "C"`, `Then the bulk bar shows 2 selected`, `Then no bulk bar is shown`,
-  `Then the bulk bar offers to merge "A" and "B"`
+  `Then the bulk bar offers to merge "A" and "B"`, `Then the bulk bar does not offer to merge`
+- `When she edits the status of the selection` then `When she sets it on the selection`,
+  `When she deletes the selection`
 - `When Alice merges "A" and "B" from the books list`, `When she keeps "B" as the name`,
   `When she completes the merge`, `Then the merge keeps "A" by default`,
   `Then "B" is gone from the books list`
@@ -160,6 +163,11 @@ def selects_on_screen(world, label):
     checkbox(world, label).check()
 
 
+@when(phrase("{name:Actor} selects everything on the page"))
+def selects_page(world):
+    world.main.get_by_role("checkbox", name="Select all on this page").check()
+
+
 @when(phrase('{name:Actor} unselects "{label:Q}"'))
 def unselects(world, label):
     checkbox(world, label).uncheck()
@@ -181,6 +189,36 @@ def offers_to_merge(world, labels):
     query = "&".join(f"object_id={record_id}" for record_id in ids)
     merge = world.main.get_by_role("link", name="Merge")
     expect(merge).to_have_attribute("href", f"/{ids[0][:3]}/merge?{query}")
+
+
+@then("the bulk bar does not offer to merge")
+def does_not_offer_merge(world):
+    expect(world.main.get_by_role("link", name="Merge")).to_have_count(0)
+
+
+def bulk_bar(world):
+    return world.main.get_by_role("toolbar", name="Selection")
+
+
+@when(phrase("{name:Actor} edits the {field:Words} of the selection"))
+def edits_selection(world, field):
+    bulk_bar(world).get_by_role("button", name="Edit field").click()
+    world.page.get_by_role("dialog").get_by_label("Field").select_option(label=field.title())
+
+
+@when(phrase("{name:Actor} sets it on the selection"))
+def sets_on_selection(world):
+    dialog = world.page.get_by_role("dialog")
+    dialog.get_by_role("button", name=re.compile(r"^Set on \d+$")).click()
+    expect(dialog).to_have_count(0)
+
+
+@when(phrase("{name:Actor} deletes the selection"))
+def deletes_selection(world):
+    bulk_bar(world).get_by_role("button", name="Delete").click()
+    dialog = world.page.get_by_role("dialog")
+    dialog.get_by_role("button", name=re.compile(r"^Delete \d+$")).click()
+    expect(dialog).to_have_count(0)
 
 
 @when(phrase("{name:Actor} merges {labels:QList} from the {model:Model} list"))

@@ -424,6 +424,12 @@ export default class CrudKitAPIClient {
     return await this.httpPost(`api/v1/${modelName}/${id}/action/`, { action }).then((r) => r.json());
   }
 
+  // Changes many records at once: `operation` "update" (with `fields`),
+  // "delete" or "action" (with `action`). Resolves to {done, skipped, job?}.
+  async bulk(modelName: string, ids: string[], operation: string, payload: Record<string, any> = {}) {
+    return await this.httpPost(`api/v1/${modelName}/bulk/`, { ids, operation, ...payload }).then(withChangeSet);
+  }
+
   // Sets the numeric `field` of each record in `ids` to its position.
   async reorder(modelName: string, field: string, ids: Array<string | number>) {
     return changeSetOf(await this.httpPost(`api/v1/${modelName}/reorder/`, { field, ids }));

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-11-03)
 
 - Import records from a spreadsheet. Every list's actions menu offers "Import…", which
   opens `/<TYPE>/import`. There you upload an `.xlsx` or `.csv` file, match its columns to
@@ -13,9 +13,9 @@
   `POST /api/v1/<TYPE>/import/` (multipart; `dry_run` previews). It needs the add
   permission, plus change for updates. The model metadata lists `import_match_fields`.
   `openpyxl` is now a dependency of the `api` extra. `CRUDKIT_IMPORT_MAX_ROWS` caps the rows
-  (default 5000).
+  (default 5000). (#80)
 - `crudkit_api.services.create_object` and `patch_fields` take a ChangeLog `label`, and
-  `patch_fields` takes `skip_unchanged`.
+  `patch_fields` takes `skip_unchanged`. (#80)
 
 - Change many records at once. `POST /api/v1/<TYPE>/bulk/` sets the same fields on, deletes,
   or runs an action on up to 500 selected records. Records the person may not touch, or that
@@ -24,7 +24,7 @@
   SPA, the list's selection bar gains a select-all-on-page checkbox, Clear, Edit field, Run
   action and Delete, and shows from one selected record (Merge still needs two). Model
   metadata gains `can_change` and `can_delete`. `crudkit_api.services` gains `bulk_patch`,
-  `bulk_delete`, `bulk_action`, `bulk_apply` and `delete_record`.
+  `bulk_delete`, `bulk_action`, `bulk_apply` and `delete_record`. (#81)
 
 - Progress bars for long-running actions. An action calls `crudkit.jobs.progress(done,
   total)` and the person who ran it sees the bar move live, in a task tray on every page and
@@ -32,7 +32,7 @@
   task. Tasks are stored as `Job` (TYPE_ID `JOB`, migration `crudkit.0008_job`), visible only
   to the person who started them, and pushed over `ws/changes/` to that person alone. The
   action endpoint's answer, and MCP/assistant action outcomes, carry the task id as `job`.
-  `crudkit_api.services.perform_tracked_action` returns the action's answer with its task.
+  `crudkit_api.services.perform_tracked_action` returns the action's answer with its task. (#79)
 
 ## 0.7.0 (2026-10-27)
 

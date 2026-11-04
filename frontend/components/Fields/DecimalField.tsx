@@ -13,7 +13,7 @@ export default function DecimalField({
   metadata,
   ...rest
 }: DecimalFieldProps) {
-  const initialValue = defaultValue !== undefined ? String(defaultValue) : "";
+  const initialValue = defaultValue != null ? String(defaultValue) : "";
 
   return (
     <BaseField

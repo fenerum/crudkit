@@ -24,7 +24,7 @@ PASSWORD = "admin"
 EMAIL = "admin@example.com"
 
 # Record types by the word a feature uses for them.
-MODELS = {"author": "AUT", "book": "BOK", "reading": "RDG", "view": "VIW"}
+MODELS = {"author": "AUT", "book": "BOK", "reading": "RDG", "view": "VIW", "call": "CAL", "email": "EML"}
 
 # Well inside simplejwt's default five-minute access token lifetime.
 TOKEN_SECONDS = 60
@@ -121,8 +121,9 @@ class Api:
     def get(self, path: str, **params):
         return self._json(self.request.get(path, headers=self._headers(), params=params))
 
-    def create(self, type_id: str, data: dict) -> dict:
-        return self._json(self.request.post(f"/api/v1/{type_id}/", headers=self._headers(), data=data))
+    def create(self, type_id: str, data: dict, params: dict | None = None) -> dict:
+        url = f"/api/v1/{type_id}/"
+        return self._json(self.request.post(url, headers=self._headers(), data=data, params=params))
 
     def update(self, ck_id: str, data: dict) -> dict:
         return self._json(self.request.patch(self._path(ck_id), headers=self._headers(), data=data))

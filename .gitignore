@@ -17,3 +17,6 @@ backend/src/crudkit_frontend/templates/
 
 # pytest-playwright failure artifacts of the BDD journey suite
 examples/demo/test-results/
+
+# Files uploaded to the demo (email attachments)
+examples/demo/media/

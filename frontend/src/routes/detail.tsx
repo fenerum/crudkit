@@ -12,38 +12,17 @@ import { formatApiError } from '../../utils/apiErrors';
 import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
+import { handleActionResult } from '../../utils/actionResult';
 import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
-import { isFrontendPath } from './is-frontend-path';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
 import ProgressBar from '../../components/ProgressBar';
 import { jobProgressText } from '../../components/JobTray';
-import { JOBS_KEY, useJobsFor } from '../../data/jobs';
+import { useJobsFor } from '../../data/jobs';
 
 function truncateLabel(s: string, max = 18) {
   if (typeof s !== 'string') return '';
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
-}
-
-// Render any http(s) URLs inside a toast message as clickable links, leaving the rest
-// as plain text. Returns the original string when there's nothing to linkify.
-function linkify(text: string) {
-  const urlPattern = /(https?:\/\/[^\s]+)/g;
-  if (!urlPattern.test(text)) return text;
-  const parts = text.split(urlPattern);
-  return (
-    <>
-      {parts.map((part, i) =>
-        /^https?:\/\//.test(part) ? (
-          <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline">
-            {part}
-          </a>
-        ) : (
-          part
-        )
-      )}
-    </>
-  );
 }
 
 function InlineTab({ inline, parent_object_id }: any) {
@@ -207,15 +186,15 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
             />
             {type === 'AGR' && <AgentRunOutput run={object} />}
             {feedInline && (() => {
-              const [mdl, fields, , inlineMetadata, , parent_object_id, related_field_name] = feedInline;
+              const [mdl, , , inlineMetadata, , parent_object_id, related_field_name] = feedInline;
               return (
                 <Feed
-                  fields={fields}
                   model={mdl}
                   parent_object_id={parent_object_id}
                   metadata={inlineMetadata}
                   related_field_name={related_field_name}
                   parentType={type}
+                  parentMetadata={metadata}
                 />
               );
             })()}
@@ -303,55 +282,7 @@ export default function Detail() {
 
   const actionMutation = useMutation({
     mutationFn: (actionName: string) => client.action(type, id, actionName),
-    onSuccess: (response: any) => {
-      if (response.messages && response.messages.length > 0) {
-        response.messages.forEach((message: string) => {
-          let displayMessage = message;
-          if (message.startsWith('[') && message.endsWith(']')) {
-            try {
-              const parsed = JSON.parse(message.replace(/'/g, '"'));
-              if (Array.isArray(parsed)) displayMessage = parsed[0] || message;
-            } catch {
-              const match = message.match(/\['(.*?)'\]/);
-              if (match && match[1]) displayMessage = match[1];
-            }
-          }
-          if (
-            displayMessage.includes('required') ||
-            displayMessage.includes('error') ||
-            displayMessage.includes('invalid') ||
-            displayMessage.includes('failed')
-          ) {
-            toast.error(linkify(displayMessage));
-          } else {
-            toast.info(linkify(displayMessage));
-          }
-        });
-      } else if (response.job) {
-        // Its progress shows in the task tray; fetch it in case the socket is down.
-        queryClient.invalidateQueries({ queryKey: JOBS_KEY });
-      } else {
-        toast.success('Action completed successfully');
-      }
-
-      if (response.redirect) {
-        if (response.open_in_new_tab) {
-          window.open(response.redirect, '_blank', 'noopener,noreferrer');
-        } else if (response.redirect.startsWith('http')) {
-          window.location.href = response.redirect;
-        } else if (response.redirect.startsWith('/')) {
-          if (isFrontendPath(response.redirect)) {
-            navigate(response.redirect);
-          } else {
-            window.location.href = response.redirect;
-          }
-        } else {
-          navigate(url(response.redirect));
-        }
-      } else if (!response.job && (!response.messages || response.messages.length === 0)) {
-        toast.warn('Action did not return redirect');
-      }
-    },
+    onSuccess: (response: any) => handleActionResult(response, navigate, queryClient),
     onError: (error: any) => {
       toast.error('Action failed: ' + (error.message || 'Unknown error'));
       console.error('Action error:', error);

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { url, valid_url } from "../utils/urls";
 import { choiceLabel } from "../utils/choices";
 import { Icon } from "./ui";
+import HtmlFrame from "./HtmlFrame";
 
 // Values longer than this can't fit on one line in a detail cell, so they get
 // the wrap + expand treatment instead of being ellipsised.
@@ -18,9 +19,6 @@ function ShowMoreToggle({ expanded, onToggle }) {
 }
 
 export default function ReadOnlyField({ value, metadata, link = true, expandable = false }) {
-    const iframeRef = useRef();
-    const iframeDefaultHeight = "140px";
-    const [iframeHeight, setIframeHeight] = useState(iframeDefaultHeight);
     const textRef = useRef(null);
     const [textExpanded, setTextExpanded] = useState(false);
     const [textOverflows, setTextOverflows] = useState(false);
@@ -37,25 +35,6 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
     if (metadata === undefined) {
         return <>[undefined]</>;
     }
-
-    const toggleSize = () => {
-        if (iframeRef.current) {
-            const height = iframeHeight === iframeDefaultHeight
-                ? (iframeRef.current.contentWindow.document.body.scrollHeight + 50) + "px"
-                : iframeDefaultHeight;
-            setIframeHeight(height);
-        }
-    };
-
-    const setInitialSize = () => {
-        if (iframeRef.current) {
-            const height = Math.min(
-                iframeRef.current.contentWindow.document.body.scrollHeight + 50,
-                parseInt(iframeDefaultHeight)
-            );
-            setIframeHeight(height + "px");
-        }
-    };
 
     const isAIField = metadata.type?.startsWith("AI");
 
@@ -84,19 +63,8 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
                     <Link to={url(value.id)} className="ck-fk-link font-medium">{value.label}</Link>
                 </span>
             ) : <span>{value.label}</span>
-        ) : value && metadata.type === "WYSIWYGEditorField" ? (
-            <div className="opacity-75 show">
-                <iframe
-                    width="100%"
-                    height={iframeHeight}
-                    ref={iframeRef}
-                    onLoad={setInitialSize}
-                    srcDoc={value}
-                    sandbox="allow-same-origin"
-                    title="content"
-                />
-                <ShowMoreToggle expanded={iframeHeight !== iframeDefaultHeight} onToggle={toggleSize} />
-            </div>
+        ) : value && (metadata.type === "WYSIWYGEditorField" || metadata.type === "EmailWYSIWYGEditorField") ? (
+            <HtmlFrame html={value} />
         ) : value && (metadata.type === "BooleanField" || metadata.type === "AIBooleanField") ? (
             <span>{value ? "Yes" : "No"}</span>
         ) : value && metadata.type === "MoneyField" ? (

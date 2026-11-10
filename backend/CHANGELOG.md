@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- Let a project add its own kinds of entries to a record's feed, such as a logged call, a
+  meeting or a sent email. `CrudKitSettings.feed_entry = FeedEntry(...)` on the entry's model
+  says which fields the composer asks for and the feed shows, its icon and wording, an action
+  to run once it is created (such as sending), which record types offer it, and whether it
+  takes replies and files. The composer gets a tab for each kind next to Note, and creating
+  with `?from_object=<CK-ID>` puts the new record on that record's feed. Its feed row follows
+  the record: undoing or deleting it takes the row out. The metadata gains `feed_entry` and,
+  for the requesting user, `feed_entries`. System check `crudkit.E003` reports a wrongly
+  declared one. The demo logs calls and sends emails with files attached.
+  **Breaking:** the feed no longer has a built-in Email tab, email or AI-suggestion rows, or
+  the disabled Call tab, and no longer guesses icons and wording from model names.
+  **Upgrade:** declare `feed_entry` on your email model and on the other models your feed
+  shows (`compose=False` for those that only arrive from integrations); read `reply_to`
+  instead of `reply_to_message` in `from_query_params`; give attachment models defaults for
+  their required fields besides the link, the file, `filename` and `content_type`.
+  `from_object` and `reply_to` must now name records the person can see.
+  `FeedItem.get_content()` now asks any related record that has a `get_content()`.
+
 - Celebrate milestones with confetti. The new `CrudKitSettings.celebrate`, e.g.
   `{"status": ["won", "closed"]}`, makes any write that moves a record into one of those
   values answer with `X-CrudKit-Celebrate: 1`. The SPA then plays a short confetti burst,

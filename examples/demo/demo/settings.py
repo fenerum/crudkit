@@ -77,6 +77,12 @@ DATABASES = {
 
 # Overridable so CI can prove the SPA works under any static prefix.
 STATIC_URL = os.environ.get("DEMO_STATIC_URL", "static/")
+# Files attached to emails in the feed.
+MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_URL = "media/"
+# The demo's emails are printed by the server instead of sent.
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+DEFAULT_FROM_EMAIL = "library@example.com"
 USE_TZ = True
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

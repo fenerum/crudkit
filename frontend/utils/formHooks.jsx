@@ -128,12 +128,13 @@ export function useCreateForm({ type, params = {}, onCreated = null, initialValu
     for (const key of allowed) {
       if (params[key] !== undefined) out[key] = params[key];
     }
-    // `from_object` is a meta-param consumed by `Model.from_query_params` to
-    // resolve initial relations (e.g. Email→Conversation, signature, history).
-    // Not a model field, so it isn't in `allowed_prefills` — pass it through
-    // explicitly so /initial/ and /create/ both receive it.
-    if (params.from_object !== undefined) out.from_object = params.from_object;
-    if (params.reply_to_message !== undefined) out.reply_to_message = params.reply_to_message;
+    // Meta-params a model's `from_query_params` reads: the record this one is
+    // started from (`from_object`; a feed entry goes on its feed) and the entry
+    // it replies to (`reply_to`). Not model fields, so they aren't in
+    // `allowed_prefills`: pass them through so /initial/ and /create/ get them.
+    for (const key of ['from_object', 'reply_to']) {
+      if (params[key] !== undefined) out[key] = params[key];
+    }
     return out;
   }, [metadataQuery.data, params]);
 

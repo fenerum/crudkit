@@ -15,6 +15,12 @@ actions, history, notes and live updates.
   `Then the history shows the revert`, `When she undoes it from the notification`,
   `When she restores "X" from its page`, `Then "X" is not marked as deleted`
 - `When Alice posts the note "N" on "X"`, `Then the feed shows "N"`
+- `Then the composer offers "Note", "Call" and "Email"`, `When Alice logs a call "C" on "X"`,
+  `Then the feed shows the call "C"`
+- `When Alice writes the email "S" to "a@b.c" on "X"`, `When she attaches the file "f.txt"`, `When she sends it`,
+  `Then the feed shows the email "S" sent with the file "f.txt"`
+- `Given Alice emailed "S" to "a@b.c" on "X"`, `When she replies to the email "S" on "X"`,
+  `Then the email form is to "a@b.c" with the subject "Re: S"`
 - `Given Alice has "X" open`, `Given Alice is editing "X"`,
   `Then she is told the record changed elsewhere`, `When she loads the other change`
 """
@@ -246,6 +252,79 @@ def posts_a_note(world, note, label):
 @then(phrase('the feed shows "{note:Q}"'))
 def feed_shows(world, note):
     expect(world.main.locator(".ck-note-body").filter(has_text=world.text(note))).to_be_visible()
+
+
+# Calls and emails in the feed
+
+
+def composer(world):
+    return world.main.locator("#feed-form")
+
+
+def feed_row(world, text):
+    return world.main.locator(".ck-act").filter(has_text=world.text(text))
+
+
+@then(phrase("the composer offers {tabs:QList}"))
+def composer_offers(world, tabs):
+    expect(composer(world).get_by_role("tab")).to_have_text(tabs)
+
+
+@when(phrase('{name:Actor} logs a call "{summary:Q}" on "{label:Q}"'))
+def logs_a_call(world, summary, label):
+    world.open(label)
+    composer(world).get_by_role("tab", name="Call").click()
+    field_input(world, composer(world), "summary").fill(world.new_name(summary))
+    composer(world).get_by_role("button", name="Add call").click()
+
+
+@then(phrase('the feed shows the call "{summary:Q}"'))
+def feed_shows_call(world, summary):
+    expect(feed_row(world, summary)).to_contain_text("logged a call")
+
+
+@when(phrase('{name:Actor} writes the email "{subject:Q}" to "{address:Q}" on "{label:Q}"'))
+def writes_an_email(world, subject, address, label):
+    world.open(label)
+    composer(world).get_by_role("tab", name="Email").click()
+    field_input(world, composer(world), "to").fill(address)
+    field_input(world, composer(world), "subject").fill(world.new_name(subject))
+
+
+@when(phrase('{name:Actor} attaches the file "{filename:Q}"'))
+def attaches_a_file(world, filename):
+    file = {"name": filename, "mimeType": "text/plain", "buffer": b"Doors open at 7pm."}
+    composer(world).locator('input[type="file"]').set_input_files(files=[file])
+
+
+@when(phrase("{name:Actor} sends it"))
+def sends_it(world):
+    composer(world).get_by_role("button", name="Send").click()
+
+
+@then(phrase('the feed shows the email "{subject:Q}" sent with the file "{filename:Q}"'))
+def feed_shows_sent_email(world, subject, filename):
+    row = feed_row(world, subject)
+    expect(row).to_contain_text("Sent")
+    expect(row).to_contain_text(filename)
+
+
+@given(phrase('{name:Actor} emailed "{subject:Q}" to "{address:Q}" on "{label:Q}"'))
+def emailed(world, subject, address, label):
+    data = {"to": address, "subject": world.new_name(subject)}
+    world.ids[subject] = world.api.create("EML", data, {"from_object": world.id(label)})["id"]
+
+
+@when(phrase('{name:Actor} replies to the email "{subject:Q}" on "{label:Q}"'))
+def replies_to_an_email(world, subject, label):
+    world.open(label)
+    feed_row(world, subject).get_by_role("button", name="Reply").click()
+
+
+@then(phrase('the email form is to "{address:Q}" with the subject "{subject:Q}"'))
+def email_form_is(world, address, subject):
+    expect(field_input(world, composer(world), "to")).to_have_value(address)
+    expect(field_input(world, composer(world), "subject")).to_have_value(world.text(subject))
 
 
 # Live updates

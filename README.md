@@ -63,7 +63,7 @@ That model now has:
 **Data model**
 - Typed record IDs (`CUS42`) that address any record from just its ID
 - Audit columns, soft delete and restore, merge that moves every related row to the record you keep
-- Change log and activity feed (notes, emails, calls) on every record
+- Change log and activity feed on every record: notes, plus the kinds of entries you declare (calls, meetings, emails)
 - External IDs for syncing with other systems, money and currency fields with exchange rates, time tracking
 
 **Web UI**

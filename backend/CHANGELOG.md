@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Celebrate milestones with confetti. The new `CrudKitSettings.celebrate`, e.g.
+  `{"status": ["won", "closed"]}`, makes any write that moves a record into one of those
+  values answer with `X-CrudKit-Celebrate: 1`. The SPA then plays a short confetti burst,
+  unless the person prefers reduced motion. This covers edits, board drags, bulk edits,
+  imports and actions. Undo and re-saves never celebrate. A `@crm_action` can also
+  celebrate by answering `{"celebrate": true}`.
+
 ## 0.8.0 (2026-11-03)
 
 - Import records from a spreadsheet. Every list's actions menu offers "Import…", which

@@ -51,12 +51,14 @@ from crudkit_api.services import (
 # agents), and no request can claim it.
 SPA_CLIENT_ID = "CrudKitAPIClient"
 CHANGE_SET_HEADER = "X-CrudKit-Change-Set"
+CELEBRATE_HEADER = "X-CrudKit-Celebrate"
 ORDERABLE_FIELDS = (models.IntegerField, models.FloatField, models.DecimalField)
 
 
 class AuditedViewMixin:
     """Attribute ChangeLog entries written by this view to the caller (see
-    crudkit.audit), and tell the client which change set its write made."""
+    crudkit.audit), and tell the client which change set its write made and
+    whether it deserves a celebration."""
 
     def initial(self, request, *args, **kwargs):
         super().initial(request, *args, **kwargs)
@@ -71,8 +73,12 @@ class AuditedViewMixin:
     def finalize_response(self, request, response, *args, **kwargs):
         response = super().finalize_response(request, response, *args, **kwargs)
         scope = getattr(self, "_audit", None)
-        if scope and request.method not in SAFE_METHODS and scope.context.logged and response.status_code < 400:
-            response[CHANGE_SET_HEADER] = str(scope.context.change_set)
+        if scope and request.method not in SAFE_METHODS and response.status_code < 400:
+            if scope.context.logged:
+                response[CHANGE_SET_HEADER] = str(scope.context.change_set)
+            # Only entries that were kept: a preview or a refused import rolls its writes back.
+            if ChangeLog.objects.filter(pk__in=scope.context.celebrations).exists():
+                response[CELEBRATE_HEADER] = "1"
         return response
 
     def dispatch(self, request, *args, **kwargs):

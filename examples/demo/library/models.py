@@ -81,3 +81,4 @@ class Reading(BaseCrudKitModel):
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name"]
+        celebrate = {"status": ["finished"]}

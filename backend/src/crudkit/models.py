@@ -446,6 +446,10 @@ class BaseCrudKitModel(models.Model):
         # Fields a spreadsheet import may match existing rows on, besides the
         # type's own IDs and its unique fields (e.g. ["email"]).
         import_match_fields = []
+        # Values worth celebrating in the UI with a confetti burst when a write
+        # moves a record into one of them, e.g. {"status": ["won", "closed"]}.
+        # Values are as stored: choice values, or related record IDs.
+        celebrate = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):
@@ -841,6 +845,16 @@ def m2m_value(obj, field) -> list:
     return sorted(json.loads(json.dumps(list(ids), cls=PrettyJSONEncoder)), key=str)
 
 
+def celebrates(instance, field_changes) -> bool:
+    """Whether `field_changes` moved `instance` into a value its
+    CrudKitSettings.celebrate asks to celebrate."""
+    rules = getattr(instance.CrudKitSettings, "celebrate", {})
+    return any(
+        field in field_changes and str(field_changes[field][1]) in {str(v) for v in values}
+        for field, values in rules.items()
+    )
+
+
 def same_value(field, a, b) -> bool:
     """Whether two logged values of `field` are equal once parsed, so 12.5 and
     "12.50", or 3 and "BOK3", count as the same."""
@@ -922,6 +936,8 @@ class ChangeLogManager(models.Manager):
             updated_by=user,
         )
         context.logged = True
+        if not context.revert_of and celebrates(instance, field_changes):
+            context.celebrations.append(entry.pk)
         return entry
 
 

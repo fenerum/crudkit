@@ -166,6 +166,13 @@ def is_told(world, message):
     expect(world.visible_text(message, world.page).first).to_be_visible()
 
 
+@then("confetti bursts across the screen and clears away")
+def confetti_bursts(world):
+    confetti = world.page.locator("canvas[data-ck-confetti]")
+    expect(confetti).to_be_attached()
+    expect(confetti).not_to_be_attached()
+
+
 @then(phrase('the page is titled "{title:Q}"'))
 def page_title(world, title):
     expect(world.page).to_have_title(world.text(title))

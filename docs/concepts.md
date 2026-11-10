@@ -61,6 +61,14 @@ class Book(BaseCrudKitModel):
 - `owner_access` — set to `True` to let any signed-in user view and change the
   rows they created without the Django model permission (others' rows stay
   hidden unless the user has the permission; delete still needs it).
+- `celebrate` — values worth a confetti burst in the SPA, e.g.
+  `{"stage": ["won"], "status": ["closed"]}`. When a write moves a record into
+  one of them, the response carries `X-CrudKit-Celebrate: 1`. That covers an
+  edit, a board drag, a bulk edit, an import, or an action that sets the field.
+  Values are as stored: choice values, or related record IDs. Saving a record
+  that is already there, and undo, never celebrate. A `@crm_action` can also
+  celebrate by answering `Response({"celebrate": True, ...})`. The SPA skips
+  the animation for people who prefer reduced motion.
 
 Project-wide configuration lives in ordinary Django settings with the
 `CRUDKIT_` prefix (`CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_AI_MODEL`,

@@ -7,6 +7,7 @@ Phrases this area adds:
 - `Given customers have an action "Open billing" that sends people to the billing page`
 - `Given customers have an action "Check credit" that answers "Credit OK"`
 - `Given customers have an action "Erase" that erases the record`
+- `Given customers have an action "Ring the bell" that asks to celebrate`
 - `Given customers have an action "Quietly churn" that sets the status to "churned" and answers nothing`
 - `Then Alice is taken to "Acme"` / `Then Alice is sent to the billing page`
 - `Then Alice gets the answer "Credit OK"`
@@ -48,6 +49,14 @@ def an_action_that_answers(request, model, verbose_name, answer):
         return Response({"message": answer})
 
     _add_action(request, model, verbose_name, check)
+
+
+@given(phrase('{model:Model} have an action "{verbose_name:Q}" that asks to celebrate'))
+def an_action_that_celebrates(request, model, verbose_name):
+    def ring(self, request):
+        return Response({"celebrate": True})
+
+    _add_action(request, model, verbose_name, ring)
 
 
 @given(phrase('{model:Model} have an action "{verbose_name:Q}" that erases the record'))

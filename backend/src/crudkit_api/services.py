@@ -18,6 +18,7 @@ from rest_framework.exceptions import ValidationError as DRFValidationError
 
 from crudkit import jobs
 from crudkit.audit import audit
+from crudkit.audit import current as current_audit
 from crudkit.authorization import (
     get_authorized_queryset,
     has_model_permission,
@@ -231,13 +232,15 @@ def perform_tracked_action(instance, action_name: str, user, request=None) -> tu
             tracker.finish(RuntimeError(_response_errors(response)))
     # An action may delete its own record; log that as a delete.
     after = instance.__class__._base_manager.filter(pk=instance.pk).first()
-    ChangeLog.objects.create_from_objects(
+    entry = ChangeLog.objects.create_from_objects(
         before,
         after,
         user=user,
         action=ChangeLog.Action.ACTION if after is not None else ChangeLog.Action.DELETE,
         label=label,
     )
+    if isinstance(data := getattr(response, "data", None), dict) and data.get("celebrate"):
+        current_audit().celebrations.append(entry.pk)
     return response, tracker.job
 
 

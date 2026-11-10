@@ -7,7 +7,7 @@ Entry points (the REST API, MCP, the assistant, reverts) wrap their writes in
 
 import uuid
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 SOURCES = ("ui", "api", "mcp", "assistant", "agent", "revert", "system")
 
@@ -21,6 +21,9 @@ class AuditContext:
     revert_of: uuid.UUID | None = None
     # Set once a ChangeLog entry is written under this context.
     logged: bool = False
+    # ChangeLog entries worth a celebration in the UI (see
+    # CrudKitSettings.celebrate). Ids, so a caller can check they were committed.
+    celebrations: list = field(default_factory=list)
 
 
 _current: ContextVar[AuditContext | None] = ContextVar("crudkit_audit", default=None)
@@ -58,6 +61,7 @@ class audit:
 
     def __exit__(self, *exc):
         _current.reset(self._token)
-        if self._outer and self.context.logged:
-            self._outer.logged = True
+        if self._outer:
+            self._outer.logged |= self.context.logged
+            self._outer.celebrations += self.context.celebrations
         return False

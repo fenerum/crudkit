@@ -25,6 +25,13 @@ Feature: View layouts
     Then the "Finished" column holds "Drag me"
 
   @layout:kanban
+  Scenario: Finishing a reading on the board celebrates
+    Given a reading "Almost done" with status "Reading"
+    When Alice opens the view "Board" of the readings
+    And she drags "Almost done" to the "Finished" column
+    Then confetti bursts across the screen and clears away
+
+  @layout:kanban
   Scenario: Dragging a card within a column changes the order
     Given a reading "Order first" with:
       | status     | Reading |

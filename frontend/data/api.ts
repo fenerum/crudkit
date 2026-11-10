@@ -1,3 +1,5 @@
+import { celebrate } from '../utils/celebrate';
+
 export class ValidationError extends Error {
   errors: Record<string, any>;
   response?: Response;
@@ -40,6 +42,7 @@ const getDefaultBaseUrl = (): string => {
 // Write responses name the change set they made; POSTing to
 // `api/v1/changesets/<id>/revert/` undoes it.
 export const CHANGE_SET_HEADER = 'X-CrudKit-Change-Set';
+const CELEBRATE_HEADER = 'X-CrudKit-Celebrate';
 
 export type ImportOptions = {
   mode: 'create' | 'update' | 'upsert';
@@ -291,6 +294,7 @@ export default class CrudKitAPIClient {
       throw error;
     }
 
+    if (response.headers.get(CELEBRATE_HEADER)) celebrate();
     return response.clone();
   }
 

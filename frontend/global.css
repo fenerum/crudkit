@@ -694,26 +694,13 @@ div[dir="auto"] > * {
     margin-top: 6px;
     line-height: var(--leading-body);
   }
-  /* Email header inside an activity row — mirrors a real mail-client header:
-     avatar + sender + subject stacked, To:/Cc: on subtle muted lines. */
-  .ck-email-head {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding-bottom: 10px;
-    margin-bottom: 10px;
-    border-bottom: 1px solid var(--border-1);
-  }
-  .ck-email-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-  .ck-email-from { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; min-width: 0; }
-  .ck-email-from-name { font-weight: 600; color: var(--fg-1); font-size: 13px; }
-  .ck-email-from-addr { color: var(--fg-3); font-size: 12px; font-family: var(--font-mono); }
-  .ck-email-subject { font-size: 13px; color: var(--fg-1); }
-  .ck-email-recip {
+  /* A feed entry's fields: label/value lines above its rich-text blocks. */
+  .ck-entry-fields { display: flex; flex-direction: column; gap: 2px; }
+  .ck-entry-field {
     display: flex; gap: 6px; align-items: baseline;
-    font-size: 12px; color: var(--fg-2);
+    font-size: 12px; color: var(--fg-1);
   }
-  .ck-email-recip-l { color: var(--fg-3); flex-shrink: 0; }
+  .ck-entry-field-l { color: var(--fg-3); flex-shrink: 0; }
 
   /* Internal notes: subtle but unmistakably yellow so private content is
      visually flagged. Mixing the dim --warn token (an amber) with bg gave a
@@ -722,17 +709,6 @@ div[dir="auto"] > * {
   .ck-act.is-internal .ck-act-text {
     background: color-mix(in oklab, #FACC15 16%, var(--bg-2));
     border-color: color-mix(in oklab, #FACC15 45%, var(--border-1));
-  }
-  /* Failed-to-send / scheduled emails: highlight the body too. */
-  .ck-act.is-error .ck-act-text {
-    background: color-mix(in oklab, var(--danger) 10%, var(--bg-2));
-    border-color: color-mix(in oklab, var(--danger) 35%, var(--border-1));
-  }
-  /* AI suggestions: light-blue wash so generated content is visibly distinct
-     from human activity. */
-  .ck-act.is-ai-suggestion .ck-act-text {
-    background: color-mix(in oklab, var(--info) 14%, var(--bg-2));
-    border-color: color-mix(in oklab, var(--info) 40%, var(--border-1));
   }
   /* Row currently targeted by the composer's Reply: faint outline so the
      user can see which message they're replying to. */
@@ -1083,11 +1059,11 @@ div[dir="auto"] > * {
     min-width: 0;
   }
 
-  /* ----- Email composer (label/field rows) ----- */
+  /* ----- Composer forms (label/field rows) ----- */
   .ck-cmp-fields { display: flex; flex-direction: column; }
   .ck-cmp-row {
     display: grid;
-    grid-template-columns: 60px 1fr auto;
+    grid-template-columns: 96px 1fr auto;
     align-items: center;
     gap: 8px;
     padding: 0 14px;

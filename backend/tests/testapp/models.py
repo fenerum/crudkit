@@ -13,7 +13,7 @@ from django.db import models
 
 from crudkit.decorators import crm_action
 from crudkit.fields import AIBooleanField, AIForeignKeyField, AISummaryField, AITagsField, CurrencyField, MoneyField
-from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField, WYSIWYGEditorField
+from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField, FeedEntry, WYSIWYGEditorField
 
 
 class Topic(BaseCrudKitModel):
@@ -130,3 +130,41 @@ class UrgentComment(Comment):
         self.escalation_reason = "escalated"
         self.save(update_fields=["escalation_reason", "updated_at"])
         return self
+
+
+class Call(BaseCrudKitModel):
+    """A kind of feed entry: calls are logged on customers' activity. It has no
+    foreign key to Customer; the feed links them."""
+
+    TYPE_ID = "CAL"
+
+    subject = models.CharField(max_length=255)
+    notes = WYSIWYGEditorField(null=True, blank=True)
+
+    def __str__(self):
+        return self.subject
+
+    @crm_action(verbose_name="Send summary")
+    def send_summary(self, request):
+        return self
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        feed_entry = FeedEntry(
+            fields=["subject", "notes"],
+            icon="phone",
+            verb="logged a call",
+            action="send_summary",
+            on=["CUS"],
+            reply=True,
+            attachments="CRC",
+        )
+
+
+class CallRecording(BaseCrudKitModel):
+    TYPE_ID = "CRC"
+
+    call = models.ForeignKey(Call, on_delete=models.CASCADE)
+    recording = models.FileField(upload_to="recordings/")
+
+    def __str__(self):
+        return self.recording.name

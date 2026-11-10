@@ -103,8 +103,11 @@ def search_objects(user, query: str, models_to_search=None, limit_per_model: int
 
 
 def get_feed(instance, limit: int = 20) -> list[dict[str, Any]]:
-    """Recent FeedItems (notes, related-object events) on `instance`."""
+    """Recent FeedItems (notes, related-object events) on `instance`, leaving out
+    those about a record that was deleted since."""
     ct = ContentType.objects.get_for_model(instance.__class__)
+    # Not prefetch_related("related_object"): it can't match CK-ID primary keys to
+    # the stored numbers, so each related record is read on its own.
     qs = FeedItem.objects.filter(parent_content_type=ct, parent_object_id=instance.pk, deleted=False).order_by(
         "-created_at"
     )[:limit]
@@ -117,7 +120,21 @@ def get_feed(instance, limit: int = 20) -> list[dict[str, Any]]:
             "related_id": str(fei.related_object_id) if fei.related_object_id else None,
         }
         for fei in qs
+        if not getattr(fei.related_object, "deleted", False)
     ]
+
+
+def add_to_feed(parent, record) -> None:
+    """Put `record`, a feed entry, on `parent`'s feed, unless it is there already
+    (a project may link its entries itself). Not logged: the entry's own change
+    log covers it, and the feed hides entries whose record is deleted."""
+    FeedItem.objects.get_or_create(
+        parent_content_type=ContentType.objects.get_for_model(parent.__class__),
+        parent_object_id=parent.pk,
+        related_content_type=ContentType.objects.get_for_model(record.__class__),
+        related_object_id=record.pk,
+        defaults={"created_by": record.created_by, "updated_by": record.created_by},
+    )
 
 
 def get_changelog(instance, limit: int = 20) -> list[dict[str, Any]]:

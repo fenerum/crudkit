@@ -298,14 +298,20 @@ class GenericRelationField(serializers.Field):
         return value.pk
 
     def to_internal_value(self, data):
-        try:
-            mdl, pk = parse_ck_id(data)
-        except ValueError as e:
-            raise serializers.ValidationError(str(e)) from e
-        model = get_model_types().get(mdl)
-        if model is None:
-            raise serializers.ValidationError(f"Model {mdl} not found")
-        return _get_viewable(model, pk, self.context, data)
+        return record_from_ck_id(data, self.context)
+
+
+def record_from_ck_id(ck_id, context):
+    """The record `ck_id` names, if the requesting user may view it, else a
+    ValidationError."""
+    try:
+        mdl, pk = parse_ck_id(ck_id)
+    except ValueError as e:
+        raise serializers.ValidationError(str(e)) from e
+    model = get_model_types().get(mdl)
+    if model is None:
+        raise serializers.ValidationError(f"Model {mdl} not found")
+    return _get_viewable(model, pk, context, ck_id)
 
 
 def _get_viewable(model, pk, context, data):

@@ -16,7 +16,7 @@ from django.db.models import Model
 
 from crudkit.authorization import get_authorized_queryset, has_model_permission
 from crudkit.fields import ModelField
-from crudkit.models import ExternalObject, FeedItem
+from crudkit.models import ExternalObject, FeedItem, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
 from crudkit_api import imports
 from crudkit_api.records import SKIPPED_FIELDS, fk_display_field
@@ -106,6 +106,37 @@ def _generic_relations() -> list[dict[str, Any]]:
     return relations
 
 
+def _feed_entry(model) -> dict[str, Any] | None:
+    entry = get_feed_entry(model)
+    if entry is None:
+        return None
+    name = str(model._meta.verbose_name)
+    attachments = attachment_fields(model, entry)
+    return {
+        "icon": entry.icon,
+        "verb": entry.verb or f"added {'an' if name[:1].lower() in 'aeiou' else 'a'} {name}",
+        "fields": list(entry.fields),
+        "action": entry.action or None,
+        "compose": entry.compose,
+        "reply": entry.reply,
+        "attachments": (
+            {"type": entry.attachments, "link": attachments[0], "file": attachments[1]} if attachments else None
+        ),
+    }
+
+
+def _feed_entries(model, user) -> list[str]:
+    """The TYPE_IDs of the kinds of entry `user` may add to the feed of a `model` record."""
+    return [
+        type_id
+        for type_id, kind in get_model_types().items()
+        if (entry := get_feed_entry(kind)) is not None
+        and entry.compose
+        and (not entry.on or model.TYPE_ID in entry.on)
+        and has_model_permission(user, kind, "add")
+    ]
+
+
 def build_model_metadata(model, user=None) -> dict[str, Any]:
     """Return the model-level metadata payload served at /api/v1/<type>/metadata/."""
     mfc = _model_field_choices()
@@ -137,6 +168,8 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
         "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
         "default_inlines": list(getattr(model.CrudKitSettings, "default_inlines", [])),
         "import_match_fields": imports.match_fields(model),
+        "feed_entry": _feed_entry(model),
+        "feed_entries": _feed_entries(model, user),
         "fields": fields,
         "relations": relations,
         "actions": [

@@ -2,6 +2,8 @@ import copy
 import functools
 import json
 import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 
 from django.apps import apps
 from django.conf import settings
@@ -450,6 +452,9 @@ class BaseCrudKitModel(models.Model):
         # moves a record into one of them, e.g. {"status": ["won", "closed"]}.
         # Values are as stored: choice values, or related record IDs.
         celebrate = {}
+        # A FeedEntry makes this model a kind of entry people add to records'
+        # feeds (a call, a meeting, an email). See FeedEntry.
+        feed_entry = None
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):
@@ -761,6 +766,49 @@ class Workspace(BaseCrudKitModel):
                 raise ValidationError({"views": _(f"View '{ck_id}' does not exist.")})
 
 
+@dataclass(frozen=True)
+class FeedEntry:
+    """Makes a model a kind of entry people add to other records' feeds, such as a
+    call, a meeting or an email. Set it as `CrudKitSettings.feed_entry`.
+
+    - `fields`: the composer's form (the editable ones) and what the feed shows, in order.
+    - `icon`: an icon name the web app knows (`frontend/components/ui/iconMap.js`).
+    - `verb`: how the feed tells it, e.g. "logged a call". Default "added a <verbose name>".
+    - `action`: a `@crm_action` the composer runs on the new record right after creating it.
+    - `on`: the TYPE_IDs whose feeds offer it. Default: every type.
+    - `compose`: False for entries that only arrive from elsewhere, e.g. an integration.
+      The feed shows them; the composer doesn't offer them.
+    - `reply`: the feed offers Reply, which opens the composer with `reply_to` set to the entry.
+    - `attachments`: the TYPE_ID of a model that holds an entry's files: a foreign key to
+      this model and a FileField, plus `filename` and `content_type` when it has them.
+    """
+
+    fields: Sequence[str]
+    icon: str = "activity"
+    verb: str = ""
+    action: str = ""
+    on: Sequence[str] = ()
+    compose: bool = True
+    reply: bool = False
+    attachments: str = ""
+
+
+def get_feed_entry(model) -> FeedEntry | None:
+    return getattr(getattr(model, "CrudKitSettings", None), "feed_entry", None)
+
+
+def attachment_fields(model, entry: FeedEntry) -> tuple[str, str] | None:
+    """(the foreign key to `model`, the file field) of the model `entry.attachments`
+    names, or None when it lacks either."""
+    attachment_model = get_model_types().get(entry.attachments)
+    if attachment_model is None:
+        return None
+    fields = attachment_model._meta.fields
+    link = next((f.name for f in fields if f.many_to_one and issubclass(model, f.related_model)), None)
+    file = next((f.name for f in fields if isinstance(f, models.FileField)), None)
+    return (link, file) if link and file else None
+
+
 class FeedItem(BaseCrudKitModel):
     TYPE_ID = "FEI"
 
@@ -788,12 +836,11 @@ class FeedItem(BaseCrudKitModel):
     pinned = models.BooleanField(default=False, blank=True)
 
     def get_content(self):
-        if self.related_content_type and self.related_content_type.model == "email" and self.related_object:
+        """The entry's text and HTML: those of its related record when that has a
+        `get_content()`, else the body."""
+        if hasattr(self.related_object, "get_content"):
             return self.related_object.get_content()
-        return {
-            "text": self.body,
-            "html": self.body,
-        }
+        return {"text": self.body, "html": self.body}
 
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         allowed_prefills = ["parent_content_type", "parent_object"]

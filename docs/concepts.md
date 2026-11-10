@@ -69,6 +69,9 @@ class Book(BaseCrudKitModel):
   that is already there, and undo, never celebrate. A `@crm_action` can also
   celebrate by answering `Response({"celebrate": True, ...})`. The SPA skips
   the animation for people who prefer reduced motion.
+- `feed_entry` — a `FeedEntry` that makes the model a kind of entry people add
+  to other records' feeds, like a logged call or a sent email (see
+  [Feed entries](#feed-entries)).
 
 Project-wide configuration lives in ordinary Django settings with the
 `CRUDKIT_` prefix (`CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_AI_MODEL`,
@@ -79,9 +82,11 @@ Project-wide configuration lives in ordinary Django settings with the
 `GET /api/v1/<TYPE_ID>/metadata/` describes a model so clients can render it
 without compile-time knowledge: `verbose_name`, the `fields` map (type,
 choices, required, editable, related model and its TYPE_ID, …), reverse and
-generic `relations`, `allowed_prefills`, `search_fields`, `actions`, and
+generic `relations`, `allowed_prefills`, `search_fields`, `actions`,
+`feed_entry` (how the type shows in feeds, if it is a kind of feed entry), and
 for the requesting user `can_create`, `can_change` and `can_delete` (the
-model permissions) plus `inline_create`.
+model permissions), `inline_create`, and `feed_entries` (the kinds of entry
+they may add to the feed of a record of this type).
 
 Actions are model methods decorated with `@crm_action("Verbose name")`
 (`crudkit.decorators`); they show up as buttons in the UI and are invoked via
@@ -160,6 +165,72 @@ uses this endpoint for Edit field, Run action and Delete.
 The SPA is built entirely on this endpoint — every list, detail view, and form
 is rendered from metadata at runtime. That is what makes the frontend generic:
 it ships in the wheel yet works for any project's models.
+
+## Feed entries
+
+A record's feed holds notes (`FeedItem`) and whatever kinds of entries the
+project declares, such as a logged call, a meeting or a sent email. Each kind is
+a model of its own, made one by `CrudKitSettings.feed_entry`:
+
+```python
+from crudkit.models import FeedEntry
+
+class Email(BaseCrudKitModel):
+    TYPE_ID = "EML"
+    ...
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        allowed_prefills = ["author", "to", "subject", "body"]
+        feed_entry = FeedEntry(
+            fields=["to", "cc", "subject", "status", "body"],
+            icon="mail",
+            verb="emailed",
+            action="send",
+            reply=True,
+            attachments="EMA",
+            on=["AUT"],
+        )
+```
+
+- `fields` — the composer's form and what the feed shows, in order. The form
+  leaves out fields that can't be edited (a status, say); the feed shows them.
+  Rich text gets a block of its own: a `WYSIWYGEditorField` shows inline like
+  a note, an `EmailWYSIWYGEditorField` in a sandboxed frame, for HTML that
+  comes from outside.
+- `icon` — a name from the SPA's icon map (`frontend/components/ui/iconMap.js`).
+- `verb` — how the feed tells it ("Alice emailed"). Default "added a <verbose name>".
+- `action` — a `@crm_action` the composer runs right after creating the record,
+  such as sending the email. Its name labels the composer's button.
+- `on` — the TYPE_IDs whose feeds offer the kind. Default: every type.
+- `compose=False` — for entries that only arrive from elsewhere (an
+  integration, a sync): the feed shows them, the composer doesn't offer them.
+- `reply` — the feed offers Reply on the kind's entries, which opens its
+  composer with `reply_to` set to the entry.
+- `attachments` — the TYPE_ID of a model that holds an entry's files: a foreign
+  key to the entry and a `FileField`. The composer uploads each file as one,
+  filling in `filename` and `content_type` when the model has them (its other
+  required fields need defaults), before it runs `action`. The feed lists
+  them; one whose `content_id` the entry's HTML references as `cid:` shows
+  inline instead.
+
+The composer has a tab for Note and one for each kind the person may add there
+(`feed_entries` in the record type's metadata). A kind's form is its create
+form: `/initial/?from_object=<CK-ID>` prefills it, along with the kind's
+foreign key to the record when that is in `allowed_prefills`, and
+`POST /api/v1/<TYPE_ID>/?from_object=<CK-ID>` creates it. `from_object`, and
+`reply_to` for a reply, must name records the person can see; the model's
+`from_query_params` then gets them, to prefill a reply's subject and quote,
+say. Once the record is created, CrudKit puts it on the feed of the
+`from_object` record: a `FeedItem` whose `related_object` is the new record,
+unless the project's own code already made that one. A kind whose `on` leaves
+out that record's type is refused.
+
+A feed row follows its record. Its Edit and Delete act on the record; undoing
+the creation or deleting the record takes the row out of the feed, and
+restoring it brings it back. Entries that come from elsewhere go on a feed the
+same way: `FeedItem.objects.create(parent_object=customer,
+related_object=call, ...)`. The system check `crudkit.E003` reports a
+`feed_entry` naming fields, an action, record types or attachments that don't
+exist.
 
 ## Saved views
 

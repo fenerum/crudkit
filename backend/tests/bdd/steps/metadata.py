@@ -22,6 +22,9 @@ The description of a record type (what forms are built from)
 - `Then the description says tickets point at it through "customer"` / `does not say tickets point at it through "watchers"`
 - `Then the description offers the action "Mark churned", which needs no approval`
 - `Then the description shows the subject of tickets inline by default`
+- `Then the description offers adding calls to the activity` / `does not offer adding calls to the activity`
+- `Then the description shows them in the activity with:` a `| what | value |` table
+  (icon, words, fields, then runs, replies, attachments)
 
 The description of one record (what the assistant reads)
 - `When the assistant describes "Acme" for Alice`
@@ -41,6 +44,7 @@ from crudkit.models import EmailWYSIWYGEditorField, WYSIWYGEditorField
 from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_instance_metadata
 from tests.bdd.steps.records import field_name
+from tests.bdd.world import model_named, split_list
 from tests.bdd.world import phrase as world_phrase
 
 # How a field's kind reads in a feature, and the field class forms receive.
@@ -272,3 +276,37 @@ def counts_related(world, count, model):
 @then(phrase('the record description offers the action "{action:Q}"'))
 def offers_named_action(world, action):
     assert action in world.record_description["actions"], world.record_description["actions"]
+
+
+# Kinds of entries in the activity
+
+
+@then(phrase("the description offers adding {model:Model} to the activity"))
+def offers_adding_to_the_activity(world, model):
+    offered = _description(world)["feed_entries"]
+    assert model.TYPE_ID in offered, offered
+
+
+@then(phrase("the description does not offer adding {model:Model} to the activity"))
+def does_not_offer_adding_to_the_activity(world, model):
+    offered = _description(world)["feed_entries"]
+    assert model.TYPE_ID not in offered, offered
+
+
+@then(phrase("the description shows them in the activity with:"))
+def shows_in_the_activity(world, datatable):
+    entry = _description(world)["feed_entry"]
+    actions = {action["action"]: action["verbose_name"] for action in _description(world)["actions"]}
+    for what, value in datatable:
+        if what == "fields":
+            assert entry["fields"] == split_list(value), entry["fields"]
+        elif what == "attachments":
+            assert entry["attachments"]["type"] == model_named(value).TYPE_ID, entry["attachments"]
+        else:
+            shown = {
+                "icon": entry["icon"],
+                "words": entry["verb"],
+                "then runs": actions.get(entry["action"]),
+                "replies": "yes" if entry["reply"] else "no",
+            }[what]
+            assert shown == value, (what, shown)

@@ -6,6 +6,7 @@ import CrudKitAPIClient from "../data/api";
 import { Avatar, Icon, useTopbarSlots } from "./ui";
 import { detail as detailRegex } from "../utils/urls";
 import { usePendingProposals } from "../hooks/usePendingProposals";
+import { useFeedEntry } from "../hooks/useFeedEntry";
 import ProposalList from "./ProposalList";
 
 const VALID_TABS = new Set(["all", "unread", "mentions", "assigned", "proposals"]);
@@ -18,15 +19,10 @@ const TABS = [
   { id: "proposals", label: "Proposals", icon: "shield" },
 ];
 
-function deriveIcon(item) {
-  const ct = item.related_content_type;
-  if (!ct) return "message-square";
-  const model = String(ct.model || "").toLowerCase();
-  if (model.includes("email")) return "mail";
-  if (model.includes("call")) return "phone";
-  if (model.includes("aisuggestion")) return "zap";
-  if (model.includes("note")) return "message-square";
-  return "activity";
+function FeedItemIcon({ item }) {
+  const { entry } = useFeedEntry(item.related_object);
+  const icon = item.related_object ? entry?.icon || "activity" : "message-square";
+  return <Icon name={icon} size={14} color="currentColor" />;
 }
 
 function previewFromBody(body) {
@@ -160,7 +156,7 @@ export default function Inbox() {
                   <Avatar name={actorName} src={actorImage} size={28} />
                 ) : (
                   <div className="flex-shrink-0 w-7 h-7 rounded-full bg-bg-3 border border-border-1 inline-flex items-center justify-center text-fg-2">
-                    <Icon name={deriveIcon(item)} size={14} color="currentColor" />
+                    <FeedItemIcon item={item} />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">

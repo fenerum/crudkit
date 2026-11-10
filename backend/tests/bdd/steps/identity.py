@@ -18,7 +18,7 @@ Phrases this area adds:
 from django.contrib.contenttypes.fields import GenericForeignKey
 from pytest_bdd import given, then, when
 
-from crudkit.checks import check_type_ids
+from crudkit.checks import check_feed_entries, check_type_ids
 from crudkit.models import get_ck_id
 from tests.bdd.world import phrase
 
@@ -109,7 +109,7 @@ def declares_no_letters(world, monkeypatch, model):
 
 @when(phrase("the record types are checked"))
 def check_record_types(world):
-    world.check_errors = check_type_ids(None)
+    world.check_errors = check_type_ids(None) + check_feed_entries(None)
 
 
 @then(phrase("the record type check passes"))

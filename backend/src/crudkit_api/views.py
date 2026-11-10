@@ -9,10 +9,12 @@ from django.db import connection, models, reset_queries, transaction
 from django.db.models import ProtectedError
 from django.http import HttpResponseRedirect
 from django.utils.safestring import mark_safe
+from django.utils.text import capfirst
 from rest_framework import viewsets
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
+from rest_framework.exceptions import ValidationError as DRFValidationError
 from rest_framework.generics import get_object_or_404
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
@@ -26,13 +28,14 @@ from crudkit.authorization import (
     has_action_permission,
     has_model_permission,
 )
-from crudkit.models import BaseCrudKitModel, ChangeLog, ck_id_regex
+from crudkit.models import BaseCrudKitModel, ChangeLog, ck_id_regex, get_feed_entry
 from crudkit.utils import get_model_types
 from crudkit_api import imports
 from crudkit_api.metadata import build_model_metadata
 from crudkit_api.permissions import CrudKitModelPermissions
-from crudkit_api.serializers import GenericSerializer, get_serializer
+from crudkit_api.serializers import GenericSerializer, get_serializer, record_from_ck_id
 from crudkit_api.services import (
+    add_to_feed,
     bulk_action,
     bulk_delete,
     bulk_patch,
@@ -53,6 +56,10 @@ SPA_CLIENT_ID = "CrudKitAPIClient"
 CHANGE_SET_HEADER = "X-CrudKit-Change-Set"
 CELEBRATE_HEADER = "X-CrudKit-Celebrate"
 ORDERABLE_FIELDS = (models.IntegerField, models.FloatField, models.DecimalField)
+# Query params a create form may carry naming another record: the one a new
+# record is started from (whose feed a feed entry goes on), and the entry it
+# replies to. Models read them in `from_query_params`.
+LINK_PARAMS = ("from_object", "reply_to")
 
 
 class AuditedViewMixin:
@@ -118,6 +125,8 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
         serializer.initial_instance = self.initial_instance
         instance = serializer.save()
         ChangeLog.objects.create_from_objects(None, instance)
+        if self.feed_parent is not None:
+            add_to_feed(self.feed_parent, instance)
 
     @transaction.atomic
     def perform_update(self, serializer: GenericSerializer):
@@ -128,7 +137,27 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
     def perform_destroy(self, instance: BaseCrudKitModel):
         delete_record(instance, self.request.user)
 
+    def _feed_parent(self, request):
+        """Check the records the `from_object` and `reply_to` query params name (the
+        record a new one is started from, and the entry it replies to): the person
+        must be able to see them before `from_query_params` reads them. Returns the
+        record whose feed a new feed entry goes on, if any."""
+        context = {"request": request}
+        linked = {name: record_from_ck_id(request.GET[name], context) for name in LINK_PARAMS if name in request.GET}
+        model = self.queryset.model
+        entry = get_feed_entry(model)
+        parent = linked.get("from_object")
+        if entry is None or parent is None:
+            return None
+        if entry.on and parent.TYPE_ID not in entry.on:
+            raise DRFValidationError(
+                f"{capfirst(model._meta.verbose_name_plural)} can't be added to the activity of "
+                f"{parent._meta.verbose_name_plural}"
+            )
+        return parent
+
     def create(self, request, *args, **kwargs):
+        self.feed_parent = self._feed_parent(request)
         self.initial_instance = self.queryset.model.from_query_params(
             self.request.GET,
             {
@@ -368,6 +397,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
 
     @action(detail=False, url_path="initial")
     def initial_data(self, request):
+        self._feed_parent(request)
         instance = self.queryset.model.from_query_params(
             self.request.GET,
             {

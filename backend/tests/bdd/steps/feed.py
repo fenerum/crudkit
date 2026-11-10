@@ -8,6 +8,13 @@ Phrases this area adds:
   / `Then the note is refused with "Note body is empty"`
 - `Then the activity of "Acme" is "Second call" and "First call"` (newest first) / `... is empty`
 - `Then the note "Called them" is by Alice` / `Then the note "Renewal call" is about "Acme"`
+- `Given a call "Renewal chat" was logged on "Acme"`: any kind of feed entry, put on the activity
+- `When Alice logs the call "Renewal chat" on "Acme"`: through the app, from Acme's activity
+- `When Alice starts a reply to "Renewal chat"`: opens the form for a reply
+- `Then the activity of "Acme" shows the call "Renewal chat"` / `Then "Renewal chat" was added to the activity by Alice`
+- `Then no call "Sneaky" was made`
+- `Given calls declare their activity entry with the field "colour"` / `... without fields`
+  / `... with the action "fly"` / `... for records with the letters "XYZ"` / `... with attachments kept as topics`
 - `Given Alice is tracking time on "Acme"` / `When Alice starts tracking time on "Acme"`
   / `When Alice stops tracking time` (`Given … stopped …`) / `Then Alice is tracking time on "Acme"` / `Then Alice is not tracking time`
 - `Then a second timer for Alice on "Globex" is refused`
@@ -20,6 +27,8 @@ Phrases this area adds:
 - `Then linking "Globex" to "42" in the "billing" system is refused`
 """
 
+from dataclasses import replace
+
 from django.contrib.contenttypes.models import ContentType
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -28,8 +37,8 @@ from pytest_bdd import given, then, when
 from crudkit.audit import audit
 from crudkit.models import ExternalObject, FeedItem, Snippet, WorkLog
 from crudkit.utils import get_model_types, get_system_user
-from crudkit_api.services import create_note, get_feed
-from tests.bdd.world import phrase, split_list
+from crudkit_api.services import add_to_feed, create_note, get_feed
+from tests.bdd.world import label_field, phrase, split_list
 
 # Notes and activity
 
@@ -96,6 +105,78 @@ def the_note_is_by(world, body, name):
 @then(phrase('the note "{body:Q}" is about "{about:Q}"'))
 def the_note_is_about(world, body, about):
     assert world.record(body).related_object == world.record(about)
+
+
+# Other kinds of entries in the activity (calls, emails, ...)
+
+
+@given(phrase('a {model:Model} "{entry:Q}" was logged on "{label:Q}"'))
+def an_entry_was_logged(world, model, entry, label):
+    add_to_feed(world.record(label), world.create(model, entry))
+
+
+@when(phrase('{name:Actor} logs the {model:Model} "{entry:Q}" on "{label:Q}"'))
+def logs_an_entry(world, name, model, entry, label):
+    url = f"/api/v1/{model.TYPE_ID}/?from_object={world.ck_id(label)}"
+    response = world.remember(name, world.api(name).post(url, {label_field(model): entry}, format="json"))
+    if response.status_code == 201:
+        world.add(entry, model.objects.get(pk=response.data["id"]))
+
+
+@when(phrase('{name:Actor} starts a reply to "{label:Q}"'))
+def starts_a_reply(world, name, label):
+    ck_id = world.ck_id(label)
+    world.remember(name, world.api(name).get(f"/api/v1/{ck_id[:3]}/initial/", {"reply_to": ck_id}))
+
+
+@then(phrase('the activity of "{label:Q}" shows the {model:Model} "{entry:Q}"'))
+def the_activity_shows(world, label, model, entry):
+    shown = [(item["related_model"], item["related_id"]) for item in get_feed(world.record(label))]
+    assert (model._meta.model_name, str(world.number(entry))) in shown, shown
+
+
+@then(phrase('"{entry:Q}" was added to the activity by {name:Actor}'))
+def added_to_the_activity_by(world, entry, name):
+    record = world.record(entry)
+    feed_item = FeedItem.objects.get(
+        related_content_type=ContentType.objects.get_for_model(record.__class__),
+        related_object_id=world.number(entry),
+    )
+    assert feed_item.created_by == world.user(name), feed_item.created_by
+
+
+@then(phrase('no {model:Model} "{entry:Q}" was made'))
+def no_entry_was_made(model, entry):
+    assert not model.objects.filter(**{label_field(model): entry}).exists()
+
+
+def _declare(monkeypatch, model, **changes):
+    monkeypatch.setattr(model.CrudKitSettings, "feed_entry", replace(model.CrudKitSettings.feed_entry, **changes))
+
+
+@given(phrase('{model:Model} declare their activity entry with the field "{field:Q}"'))
+def declare_with_a_field(monkeypatch, model, field):
+    _declare(monkeypatch, model, fields=[field])
+
+
+@given(phrase("{model:Model} declare their activity entry without fields"))
+def declare_without_fields(monkeypatch, model):
+    _declare(monkeypatch, model, fields=[])
+
+
+@given(phrase('{model:Model} declare their activity entry with the action "{action:Q}"'))
+def declare_with_an_action(monkeypatch, model, action):
+    _declare(monkeypatch, model, action=action)
+
+
+@given(phrase('{model:Model} declare their activity entry for records with the letters "{letters:Q}"'))
+def declare_for_records(monkeypatch, model, letters):
+    _declare(monkeypatch, model, on=[letters])
+
+
+@given(phrase("{model:Model} declare their activity entry with attachments kept as {other:Model}"))
+def declare_with_attachments(monkeypatch, model, other):
+    _declare(monkeypatch, model, attachments=other.TYPE_ID)
 
 
 # Work logs

@@ -49,6 +49,22 @@ describe("ReadOnlyField", () => {
         expect(container.textContent).toBe("legacy");
     });
 
+    test("groups thousands in numbers", () => {
+        const { container } = render(<ReadOnlyField value={1234567} metadata={{ type: "PositiveIntegerField" }} />);
+        expect(container.textContent).toBe("1,234,567");
+    });
+
+    test("shows zero rather than nothing", () => {
+        const { container } = render(<ReadOnlyField value={0} metadata={{ type: "IntegerField" }} />);
+        expect(container.textContent).toBe("0");
+    });
+
+    test("groups thousands in amounts and their worth in the default currency", () => {
+        const value = { amount: "1000.00", currency: "EUR", amount_default_currency: "7462.69", default_currency: "DKK" };
+        const { container } = render(<ReadOnlyField value={value} metadata={{ type: "MoneyField" }} />);
+        expect(container.textContent).toBe("1,000.00 EUR (7,462.69 DKK)");
+    });
+
     test("does not wrap choice values", () => {
         const metadata = { type: "TextField", choices: [["a", "A"]] };
         const { container } = render(

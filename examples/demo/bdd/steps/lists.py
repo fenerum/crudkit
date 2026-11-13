@@ -11,6 +11,7 @@
 - `When she selects everything on the page`
 - `When she unselects "C"`, `Then the bulk bar shows 2 selected`, `Then no bulk bar is shown`,
   `Then the bulk bar offers to merge "A" and "B"`, `Then the bulk bar does not offer to merge`
+- `Then the pages of "X" read "1,234", lined up on the right`
 - `When she edits the status of the selection` then `When she sets it on the selection`,
   `When she deletes the selection`
 - `When Alice merges "A" and "B" from the books list`, `When she keeps "B" as the name`,
@@ -248,3 +249,16 @@ def gone_from_list(world, label, model):
     open_own_records(world, model)
     expect(showing(world, r"1–\d+ of \d+")).to_be_visible()
     expect(world.main.get_by_role("link", name=world.id(label), exact=True)).to_have_count(0)
+
+
+# Numbers
+
+
+@then(phrase('the {field:Words} of "{label:Q}" read "{value:Q}", lined up on the right'))
+def number_lined_up(world, field, label, value):
+    row = world.main.locator(".ck-lrow").filter(has_text=world.text(label))
+    cell = row.locator(".ck-lh-c", has_text=re.compile(rf"^{re.escape(value)}$"))
+    expect(cell).to_be_visible()
+    gap = cell.evaluate("c => c.getBoundingClientRect().right - c.firstElementChild.getBoundingClientRect().right")
+    padding = cell.evaluate("c => parseFloat(getComputedStyle(c).paddingRight)")
+    assert gap <= padding + 1, f"The {field} sit {gap}px from the right edge of their cell"

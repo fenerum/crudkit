@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import ReadOnlyField from './ReadOnlyField';
 import { PageRange, PageSizeSelect } from './ui';
 import { url } from '@/utils/urls';
+import { isNumericField } from '@/utils/numbers';
 import CrudKitAPIClient from '@/data/api';
 import { getStoredPageSize, storePageSize } from '@/utils/pageSize';
 
@@ -93,7 +94,7 @@ export default function InlineList({ fields, model, metadata, parent_object_id, 
           {fields.map((field, i) => (
             <div
               key={field}
-              className="ck-lh-c"
+              className={`ck-lh-c${isNumericField(metadata.fields[field]) ? ' ck-num' : ''}`}
               style={{ flex: i === 0 ? '2 1 0' : '1 1 0' }}
             >
               {metadata.fields[field]?.verbose_name || field}
@@ -149,7 +150,7 @@ export default function InlineList({ fields, model, metadata, parent_object_id, 
                   {fields.map((field, i) => (
                     <div
                       key={field}
-                      className="ck-lh-c"
+                      className={`ck-lh-c${isNumericField(metadata.fields[field]) ? ' ck-num' : ''}`}
                       style={{ flex: i === 0 ? '2 1 0' : '1 1 0' }}
                     >
                       <ReadOnlyField field={field} value={object[field]} metadata={metadata.fields[field]} />

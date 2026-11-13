@@ -5,6 +5,7 @@ lanes (swimlane) and conversation inbox.
 - `Given Alice's private view "V" of the readings`,
   `Given a view "V" of the readings that is not in the sidebar`,
   `Given a conversation view "V" of the readings` (any layout; newest records first)
+- `Given a view "V" of the readings showing its pages` (label plus that field; newest first)
 - `When Alice opens the view "Board" of the readings`, `When she switches to the view "V"`
 - `Then the view "V" is offered|is not offered above the list|in the sidebar`
 - Board: `Then the "To read" column holds "X"`, `Then the card "X" shows its priority "High"`,
@@ -60,6 +61,12 @@ def a_private_view(world, label, model):
 @given(phrase('a view "{label:Q}" of the {model:Model} that is not in the sidebar'))
 def a_view_outside_the_sidebar(world, label, model):
     create_view(world, model, label, show_in_menu=False)
+
+
+@given(phrase('a view "{label:Q}" of the {model:Model} showing its {field:Words}'))
+def a_view_showing(world, label, model, field):
+    fields = [world.api.label_field(model), world.api.field(model, field)["name"]]
+    create_view(world, model, label, fields=fields, order_by="-created_at")
 
 
 @given(phrase('a {layout:Words} view "{label:Q}" of the {model:Model}'))

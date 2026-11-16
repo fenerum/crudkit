@@ -3,6 +3,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { url, valid_url } from "../utils/urls";
 import { choiceLabel } from "../utils/choices";
+import { formatNumber, isNumericField } from "../utils/numbers";
 import { Icon } from "./ui";
 import HtmlFrame from "./HtmlFrame";
 
@@ -71,8 +72,8 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
             <span>
                 {typeof value === 'object' && value !== null && 'amount' in value
                     ? (value.currency === value.default_currency || value.amount_default_currency == null
-                        ? `${value.amount} ${value.currency}`
-                        : `${value.amount} ${value.currency} (${value.amount_default_currency} ${value.default_currency})`)
+                        ? `${formatNumber(value.amount)} ${value.currency}`
+                        : `${formatNumber(value.amount)} ${value.currency} (${formatNumber(value.amount_default_currency)} ${value.default_currency})`)
                     : value}
             </span>
         ) : value && metadata.type === "PhoneNumberField" ? (
@@ -81,6 +82,8 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
             <a href={value} target="_blank" rel="noopener noreferrer" className="ck-fk-link font-medium">{value}</a>
         ) : value && metadata.type === "CrudKitPositiveIntegerField" && typeof value === 'string' && link && valid_url(value) ? (
             <Link to={url(value)} className="ck-fk-link font-medium">{value}</Link>
+        ) : isNumericField(metadata) && value != null && value !== "" ? (
+            <span>{formatNumber(value)}</span>
         ) : isLongText ? (
             <span className="ck-ro-text">
                 <span ref={textRef} className={`ck-ro-text-body${textExpanded ? "" : " is-clamped"}`}>{value}</span>

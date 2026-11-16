@@ -1,7 +1,9 @@
 @page:/<segment>
 Feature: Lists
   Every record type has a list that can be searched and paged through, so
-  any record is a few keystrokes away however many there are.
+  any record is a few keystrokes away however many there are. Numbers and
+  amounts are grouped in thousands and lined up on the right, so a column of
+  them can be compared at a glance.
 
   Background:
     Given Alice is signed in
@@ -47,3 +49,9 @@ Feature: Lists
     Then the list shows 10 records per page
     When she opens the readings list
     Then the list shows 10 records per page
+
+  Scenario: Numbers are grouped in thousands and lined up on the right
+    Given a reading "Doorstopper" with pages "1234"
+    And a view "Long reads" of the readings showing its pages
+    When Alice opens the view "Long reads" of the readings
+    Then the pages of "Doorstopper" read "1,234", lined up on the right

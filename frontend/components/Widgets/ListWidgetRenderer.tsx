@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { url } from '@/utils/urls';
+import { isNumericField } from '@/utils/numbers';
 import ReadOnlyField from '@/components/ReadOnlyField';
 
 export interface ListWidgetRendererProps {
@@ -93,7 +94,7 @@ const ListWidgetRenderer = ({
                 <th
                   key={field}
                   scope="col"
-                  className="px-3 py-2 text-left eyebrow truncate"
+                  className={`px-3 py-2 eyebrow truncate ${isNumericField(metadata?.fields[field]) ? 'ck-num' : 'text-left'}`}
                 >
                   {metadata?.fields[field]?.verbose_name || field}
                 </th>
@@ -112,7 +113,7 @@ const ListWidgetRenderer = ({
                   </Link>
                 </td>
                 {displayFields.map(field => (
-                  <td key={field} className="px-3 py-2 text-sm text-fg-2 truncate max-w-[200px]">
+                  <td key={field} className={`px-3 py-2 text-sm text-fg-2 truncate max-w-[200px]${isNumericField(metadata?.fields[field]) ? ' ck-num' : ''}`}>
                     <div className="truncate">
                       {metadata?.fields[field] ? (
                         <ReadOnlyField

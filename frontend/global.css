@@ -408,6 +408,13 @@ div[dir="auto"] > * {
     align-items: center;
     gap: 6px;
   }
+  /* Numbers line up on the right, digits equally wide. */
+  .ck-num {
+    justify-content: flex-end;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    padding-right: 16px;
+  }
 
   /* ---- Buttons ---- */
   .ck-btn {

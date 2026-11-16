@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import BulkBar from "./BulkBar.jsx";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
+import { isNumericField } from "../utils/numbers";
 import { Icon, PageRange, PageSizeSelect, useScreenContext } from "./ui";
 
 export default function ObjectList({
@@ -73,7 +74,7 @@ export default function ObjectList({
                     {fieldKeys ? fieldKeys.map((field, i) => (
                         <div
                             key={i}
-                            className="ck-lh-c"
+                            className={`ck-lh-c${isNumericField(metadata.fields[field]) ? ' ck-num' : ''}`}
                             style={{ flex: i === 0 ? '2 1 0' : '1 1 0' }}
                         >
                             {metadata.fields[field]?.verbose_name || field}
@@ -117,7 +118,7 @@ export default function ObjectList({
                                 {fieldKeys ? fieldKeys.map((field, i) => (
                                     <div
                                         key={i}
-                                        className="ck-lh-c"
+                                        className={`ck-lh-c${isNumericField(metadata.fields[field]) ? ' ck-num' : ''}`}
                                         style={{ flex: i === 0 ? '2 1 0' : '1 1 0' }}
                                     >
                                         <ReadOnlyField field={field} value={object[field]} metadata={metadata.fields[field]} />

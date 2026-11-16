@@ -35,5 +35,6 @@ Feature: Assistant
     Given Alice is on the books list
     And the assistant is open
     When she asks the assistant "Hello there"
-    And she reloads the page
+    Then the assistant answers
+    When she reloads the page
     Then the assistant still shows "Hello there"

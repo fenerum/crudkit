@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Fix a record of a type that extends another (multi-table inheritance) being named with the
+  parent type's letters where another record links to it generically, such as a row in the
+  activity feed. The feed tells an entry's kind from those letters, so an entry of an extending
+  type, such as an email that extends a message, showed as a plain "posted" row without its
+  fields, icon, wording or Reply. Generic links now carry the record's own letters, as its
+  own `id` already did.
+
 ## 0.9.0 (2026-11-17)
 
 - Let a project add its own kinds of entries to a record's feed, such as a logged call, a

@@ -7,7 +7,7 @@ from django.test import TestCase
 from rest_framework.test import APIClient
 
 from crudkit.models import FeedItem
-from tests.testapp.models import Call, Customer
+from tests.testapp.models import Call, Customer, Ticket, UrgentComment
 
 
 class AddToFeedTest(TestCase):
@@ -70,3 +70,22 @@ class GetContentTest(TestCase):
         content = {"text": "Renewal", "html": "<b>Renewal</b>"}
         with mock.patch.object(Call, "get_content", create=True, return_value=content):
             self.assertEqual(entry.get_content(), content)
+
+
+class SubclassEntryTest(TestCase):
+    """The feed tells an entry's kind from the letters of its ID, so a row names a
+    record of an extending type (URG extends COM) with that type's own letters."""
+
+    def test_row_names_the_record_with_its_own_letters(self):
+        user = User.objects.create_superuser(username="alice")
+        audit = {"created_by": user, "updated_by": user}
+        ticket = Ticket.objects.create(subject="Outage", **audit)
+        comment = UrgentComment.objects.create(ticket=ticket, body="Server down", **audit)
+        FeedItem.objects.create(parent_object=ticket, related_object=comment, **audit)
+        client = APIClient()
+        client.force_authenticate(user)
+
+        rows = client.get(f"/api/v1/FEI/?parent_object={ticket.pk}").json()["results"]
+
+        own_id = client.get(f"/api/v1/URG/{comment.pk}/").data["id"]
+        self.assertEqual([row["related_object"] for row in rows], [own_id])

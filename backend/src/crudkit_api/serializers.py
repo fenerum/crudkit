@@ -295,7 +295,12 @@ class GenericRelationField(serializers.Field):
     may view can be linked, so the field can't reach (or probe for) others."""
 
     def to_representation(self, value):
-        return value.pk
+        type_id = getattr(value, "TYPE_ID", None)
+        if type_id is None:
+            return value.pk
+        # A record of an extending type shares its parent's pk, which carries the parent's letters.
+        pk = value.pk
+        return get_ck_id(type_id, parse_ck_id(pk)[1] if isinstance(pk, str) else pk)
 
     def to_internal_value(self, data):
         return record_from_ck_id(data, self.context)

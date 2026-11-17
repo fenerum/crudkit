@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-11-17)
 
 - Let a project add its own kinds of entries to a record's feed, such as a logged call, a
   meeting or a sent email. `CrudKitSettings.feed_entry = FeedEntry(...)` on the entry's model
@@ -18,14 +18,17 @@
   instead of `reply_to_message` in `from_query_params`; give attachment models defaults for
   their required fields besides the link, the file, `filename` and `content_type`.
   `from_object` and `reply_to` must now name records the person can see.
-  `FeedItem.get_content()` now asks any related record that has a `get_content()`.
+  `FeedItem.get_content()` now asks any related record that has a `get_content()`. (#85)
 
 - Celebrate milestones with confetti. The new `CrudKitSettings.celebrate`, e.g.
   `{"status": ["won", "closed"]}`, makes any write that moves a record into one of those
   values answer with `X-CrudKit-Celebrate: 1`. The SPA then plays a short confetti burst,
   unless the person prefers reduced motion. This covers edits, board drags, bulk edits,
   imports and actions. Undo and re-saves never celebrate. A `@crm_action` can also
-  celebrate by answering `{"celebrate": true}`.
+  celebrate by answering `{"celebrate": true}`. (#84)
+
+- Numbers in lists and read-only fields are grouped in thousands with the browser locale's
+  separators, and number columns line up on the right. (#86)
 
 ## 0.8.0 (2026-11-03)
 

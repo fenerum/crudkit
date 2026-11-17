@@ -50,6 +50,13 @@ Feature: Record IDs
     When Alice looks at "Server down"
     Then "Server down" is shown with the ID "URG" followed by its number
 
+  Scenario: A note about a record of an extending type names it with that type's letters
+    Given a ticket "Outage"
+    And an urgent comment "Server down" on the ticket "Outage"
+    And a note "Paged the on-call" was left on "Outage" about "Server down"
+    When Alice looks at "Paged the on-call"
+    Then the related object is shown with the ID of "Server down"
+
   Scenario Outline: A record of an extending type can be found by either type's letters
     Given a ticket "Outage"
     And an urgent comment "Server down" on the ticket "Outage"

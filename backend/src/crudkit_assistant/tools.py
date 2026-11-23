@@ -33,7 +33,8 @@ from crudkit.authorization import (
     has_action_permission,
     has_model_permission,
 )
-from crudkit.models import ChangeLog, parse_ck_id
+from crudkit.field_access import hidden_fields, read_only_fields
+from crudkit.models import BaseCrudKitModel, ChangeLog, parse_ck_id
 from crudkit_api import records, services
 from crudkit_api.metadata import build_instance_metadata, related_queryset, reverse_relations
 from crudkit_assistant.deps import AssistantDeps
@@ -77,6 +78,16 @@ def describe_call(tool_name: str, args: dict) -> str:
 # Read tools
 
 
+def ai_context(instance, user) -> str:
+    """The record's `get_ai_context()` text, without the fields `user` may not
+    see when the model uses the default text. A model that writes its own text
+    decides what goes in it."""
+    hidden = hidden_fields(user, instance.__class__)
+    if hidden and type(instance).get_ai_context is BaseCrudKitModel.get_ai_context:
+        return instance.default_ai_context(exclude=hidden)
+    return instance.get_ai_context()
+
+
 def _load_user(deps: AssistantDeps):
     return get_user_model().objects.get(pk=deps.user_id)
 
@@ -103,7 +114,8 @@ async def get_object(ctx: RunContext[AssistantDeps], id: str | None = None) -> s
         instance, error = _load_instance(ctx.deps, id)
         if instance is None:
             return f"ERROR: {error}"
-        return f"{instance.__class__._meta.verbose_name} {instance.id}\n{instance.get_ai_context()}"
+        context = ai_context(instance, _load_user(ctx.deps))
+        return f"{instance.__class__._meta.verbose_name} {instance.id}\n{context}"
 
     return await sync_to_async(_run)()
 
@@ -143,7 +155,7 @@ async def get_changelog(
             return f"ERROR: {error}"
         if not has_model_permission(_load_user(ctx.deps), ChangeLog, "view"):
             return "ERROR: this user may not view change history."
-        return services.get_changelog(instance, limit)
+        return services.get_changelog(instance, limit, user=_load_user(ctx.deps))
 
     return await sync_to_async(_run)()
 
@@ -187,7 +199,7 @@ async def get_related(
             valid = [f"{rel.get_accessor_name()} ({rel.related_model.TYPE_ID})" for rel in relations]
             return f"ERROR: Unknown relation {relation_name!r}. Valid: {valid}"
         return [
-            {"id": str(obj.pk), "context": obj.get_ai_context()}
+            {"id": str(obj.pk), "context": ai_context(obj, user)}
             for obj in related_queryset(instance, relation, user)[:limit]
         ]
 
@@ -301,7 +313,7 @@ async def get_screen_rows(ctx: RunContext[AssistantDeps], which: str = "selected
                 _, instance = records.get_instance(user, object_id, "view")
             except (ValueError, PermissionDenied):
                 continue
-            out.append({"id": object_id, "context": instance.get_ai_context()})
+            out.append({"id": object_id, "context": ai_context(instance, user)})
         return out
 
     return await sync_to_async(_run)()
@@ -414,6 +426,7 @@ def _field_errors(model, fields: dict, user) -> str | None:
     """Why `fields` can't be proposed on `model`: unknown or read-only field
     names, FK targets that don't exist or `user` can't see (the serializer
     would silently store None), or choice values the model invented."""
+    read_only = read_only_fields(user, model)
     writable = {
         f.name: f
         for f in model._meta.fields
@@ -421,6 +434,7 @@ def _field_errors(model, fields: dict, user) -> str | None:
         and not f.primary_key
         and f.name not in records.AUDIT_FIELDS | records.SKIPPED_FIELDS
         and not getattr(f, "ai_field", False)
+        and f.name not in read_only
     }
     try:
         records.check_values(user, writable, fields)

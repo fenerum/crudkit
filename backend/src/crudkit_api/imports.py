@@ -122,14 +122,15 @@ def _blank(value) -> bool:
 # Columns and keys
 
 
-def importable_fields(model) -> dict[str, models.Field]:
-    return {f.name: f for f, _ in writable_fields(model)}
+def importable_fields(model, user=None) -> dict[str, models.Field]:
+    """The fields an import may fill in: those `user` may change."""
+    return {f.name: f for f, _ in writable_fields(model, user)}
 
 
-def match_fields(model) -> list[str]:
+def match_fields(model, user=None) -> list[str]:
     """Fields an import can find existing records by: the type's own IDs, unique
     fields, and those listed in `CrudKitSettings.import_match_fields`."""
-    fields = importable_fields(model)
+    fields = importable_fields(model, user)
     declared = list(getattr(model.CrudKitSettings, "import_match_fields", []))
     unique = [f.name for f in model._meta.fields if f.unique] + [
         c.fields[0] for c in model._meta.constraints if isinstance(c, UniqueConstraint) and len(c.fields) == 1
@@ -141,7 +142,7 @@ def match_fields(model) -> list[str]:
     return keys
 
 
-def suggest_mapping(model, headers: list[str]) -> dict[str, str]:
+def suggest_mapping(model, headers: list[str], user=None) -> dict[str, str]:
     """{header: field} for headers that name a field (or its label), ignoring case,
     spaces and underscores."""
 
@@ -149,7 +150,7 @@ def suggest_mapping(model, headers: list[str]) -> dict[str, str]:
         return str(text).lower().replace("_", " ").strip()
 
     targets = {normal(ID): ID}
-    for name, field in importable_fields(model).items():
+    for name, field in importable_fields(model, user).items():
         targets.setdefault(normal(field.verbose_name), name)
         targets[normal(name)] = name
     mapping = {}
@@ -160,10 +161,10 @@ def suggest_mapping(model, headers: list[str]) -> dict[str, str]:
     return mapping
 
 
-def _check_mapping(model, headers, mapping) -> None:
+def _check_mapping(model, headers, mapping, user=None) -> None:
     if not isinstance(mapping, dict):
         raise ValueError("The mapping must map columns to fields")
-    fields = importable_fields(model)
+    fields = importable_fields(model, user)
     for header, field in mapping.items():
         if header not in headers:
             raise ValueError(f"The file has no column {header!r}")
@@ -271,7 +272,7 @@ def run_import(model, user, upload, mapping=None, match_on=None, mode="create", 
         mode in UPDATING_MODES and not has_model_permission(user, model, "change")
     ):
         raise PermissionDenied
-    keys = match_fields(model)
+    keys = match_fields(model, user)
     if match_on and match_on not in keys:
         raise ValueError(f"Records can't be matched on {match_on!r}; use one of {', '.join(keys)}")
     if mode in UPDATING_MODES and not match_on:
@@ -279,10 +280,10 @@ def run_import(model, user, upload, mapping=None, match_on=None, mode="create", 
 
     headers, rows = read_table(upload)
     if mapping is None:
-        mapping = suggest_mapping(model, headers)
-    _check_mapping(model, headers, mapping)
+        mapping = suggest_mapping(model, headers, user)
+    _check_mapping(model, headers, mapping, user)
     if match_on and match_on not in mapping.values():
-        label = "ID" if match_on == ID else importable_fields(model)[match_on].verbose_name
+        label = "ID" if match_on == ID else importable_fields(model, user)[match_on].verbose_name
         raise ValueError(f"Choose the column that holds the {label} to match records on it")
 
     importer = _Importer(model, user, mapping, match_on, mode, label=f"Imported from {upload.name}"[:255])
@@ -301,7 +302,7 @@ def run_import(model, user, upload, mapping=None, match_on=None, mode="create", 
         "columns": headers,
         "samples": _samples(headers, rows),
         "fields": [{"name": ID, "label": "ID"}]
-        + [{"name": name, "label": capfirst(f.verbose_name)} for name, f in importable_fields(model).items()],
+        + [{"name": name, "label": capfirst(f.verbose_name)} for name, f in importable_fields(model, user).items()],
         "mapping": mapping,
         "match_fields": keys,
         **report,
@@ -326,7 +327,7 @@ class _Importer:
         self.match_on = match_on
         self.mode = mode
         self.label = label
-        self.fields = importable_fields(model)
+        self.fields = importable_fields(model, user)
 
     def run(self, rows, dry_run: bool) -> dict:
         results = []

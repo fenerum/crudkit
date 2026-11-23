@@ -27,6 +27,7 @@ from crudkit.authorization import (
     require_object_permission,
     requires_approval,
 )
+from crudkit.field_access import hidden_fields, require_editable_fields
 from crudkit.models import (
     ChangeLog,
     FeedItem,
@@ -65,21 +66,25 @@ class RequestShim:
 # Reads
 
 
-def get_search_fields(model) -> list[str]:
-    return list(getattr(getattr(model, "CrudKitSettings", None), "search_fields", None) or [])
+def get_search_fields(model, user=None) -> list[str]:
+    """The model's `search_fields`, less those through a field `user` may not see."""
+    names = list(getattr(getattr(model, "CrudKitSettings", None), "search_fields", None) or [])
+    hidden = hidden_fields(user, model) if user is not None else set()
+    return [name for name in names if name.split("__")[0] not in hidden]
 
 
-def search_filter(model, query: str, include_subtypes: bool = True) -> Q:
+def search_filter(model, query: str, include_subtypes: bool = True, user=None) -> Q:
     """Case-insensitive match of `query` against the model's CRM ID (exact) and its
     `CrudKitSettings.search_fields` (substring). Matches nothing if neither applies.
-    Without `include_subtypes`, an ID of a multi-table child type doesn't match the parent."""
+    Without `include_subtypes`, an ID of a multi-table child type doesn't match the parent.
+    With `user`, fields they may not see are not searched, so a search can't probe them."""
     query = query.strip()
     q = Q(pk__in=[])
     ck_id = query.upper()
     type_ids = get_accepted_type_ids(model) if include_subtypes else {model.TYPE_ID}
     if ck_id_regex.fullmatch(ck_id) and ck_id[:3] in type_ids:
         q |= Q(pk=parse_ck_id(ck_id)[1])
-    for field in get_search_fields(model):
+    for field in get_search_fields(model, user):
         q |= Q(**{f"{field}__icontains": query})
     return q
 
@@ -94,7 +99,7 @@ def search_objects(user, query: str, models_to_search=None, limit_per_model: int
             continue
         serializer_cls = get_serializer(mdl, depth=0, fields=["id", "label", "object_images"])
         qs = get_authorized_queryset(user, mdl.objects.all(), "view").filter(
-            search_filter(mdl, query, include_subtypes=False)
+            search_filter(mdl, query, include_subtypes=False, user=user)
         )
         if "deleted" in [field.name for field in mdl._meta.fields]:
             qs = qs.filter(deleted=False)
@@ -137,9 +142,16 @@ def add_to_feed(parent, record) -> None:
     )
 
 
-def get_changelog(instance, limit: int = 20) -> list[dict[str, Any]]:
+def visible_changes(field_changes, hidden) -> dict:
+    """A ChangeLog entry's `field_changes` less the fields in `hidden`."""
+    return {name: change for name, change in (field_changes or {}).items() if name not in hidden}
+
+
+def get_changelog(instance, limit: int = 20, user=None) -> list[dict[str, Any]]:
     """Recent ChangeLog entries for `instance`: {at, by, action, source, client,
-    label, change_set, field_changes: {field: [old, new]}}."""
+    label, change_set, field_changes: {field: [old, new]}}. With `user`, the
+    fields they may not see are left out."""
+    hidden = hidden_fields(user, instance.__class__) if user is not None else set()
     ct = ContentType.objects.get_for_model(instance.__class__)
     qs = ChangeLog.objects.filter(related_content_type=ct, related_object_id=instance.pk).order_by("-updated_at")[
         :limit
@@ -153,15 +165,17 @@ def get_changelog(instance, limit: int = 20) -> list[dict[str, Any]]:
             "client": cl.client,
             "label": cl.label,
             "change_set": str(cl.change_set) if cl.change_set else None,
-            "field_changes": cl.field_changes or {},
+            "field_changes": visible_changes(cl.field_changes, hidden),
         }
         for cl in qs
     ]
 
 
-def get_history(instance, limit: int = 200) -> list[dict[str, Any]]:
+def get_history(instance, limit: int = 200, user=None) -> list[dict[str, Any]]:
     """ChangeLog entries for `instance`, newest first, grouped into the change
-    sets that produced them, each flagged with whether it can be reverted."""
+    sets that produced them, each flagged with whether it can be reverted.
+    With `user`, the fields they may not see are left out."""
+    hidden = hidden_fields(user, instance.__class__) if user is not None else set()
     ct = ContentType.objects.get_for_model(instance.__class__)
     entries = list(
         ChangeLog.objects.filter(related_content_type=ct, related_object_id=instance.pk)
@@ -203,7 +217,9 @@ def get_history(instance, limit: int = 200) -> list[dict[str, Any]]:
         if entry.action not in group["actions"]:
             group["actions"].append(entry.action)
         group["label"] = group["label"] or entry.label
-        group["entries"].append({"id": entry.id, "action": entry.action, "field_changes": entry.field_changes or {}})
+        group["entries"].append(
+            {"id": entry.id, "action": entry.action, "field_changes": visible_changes(entry.field_changes, hidden)}
+        )
     for group in groups.values():
         group["other_records"] = group.pop("total_entries") - len(group["entries"])
     return list(groups.values())
@@ -322,7 +338,8 @@ def _validated_serializer(model, instance, fields: dict[str, Any], user, request
         partial=partial,
         context={"request": request or RequestShim(user)},
     )
-    unknown = [k for k in fields if k not in serializer.fields]
+    # A field the person may not see is refused by the serializer's own validation.
+    unknown = [k for k in fields if k not in serializer.fields and k not in serializer.hidden_names]
     if unknown:
         logger.warning("Rejected unknown field(s) %s on %s", unknown, model.__name__)
         raise ValueError(f"Field(s) not on {model.__name__}: {unknown}")
@@ -598,6 +615,9 @@ def _require_revert_permission(user, entry, instance):
     permission = "delete" if entry.action == ChangeLog.Action.CREATE else "change"
     if not has_object_permission(user, instance, permission):
         raise PermissionDenied(f"You may not {permission} {instance}")
+    if entry.action in (ChangeLog.Action.UPDATE, ChangeLog.Action.ACTION, ChangeLog.Action.REVERT):
+        # Undo writes the old values back, so it needs the right to change each field.
+        require_editable_fields(user, instance.__class__, entry.field_changes or {})
     if entry.action == ChangeLog.Action.ACTION:
         # Undoing an action needs the same permission as running it. Entries
         # name the action by its label; an action that no longer exists can't

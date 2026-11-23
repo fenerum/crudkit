@@ -117,7 +117,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
             queryset = queryset.filter(deleted=False)
         search = self.request.GET.get("_q", False)
         if search:
-            queryset = queryset.filter(search_filter(self.queryset.model, search))
+            queryset = queryset.filter(search_filter(self.queryset.model, search, user=self.request.user))
         return queryset
 
     @transaction.atomic
@@ -384,7 +384,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
         # own permission on top of seeing the record.
         if not has_model_permission(request.user, ChangeLog, "view"):
             raise PermissionDenied("You may not view change history.")
-        return Response(get_history(self.get_object()))
+        return Response(get_history(self.get_object(), user=request.user))
 
     @action(["POST"], detail=True)
     def restore(self, request, pk=None):
@@ -410,7 +410,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
             {
                 "fields": {
                     field: value
-                    for field, value in self.serializer_class(instance).data.items()
+                    for field, value in self.get_serializer(instance).data.items()
                     if field in getattr(self.queryset.model.CrudKitSettings, "allowed_prefills", [])
                 }
             }

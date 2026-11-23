@@ -16,6 +16,7 @@ import { getStoredPageSize, storePageSize } from '../../utils/pageSize';
 import { isVisibleToUser } from '../../hooks/useMenuViews';
 import { useAuth } from '../../context/AuthContext';
 import { useRealtimeConnected } from '../../data/realtime';
+import { visibleView } from '../../utils/visibleView';
 
 export default function List() {
   const { segment: type, view: viewId } = useParams() as { segment: string; view?: string };
@@ -179,7 +180,7 @@ export default function List() {
     setCurrentPage(1);
   }, [setSearchParams]);
 
-  const view = currentView;
+  const view = useMemo(() => visibleView(currentView, metadata), [currentView, metadata]);
 
   const overflowItems = useMemo(() => {
     const items: any[] = [];

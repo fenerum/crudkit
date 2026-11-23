@@ -22,6 +22,7 @@ from crudkit.authorization import (
     has_model_permission,
     requires_approval,
 )
+from crudkit.field_access import EDIT, field_access
 from crudkit.models import ChangeLog, View, ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
 from crudkit_api import services
@@ -111,8 +112,10 @@ def _field_schema(f) -> dict | None:
     return None
 
 
-def _schema_fields(model) -> list[tuple[models.Field, dict]]:
-    """Concrete fields that can be expressed as JSON-schema arguments."""
+def _schema_fields(model, user=None, level=None) -> list[tuple[models.Field, dict]]:
+    """Concrete fields that can be expressed as JSON-schema arguments, less
+    those `user` may not see (or, with `level="edit"`, may not change)."""
+    access = field_access(user, model)
     generic_parts = set()
     for private in model._meta.private_fields:
         if isinstance(private, GenericForeignKey):
@@ -125,6 +128,8 @@ def _schema_fields(model) -> list[tuple[models.Field, dict]]:
             or f.name in generic_parts
             or getattr(f.remote_field, "parent_link", False)
             or isinstance(f, models.FileField)
+            or access.get(f.name, EDIT) is None
+            or (level == EDIT and access.get(f.name, EDIT) != EDIT)
         ):
             continue
         schema = _field_schema(f)
@@ -133,32 +138,33 @@ def _schema_fields(model) -> list[tuple[models.Field, dict]]:
     return out
 
 
-def writable_fields(model) -> list[tuple[models.Field, dict]]:
+def writable_fields(model, user=None) -> list[tuple[models.Field, dict]]:
     return [
         (f, schema)
-        for f, schema in _schema_fields(model)
+        for f, schema in _schema_fields(model, user, level=EDIT)
         if f.editable and f.name not in AUDIT_FIELDS and not getattr(f, "ai_field", False)
     ]
 
 
-def readable_fields(model) -> dict[str, models.Field]:
+def readable_fields(model, user=None) -> dict[str, models.Field]:
     """{name: field} of the columns a caller may ask for by name. Password
-    fields stay out, as they do in the serializer."""
-    return {f.name: f for f, _ in _schema_fields(model) if not f.name.lower().endswith("password")}
+    fields stay out, as they do in the serializer, and so do the fields `user`
+    may not see."""
+    return {f.name: f for f, _ in _schema_fields(model, user) if not f.name.lower().endswith("password")}
 
 
 def _numeric(f) -> bool:
     return isinstance(f, NUMERIC_FIELDS) and not f.choices
 
 
-def _filters(model) -> tuple[dict, dict[str, str]]:
+def _filters(model, user=None) -> tuple[dict, dict[str, str]]:
     """The accepted `filters` keys and the ORM lookup each maps to."""
     described, lookups = {}, {}
 
     def add(key, lookup, schema):
         described[key], lookups[key] = schema, lookup
 
-    for f, schema in _schema_fields(model):
+    for f, schema in _schema_fields(model, user):
         if isinstance(f, models.JSONField):
             continue
         if isinstance(f, models.DateField):
@@ -213,15 +219,15 @@ def _type_summary(model) -> dict:
 
 
 def _type_detail(user, model) -> dict:
-    filters, _ = _filters(model)
+    filters, _ = _filters(model, user)
     can_change = has_model_permission(user, model, "change")
     return {
         "filters": filters,
-        "searchable": bool(services.get_search_fields(model)),
-        "fields": {f.name: schema for f, schema in writable_fields(model)},
-        "required_on_create": [f.name for f, _ in writable_fields(model) if not f.blank and not f.has_default()],
-        "columns": list(readable_fields(model)),
-        "aggregatable": [name for name, f in readable_fields(model).items() if _numeric(f)],
+        "searchable": bool(services.get_search_fields(model, user)),
+        "fields": {f.name: schema for f, schema in writable_fields(model, user)},
+        "required_on_create": [f.name for f, _ in writable_fields(model, user) if not f.blank and not f.has_default()],
+        "columns": list(readable_fields(model, user)),
+        "aggregatable": [name for name, f in readable_fields(model, user).items() if _numeric(f)],
         "actions": {
             name: {"label": label, "requires_approval": requires_approval(model, action=name)}
             for name, label in action_names(model).items()
@@ -253,16 +259,22 @@ def list_records(
     """Records of one type, or of a saved view (its filters, ordering and columns).
     `fields` picks the columns, overriding the view's."""
     model, view_obj, qs = _queryset(user, type_id, view, filters, query)
-    if order_by and order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields}:
+    if order_by and order_by.lstrip("-") not in {f.name for f in model._meta.concrete_fields} - set(
+        _hidden(user, model)
+    ):
         raise ValueError(f"Cannot order by {order_by!r}")
     qs = order_queryset(qs, get_order_fields(view_obj, order_by))
     limit = min(max(int(limit or DEFAULT_LIMIT), 1), MAX_LIMIT)
     offset = max(int(offset or 0), 0)
     if fields:
-        columns = _with_id_label(_checked_columns(model, fields))
+        columns = _with_id_label(_checked_columns(model, fields, user=user))
     else:
-        columns = _with_id_label(view_obj.fields) if view_obj else "__all__"
-    return {"total": qs.count(), "results": serialize(model, qs[offset : offset + limit], depth=0, fields=columns)}
+        hidden = _hidden(user, model)
+        columns = _with_id_label([name for name in view_obj.fields if name not in hidden]) if view_obj else "__all__"
+    return {
+        "total": qs.count(),
+        "results": serialize(model, qs[offset : offset + limit], depth=0, fields=columns, user=user),
+    }
 
 
 def aggregate_records(
@@ -280,7 +292,7 @@ def aggregate_records(
     return, grouped by up to MAX_GROUP_BY fields or date periods
     (`created_at:month`)."""
     model, _, qs = _queryset(user, type_id, view, filters, query)
-    columns = readable_fields(model)
+    columns = readable_fields(model, user)
     plain, truncated = [], {}
     for entry in _names(group_by, "group_by"):
         name, _, period = entry.partition(":")
@@ -335,15 +347,15 @@ def get_record(user, object_id: str, fields: list[str] | None = None) -> dict:
     run. `fields` picks the columns, and `feed`/`changelog` only if named."""
     model, instance = get_instance(user, object_id, "view")
     if fields:
-        wanted = _checked_columns(model, fields, RECORD_EXTRAS)
+        wanted = _checked_columns(model, fields, RECORD_EXTRAS, user=user)
         columns = _with_id_label([name for name in wanted if name not in RECORD_EXTRAS])
     else:
         wanted, columns = RECORD_EXTRAS, "__all__"
-    data = serialize(model, [instance], depth=1, fields=columns)[0]
+    data = serialize(model, [instance], depth=1, fields=columns, user=user)[0]
     if "feed" in wanted:
         data["feed"] = services.get_feed(instance, FEED_LIMIT)
     if "changelog" in wanted and has_model_permission(user, ChangeLog, "view"):
-        data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT)
+        data["changelog"] = services.get_changelog(instance, CHANGELOG_LIMIT, user=user)
     data["actions"] = [name for name in action_names(model) if has_action_permission(user, instance, name)]
     return data
 
@@ -359,7 +371,7 @@ def _queryset(user, type_id, view, filters, query):
     model = resolve_type(user, view_obj.model if view_obj else type_id)
     if view_obj and type_id not in (None, view_obj.model):
         raise ValueError(f"{view_obj.id} is a view of {view_obj.model}, not {type_id}")
-    _, lookups = _filters(model)
+    _, lookups = _filters(model, user)
     filters = filters or {}
     if not isinstance(filters, dict):
         raise ValueError("`filters` must be an object of {field: value}")
@@ -378,7 +390,7 @@ def _queryset(user, type_id, view, filters, query):
             lookup += "__in"
         qs = qs.filter(**{lookup: value})
     if query:
-        qs = qs.filter(services.search_filter(model, query))
+        qs = qs.filter(services.search_filter(model, query, user=user))
     if view_obj:
         qs = view_obj.filter(qs, request=services.RequestShim(user))
     return model, view_obj, qs
@@ -395,9 +407,13 @@ def _names(value, argument: str) -> list[str]:
     return value
 
 
-def _checked_columns(model, fields, extras=()) -> list[str]:
+def _hidden(user, model) -> list[str]:
+    return [name for name, level in field_access(user, model).items() if level is None]
+
+
+def _checked_columns(model, fields, extras=(), user=None) -> list[str]:
     names = _names(fields, "fields")
-    valid = ["id", "label", *readable_fields(model), *extras]
+    valid = ["id", "label", *readable_fields(model, user), *extras]
     unknown = sorted(set(names) - set(valid))
     if unknown:
         raise ValueError(f"Unknown field(s): {unknown}. Valid: {valid}")
@@ -476,7 +492,7 @@ def checked_fields(model, user, fields) -> dict:
     serializer silently turns an unknown FK id into None, so check first."""
     if not isinstance(fields, dict) or not fields:
         raise ValueError("`fields` must be a non-empty object of {field: value}")
-    return check_values(user, {f.name: f for f, _ in writable_fields(model)}, fields)
+    return check_values(user, {f.name: f for f, _ in writable_fields(model, user)}, fields)
 
 
 def check_values(user, writable: dict, fields: dict) -> dict:
@@ -497,10 +513,12 @@ def check_values(user, writable: dict, fields: dict) -> dict:
     return fields
 
 
-def serialize(model, rows, depth: int, fields="__all__") -> list[dict]:
+def serialize(model, rows, depth: int, fields="__all__", user=None) -> list[dict]:
+    """`rows` as the REST API shows them to `user` (leaving out the fields they may not see)."""
     # One serializer for all rows, re-pointed per row: MoneyField reads the
     # currency from `parent.instance`.
-    serializer = get_serializer(model, depth=depth, fields=fields)()
+    context = {"user": user} if user is not None else {}
+    serializer = get_serializer(model, depth=depth, fields=fields)(context=context)
     data = []
     for obj in rows:
         serializer.instance = obj

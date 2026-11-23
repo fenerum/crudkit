@@ -320,8 +320,12 @@ class BaseCrudKitModel(models.Model):
         return [f for f in cls._meta.get_fields() if getattr(f, "ai_field", False)]
 
     def get_ai_context(self) -> str:
+        return self.default_ai_context()
+
+    def default_ai_context(self, exclude=()) -> str:
+        """The record's fields as `verbose name: value` lines, less `exclude`."""
         parts = []
-        skip = {"deleted", "merged_into", "id", "created_by", "updated_by"}
+        skip = {"deleted", "merged_into", "id", "created_by", "updated_by", *exclude}
         for field in self._meta.get_fields():
             if not field.concrete or field.name in skip:
                 continue
@@ -919,9 +923,7 @@ def same_value(field, a, b) -> bool:
 
 def logged_fields(obj):
     # primary_key also skips the parent link of multi-table inheritance children.
-    return [
-        field for field in obj._meta.fields if not field.primary_key and field.name not in CHANGELOG_SKIP_FIELDS
-    ]
+    return [field for field in obj._meta.fields if not field.primary_key and field.name not in CHANGELOG_SKIP_FIELDS]
 
 
 class ChangeLogManager(models.Manager):

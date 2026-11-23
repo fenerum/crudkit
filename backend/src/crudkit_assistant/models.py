@@ -12,6 +12,7 @@ from rest_framework.response import Response
 from crudkit.audit import audit
 from crudkit.authorization import has_model_permission, has_object_permission, requires_approval
 from crudkit.decorators import crm_action
+from crudkit.field_access import read_only_fields
 from crudkit.fields import ModelField
 from crudkit.models import BaseCrudKitModel, ChangeLog, CrudKitPositiveIntegerField, View
 from crudkit.utils import get_model_types
@@ -142,8 +143,13 @@ class AssistantProposal(BaseCrudKitModel):
         return self._permits(user) and (self.created_by_id == user.pk or self._permits(self.created_by))
 
     def _permits(self, user) -> bool:
+        model = self.target_content_type.model_class()
+        if self.kind in (self.Kind.PATCH, self.Kind.CREATE) and set(self.payload.get("fields") or {}) & (
+            read_only_fields(user, model)
+        ):
+            return False
         if self.kind == self.Kind.CREATE:
-            return has_model_permission(user, self.target_content_type.model_class(), "add")
+            return has_model_permission(user, model, "add")
         target = self.target
         return target is not None and has_object_permission(user, target, "change")
 

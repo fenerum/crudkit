@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db.models import Model
 
 from crudkit.authorization import get_authorized_queryset, has_model_permission
+from crudkit.field_access import EDIT, field_access
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
@@ -140,7 +141,15 @@ def _feed_entries(model, user) -> list[str]:
 def build_model_metadata(model, user=None) -> dict[str, Any]:
     """Return the model-level metadata payload served at /api/v1/<type>/metadata/."""
     mfc = _model_field_choices()
-    fields = OrderedDict((field.name, _field_metadata(field, mfc)) for field in model._meta.fields)
+    access = field_access(user, model)
+    fields = OrderedDict(
+        (field.name, _field_metadata(field, mfc)) for field in model._meta.fields if access.get(field.name, EDIT)
+    )
+    for name, level in access.items():
+        if level != EDIT and name in fields:
+            # Read-only for this person's roles.
+            fields[name]["editable"] = False
+            fields[name]["role_restricted"] = True
     relations = [_relation_metadata(rel) for rel in model._meta.related_objects if not rel.hidden]
     for gen in _generic_relations():
         rm = gen["related_model_cls"]
@@ -161,13 +170,15 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
         "allowed_prefills": list(
             getattr(model.CrudKitSettings, "allowed_prefills", []),
         ),
-        "search_fields": list(getattr(model.CrudKitSettings, "search_fields", [])),
+        "search_fields": [
+            name for name in getattr(model.CrudKitSettings, "search_fields", []) if access.get(name, EDIT)
+        ],
         "can_create": has_model_permission(user, model, "add"),
         "can_change": has_model_permission(user, model, "change"),
         "can_delete": has_model_permission(user, model, "delete"),
         "inline_create": getattr(model.CrudKitSettings, "inline_create", True),
         "default_inlines": list(getattr(model.CrudKitSettings, "default_inlines", [])),
-        "import_match_fields": imports.match_fields(model),
+        "import_match_fields": imports.match_fields(model, user),
         "feed_entry": _feed_entry(model),
         "feed_entries": _feed_entries(model, user),
         "fields": fields,
@@ -274,7 +285,7 @@ def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
     instance: name, type, current value, valid choices, FK options, plus
     the available @crm_action names and the records pointing at it. Skips
     audit/housekeeping fields."""
-    base = build_model_metadata(instance.__class__)
+    base = build_model_metadata(instance.__class__, user)
     fields_out: dict[str, Any] = {}
     for name, meta in base["fields"].items():
         if name in NON_PATCHABLE_FIELDS or meta.get("auto_created"):

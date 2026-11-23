@@ -22,7 +22,7 @@ test('creates a filtered saved view and switches to it', async ({ page }) => {
   await page.getByRole('main').getByRole('button', { name: 'Create', exact: true }).click();
 
   await expect(page).toHaveURL('/RDG');
-  await page.getByRole('banner').getByRole('button', { name }).click();
+  await page.getByRole('main').getByRole('button', { name }).click();
   await expect(page).toHaveURL(/\/RDG\/VIW\/VIW\d+$/);
   await expect(page).toHaveTitle(`${name} - CrudKit Demo`);
 
@@ -45,7 +45,7 @@ test.describe('layouts', () => {
   });
 
   const openView = (page, name: string) =>
-    page.getByRole('banner').getByRole('button', { name, exact: true }).click();
+    page.getByRole('main').getByRole('button', { name, exact: true }).click();
 
   test('kanban groups cards by status', async ({ page }) => {
     await openView(page, 'Board');
@@ -190,13 +190,13 @@ test('private views only show to their owner, outside the shared menu', async ({
   await page.goto('/RDG');
 
   const sidebar = page.getByRole('navigation', { name: 'Sidebar' });
-  const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button', { name, exact: true })).toBeVisible();
+  const viewTabs = page.getByRole('main');
+  await expect(viewTabs.getByRole('button', { name, exact: true })).toBeVisible();
   await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
 
   // Seeded view owned by another user; the admin is a superuser so the API returns it.
   const othersView = "Reader's private picks";
-  await expect(banner.getByRole('button', { name: othersView })).toBeHidden();
+  await expect(viewTabs.getByRole('button', { name: othersView })).toBeHidden();
   await expect(sidebar.getByRole('link', { name: othersView })).toBeHidden();
 });
 
@@ -205,6 +205,6 @@ test('views without show_in_menu stay out of the sidebar', async ({ page, reques
   await createObject(request, 'VIW', { model: 'RDG', name, fields: ['name'], show_in_menu: false });
   await page.goto('/RDG');
 
-  await expect(page.getByRole('banner').getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByRole('button', { name, exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sidebar' }).getByRole('link', { name })).toBeHidden();
 });

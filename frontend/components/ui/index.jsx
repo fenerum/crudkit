@@ -10,6 +10,7 @@ export { default as StageBadge, colorForStage } from './StageBadge';
 export { default as OverflowMenu } from './OverflowMenu';
 export { default as PageRange } from './PageRange';
 export { default as PageSizeSelect } from './PageSizeSelect';
+export { default as PageHeader } from './PageHeader';
 export { default as ThemeToggle } from './ThemeToggle';
 export { ThemeProvider, useTheme } from './ThemeContext';
 export { mapIcon } from './iconMap';

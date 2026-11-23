@@ -7,6 +7,14 @@
   request), 4px radii, 35px list rows, square status badges and borders instead of shadows.
   Dark mode is still a click away and follows the same palette; a stored choice is kept.
   `CRUDKIT_FRONTEND_CONFIG["brand_color"]` still replaces the accent in both themes.
+- New app shell: an icon rail on the far left switches workspaces (replacing the
+  workspace picker in the sidebar header) and holds Home, New workspace, Search and Inbox
+  with its pending count. The sidebar next to it lists the workspace's views and can be
+  collapsed; the choice is remembered. List pages get a page header with the title and
+  record count, actions, the saved views as tabs and the search box, instead of packing
+  them into the top bar. Below 1200px the assistant opens over the content, below 900px
+  the sidebar does too, and record lists scroll sideways on phones instead of squeezing
+  their columns.
 
 ## 0.10.0 (2026-11-23)
 

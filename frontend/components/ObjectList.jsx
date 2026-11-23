@@ -47,8 +47,7 @@ export default function ObjectList({
     return (
         <form
             id="bulk"
-            className="ck-fullbleed flex flex-col"
-            style={{ minHeight: 'calc(100vh - var(--topbar-h))' }}
+            className="ck-fullbleed flex flex-col flex-1"
         >
             {selectedRows.length > 0 && (
                 <BulkBar
@@ -59,7 +58,7 @@ export default function ObjectList({
                 />
             )}
 
-            <div className="bg-bg-1 flex-1">
+            <div className="ck-list-scroll bg-bg-1 flex-1">
                 <div className="ck-list-head">
                     <div className="ck-lh-c" style={{ flex: '0 0 28px' }}>
                         <input
@@ -150,7 +149,7 @@ export default function ObjectList({
             {/* Pagination */}
             {isPaginated && (
                 <div
-                    className="sticky bottom-0 z-10 flex items-center justify-between border-t border-border-1 bg-bg-1 px-3.5 py-2"
+                    className="sticky bottom-0 z-10 flex items-center justify-between border-t border-border-1 bg-bg-1 px-4 py-2"
                 >
                     <PageRange
                         page={pagination.current_page}

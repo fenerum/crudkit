@@ -75,7 +75,7 @@ def a_view_with_layout(world, layout, label, model):
 
 
 def view_tab(world, label):
-    return world.banner.get_by_role("button", name=world.text(label), exact=True)
+    return world.main.get_by_role("button", name=world.text(label), exact=True)
 
 
 def sidebar_link(world, label):

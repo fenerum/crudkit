@@ -7,7 +7,6 @@ import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
 import {isMine, isVisibleToUser, useMenuViews, useWorkspaces, viewBadgeQuery} from "../hooks/useMenuViews";
 import {resolveWorkspaceViews} from "../utils/workspaces";
-import WorkspaceSwitcher from "../components/WorkspaceSwitcher";
 import AppLogo from "../components/AppLogo";
 import faviconUrl from "../images/favicon.svg";
 import {appConfig} from "../utils/appConfig";
@@ -18,6 +17,7 @@ import JobTray from "../components/JobTray";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
+import {ASSISTANT_OVERLAY_QUERY, NAV_OVERLAY_QUERY, useMediaQuery} from "../hooks/useMediaQuery";
 import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
@@ -25,47 +25,39 @@ import AssistantSidebar from "../components/Assistant/AssistantSidebar";
 import {AssistantContext, useAssistant} from "../components/Assistant/AssistantContext";
 
 const ASSISTANT_OPEN_KEY = "crudkit.assistant.open";
+const NAV_COLLAPSED_KEY = "crudkit.nav.collapsed";
 const VIEW_DOT_PALETTE = ['var(--stage-blue)', 'var(--stage-amber)', 'var(--stage-violet)', 'var(--stage-green)', 'var(--stage-rose)', 'var(--stage-slate)'];
 
-const NavItem = React.memo(function NavItem({href, icon, label, count, color, active, onClick}) {
-  const cls =
-    "flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm " +
-    (active
-      ? "bg-bg-3 text-fg-1"
-      : "text-fg-2 hover:bg-bg-2 hover:text-fg-1");
-  const inner = (
-    <>
-      {color ? (
-        <Dot color={color} size={8} />
-      ) : icon ? (
-        <Icon name={icon} size={14} color="currentColor" />
-      ) : null}
-      <span className="flex-1 truncate">{label}</span>
-      {count != null && count > 0 && (
-        <span className="text-2xs text-fg-3 font-mono">{count}</span>
-      )}
-    </>
-  );
+function viewHref(view) {
+  return view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
+}
+
+// A link when given `href`, else a button.
+function LinkOrButton({href, className, children, ...rest}) {
   if (href) {
-    return (
-      <Link to={href} className={cls} onClick={onClick}>
-        {inner}
-      </Link>
-    );
+    return <Link to={href} className={className} {...rest}>{children}</Link>;
   }
+  return <button type="button" className={className} {...rest}>{children}</button>;
+}
+
+const NavItem = React.memo(function NavItem({href, icon, label, count, color, active, onClick}) {
   return (
-    <button type="button" className={cls + " w-full text-left"} onClick={onClick}>
-      {inner}
-    </button>
+    <LinkOrButton href={href} onClick={onClick} className={"ck-navleaf" + (active ? " is-active" : "")}>
+      <span className="ck-navleaf-ico">
+        {color ? <Dot color={color} size={8} /> : <Icon name={icon} size={15} color="currentColor" />}
+      </span>
+      <span className="ck-navleaf-label">{label}</span>
+      {count != null && count > 0 && <span className="ck-navleaf-count">{count}</span>}
+    </LinkOrButton>
   );
 });
 
 function NavSection({title, action, children}) {
   return (
-    <div className="flex flex-col mb-1.5">
+    <div className="flex flex-col">
       {title && (
-        <div className="flex items-center justify-between px-2 pt-2.5 pb-1 eyebrow">
-          <span>{title}</span>
+        <div className="ck-navpanel-section eyebrow">
+          <span className="truncate">{title}</span>
           {action}
         </div>
       )}
@@ -74,38 +66,50 @@ function NavSection({title, action, children}) {
   );
 }
 
-function Topbar({ menuActive, setMenuActive, handleNavClick }) {
+// The rail labels sit under the icon and hide on the active item, so the
+// accessible name comes from aria-label.
+function RailItem({href, icon, label, active, badge, onClick, ariaLabel}) {
+  return (
+    <LinkOrButton
+      href={href}
+      onClick={onClick}
+      className={"ck-rail-item" + (active ? " is-active" : "")}
+      aria-label={ariaLabel || label}
+      aria-current={href && active ? "page" : undefined}
+      aria-pressed={!href ? !!active : undefined}
+      title={ariaLabel || label}
+    >
+      <span className="ck-rail-ico">
+        <Icon name={icon} size={18} color="currentColor" />
+        <span className="ck-rail-label" aria-hidden="true">{label}</span>
+        {badge > 0 && <span className="ck-rail-badge">{badge}</span>}
+      </span>
+    </LinkOrButton>
+  );
+}
+
+function Topbar({ navOverlay, onOpenNav }) {
   const slots = useTopbarSlotsValue();
   const assistant = useAssistant();
   return (
-    <header className="ck-topbar sticky top-0 z-40 flex items-center gap-3 px-3.5">
-      <button
-        type="button"
-        className="ck-icon-btn ck-icon-btn-sm lg:hidden"
-        onClick={() => setMenuActive(!menuActive)}
-        aria-label={menuActive ? 'Close sidebar' : 'Open sidebar'}
-      >
-        <Icon name="panel-left" size={14} color="currentColor" />
-      </button>
+    <header className="ck-topbar relative z-40 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 flex-shrink-0">
+      {navOverlay && (
+        <button type="button" className="ck-icon-btn ck-icon-btn-sm" onClick={onOpenNav} aria-label="Open sidebar">
+          <Icon name="panel-left" size={14} color="currentColor" />
+        </button>
+      )}
 
-      {/* Left cluster: home + crumbs + optional title */}
-      <nav className="flex items-center gap-1.5 min-w-0 flex-shrink-0" aria-label="Breadcrumb">
-        <Link
-          to="/"
-          className="text-fg-3 hover:text-fg-1 transition-colors duration-fast inline-flex items-center"
-          onClick={handleNavClick}
-        >
-          <Icon name="home" size={13} color="currentColor" />
+      <nav className="ck-crumbs" aria-label="Breadcrumb">
+        <Link to="/" className="text-fg-3 hover:text-fg-1 transition-colors duration-fast inline-flex items-center" aria-label="Home">
+          <Icon name="home" size={14} color="currentColor" />
         </Link>
-        <ol role="list" className="flex items-center gap-1.5 min-w-0">
+        <ol role="list" className="flex items-center gap-2 min-w-0">
           <Breadcrumbs />
         </ol>
       </nav>
 
       {slots.title && slots.title.label && (
-        <span className="text-sm font-normal text-fg-2 truncate min-w-0">
-          {slots.title.label}
-        </span>
+        <span className="text-md text-fg-2 truncate min-w-0">{slots.title.label}</span>
       )}
 
       {/* Middle slot — view switcher, tab strip, etc. */}
@@ -113,30 +117,26 @@ function Topbar({ menuActive, setMenuActive, handleNavClick }) {
         {slots.middle}
       </div>
 
-      {/* Right cluster: viewSwitch | pageSearch | rightSlot | primary */}
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex items-center gap-1.5 flex-shrink-0">
         {slots.viewSwitch}
-
         {slots.pageSearch}
-
         {slots.right}
-
         <div className="hidden md:flex items-center">
           <TimeTracker />
         </div>
-
         {slots.primary}
-
         {assistant.enabled && (
           <button
             type="button"
-            className={"ck-icon-btn ck-icon-btn-sm " + (assistant.open ? "text-primary-400" : "")}
+            className={"ck-btn ck-btn-secondary" + (assistant.open ? " text-link" : "")}
             onClick={() => assistant.setOpen(!assistant.open)}
             aria-label="Toggle assistant"
             aria-pressed={assistant.open}
             title="Assistant (⌘J)"
           >
             <Icon name="sparkles" size={14} color="currentColor" />
+            <span className="hidden sm:inline">Assistant</span>
+            <span className="hidden sm:inline-flex"><Kbd>⌘J</Kbd></span>
           </button>
         )}
       </div>
@@ -160,7 +160,6 @@ function BaseLayoutInner() {
   useDocumentTitle();
 
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [menuActive, setMenuActive] = useState(false);
 
   const assistantEnabled = !!user?.assistant?.enabled;
   const [assistantOpen, setAssistantOpenState] = useState(() => localStorage.getItem(ASSISTANT_OPEN_KEY) === "1");
@@ -273,20 +272,38 @@ function BaseLayoutInner() {
   const badgeCounts = Object.fromEntries(viewsWithBadges.map((view, i) => [view.id, badgeQueries[i]?.data?.count]));
   const pendingProposals = usePendingProposals();
 
-  const handleNavClick = useCallback(() => {
-    if (window.innerWidth < 1024) {
-      setMenuActive(false);
-    }
+  const navOverlay = useMediaQuery(NAV_OVERLAY_QUERY);
+  const assistantOverlay = useMediaQuery(ASSISTANT_OVERLAY_QUERY);
+  const [navCollapsed, setNavCollapsedState] = useState(() => localStorage.getItem(NAV_COLLAPSED_KEY) === "1");
+  const setNavCollapsed = useCallback((collapsed) => {
+    localStorage.setItem(NAV_COLLAPSED_KEY, collapsed ? "1" : "0");
+    setNavCollapsedState(collapsed);
   }, []);
+  // Below the nav breakpoint the panel is an overlay, closed by default.
+  const [navOpen, setNavOpen] = useState(false);
+  const showNav = useCallback(() => (navOverlay ? setNavOpen(true) : setNavCollapsed(false)), [navOverlay, setNavCollapsed]);
+  const hideNav = useCallback(() => (navOverlay ? setNavOpen(false) : setNavCollapsed(true)), [navOverlay, setNavCollapsed]);
+
+  const handleNavClick = useCallback(() => setNavOpen(false), []);
+  const selectWorkspace = useCallback((id) => {
+    setActiveWorkspaceId(id);
+    showNav();
+  }, [setActiveWorkspaceId, showNav]);
+
+  const closeOverlays = useCallback(() => {
+    setNavOpen(false);
+    if (assistantOverlay) setAssistantOpen(false);
+  }, [assistantOverlay, setAssistantOpen]);
+  const scrim = (navOverlay && navOpen) || (assistantOverlay && assistantValue.open);
 
   const userName = user?.first_name
     ? `${user.first_name} ${user.last_name || ''}`.trim()
     : (user?.username || 'User');
 
-  const sidebarClasses =
-    "flex flex-col bg-bg-0 border-r border-border-1 overflow-y-auto " +
-    "lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:flex-col " +
-    (menuActive ? "fixed inset-0 z-50 flex" : "hidden lg:flex");
+  const shellClass = "ck-shell"
+    + (assistantValue.open ? " with-assistant" : "")
+    + (navCollapsed && !navOverlay ? " is-nav-collapsed" : "")
+    + (navOverlay && navOpen ? " is-nav-open" : "");
 
   return (
     <CommandPaletteContext.Provider value={{open: paletteOpen, setOpen: setPaletteOpen}}>
@@ -294,72 +311,81 @@ function BaseLayoutInner() {
       <PageSearchContext.Provider value={pageSearchValue}>
       <ScreenProvider>
       <TopbarSlotsProvider>
-      <div className="flex flex-col h-screen overflow-hidden bg-bg-1 text-fg-1">
-        {/* Sidebar */}
-        <nav
-          aria-label="Sidebar"
-          className={sidebarClasses}
-          style={{width: 'var(--sidebar-w)', padding: '10px 8px'}}
-        >
-          {/* Workspace header — a picker when workspaces exist, else a home link */}
-          {visibleWorkspaces.length > 0 ? (
-            <WorkspaceSwitcher
-              workspaces={visibleWorkspaces}
-              activeWorkspace={activeWorkspace}
-              onSelect={setActiveWorkspaceId}
-              userName={userName}
-            />
-          ) : (
-            <Link
-              to="/"
-              onClick={handleNavClick}
-              className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-bg-2"
-            >
-              <AppLogo />
-              <span className="flex-1 min-w-0">
-                <span className="block text-sm font-semibold text-fg-1 truncate">{appConfig.org_name}</span>
-                <span className="block text-2xs text-fg-3">{userName}</span>
-              </span>
-              <Icon name="chevrons-up-down" size={14} color="var(--fg-3)" />
-            </Link>
-          )}
-
-          {/* Search trigger */}
-          <button
-            type="button"
-            onClick={() => setPaletteOpen(true)}
-            className="flex items-center gap-2 px-2.5 py-1.5 mt-1 mb-2 rounded-md bg-bg-2 hover:bg-bg-3 border border-border-1 text-fg-3 text-xs"
-          >
-            <Icon name="search" size={13} color="var(--fg-3)" />
-            <span className="flex-1 text-left">Search</span>
-            <Kbd>⌘K</Kbd>
-          </button>
-
-          {/* Inbox + Home */}
-          <NavSection>
-            <NavItem
+      <div className={shellClass}>
+        <nav className="ck-rail" aria-label="Workspaces">
+          <Link to="/" className="ck-rail-logo" aria-label={appConfig.app_name} onClick={handleNavClick}>
+            <AppLogo />
+          </Link>
+          <div className="ck-rail-group">
+            {navCollapsed && !navOverlay && (
+              <RailItem icon="panel-left" label="Views" ariaLabel="Show sidebar" onClick={showNav} />
+            )}
+            <RailItem href="/" icon="home" label="Home" active={pathname === '/'} onClick={handleNavClick} />
+            {visibleWorkspaces.length > 0 && (
+              <RailItem
+                icon="columns"
+                label="All"
+                ariaLabel="All views"
+                active={!activeWorkspace}
+                onClick={() => selectWorkspace(null)}
+              />
+            )}
+            {visibleWorkspaces.map((workspace) => (
+              <RailItem
+                key={workspace.id}
+                icon={workspace.icon || 'layout-grid'}
+                label={workspace.name || 'Untitled'}
+                active={activeWorkspace?.id === workspace.id}
+                onClick={() => selectWorkspace(workspace.id)}
+              />
+            ))}
+            <RailItem href="/WSP/create" icon="plus" label="New" ariaLabel="New workspace" onClick={handleNavClick} />
+          </div>
+          <div className="ck-rail-group ck-rail-foot">
+            <RailItem icon="search" label="Search" onClick={() => setPaletteOpen(true)} />
+            <RailItem
               href="/inbox"
               icon="inbox"
               label="Inbox"
-              count={pendingProposals.data?.count}
+              badge={pendingProposals.data?.count}
               active={pathname === '/inbox'}
               onClick={handleNavClick}
             />
-            <NavItem
-              href="/"
-              icon="home"
-              label="Home"
-              active={pathname === '/'}
-              onClick={handleNavClick}
-            />
-          </NavSection>
+          </div>
+        </nav>
 
-          {/* Workspace — the active workspace's tabs, or all shared views */}
-          {(activeWorkspace || workspaceViews.length > 0) && (
-            <NavSection title={activeWorkspace ? activeWorkspace.name : 'Workspace'}>
+        <nav aria-label="Sidebar" className="ck-navpanel">
+          <div className="ck-navpanel-header">
+            <span className="ck-navpanel-title">{activeWorkspace ? activeWorkspace.name : appConfig.org_name}</span>
+            {activeWorkspace && (
+              <Link
+                to={`/${activeWorkspace.id}/edit`}
+                className="ck-navpanel-btn"
+                aria-label="Edit workspace"
+                title="Edit workspace"
+                onClick={handleNavClick}
+              >
+                <Icon name="edit-3" size={13} color="currentColor" />
+              </Link>
+            )}
+            <button type="button" className="ck-navpanel-btn" onClick={hideNav} aria-label="Collapse sidebar" title="Collapse sidebar">
+              <Icon name="panel-left" size={14} color="currentColor" />
+            </button>
+          </div>
+
+          <button type="button" onClick={() => setPaletteOpen(true)} className="ck-navpanel-search">
+            <Icon name="search" size={13} color="currentColor" />
+            <span className="flex-1 truncate">Find anything…</span>
+            <Kbd>⌘K</Kbd>
+          </button>
+
+          <div className="ck-navpanel-scroll">
+            {/* The active workspace's tabs, or all shared views */}
+            <NavSection title={activeWorkspace ? 'Views' : 'Workspace'}>
               {(activeWorkspace ? workspaceTabs : workspaceViews).map((view, i) => {
-                const href = view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
-                const active = pathname === href || pathname.startsWith(`/${view.model}`);
+                const href = viewHref(view);
+                const active = pathname === href
+                  || (view.default && pathname.startsWith(`/${view.model}`) && !pathname.includes('/VIW/'));
                 return (
                   <NavItem
                     key={view.id}
@@ -380,95 +406,79 @@ function BaseLayoutInner() {
                 onClick={handleNavClick}
               />
             </NavSection>
-          )}
 
-          {/* My Views — private views the current user created */}
-          <NavSection
-            title="My Views"
-            action={
-              <Link
-                to="/VIW/create"
-                onClick={handleNavClick}
-                aria-label="New view"
-                className="inline-flex items-center justify-center w-4 h-4 rounded text-fg-3 hover:text-fg-1 hover:bg-bg-2"
-              >
-                <Icon name="plus" size={12} color="currentColor" />
-              </Link>
-            }
-          >
-            {myViews.map((view, i) => {
-              const href = view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
-              return (
-                <NavItem
-                  key={view.id}
-                  href={href}
-                  color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
-                  label={view.name || 'Untitled'}
-                  count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
-                  active={pathname === href}
+            {/* My Views — private views the current user created */}
+            <NavSection
+              title="My views"
+              action={
+                <Link
+                  to="/VIW/create"
                   onClick={handleNavClick}
-                />
-              );
-            })}
-          </NavSection>
+                  aria-label="New view"
+                  className="inline-flex items-center justify-center w-4 h-4 rounded text-fg-3 hover:text-fg-1 hover:bg-bg-3"
+                >
+                  <Icon name="plus" size={12} color="currentColor" />
+                </Link>
+              }
+            >
+              {myViews.map((view, i) => {
+                const href = viewHref(view);
+                return (
+                  <NavItem
+                    key={view.id}
+                    href={href}
+                    color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
+                    label={view.name || 'Untitled'}
+                    count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
+                    active={pathname === href}
+                    onClick={handleNavClick}
+                  />
+                );
+              })}
+            </NavSection>
 
-          {/* Footer */}
-          <div className="mt-auto flex items-center gap-2.5 p-2 border-t border-border-1">
+            {appConfig.crudkit_version && (
+              <div className="px-2.5 pt-5 text-2xs text-fg-4 font-mono select-all">
+                <a href="https://github.com/fenerum/crudkit" target="_blank" rel="noopener noreferrer" className="text-inherit">crudkit</a> v{appConfig.crudkit_version}
+              </div>
+            )}
+          </div>
+        </nav>
+
+        <div className="ck-shell-footer">
+          <Link to="/profile" className="ck-shell-footer-me" onClick={handleNavClick}>
             <Avatar
               name={userName}
-              size={24}
+              size={28}
               status="online"
               src={user?.object_images?.[0] || user?.image || user?.avatar || null}
             />
-            <Link
-              to="/profile"
-              className="flex-1 min-w-0"
-              onClick={handleNavClick}
-            >
-              <span className="block text-sm font-medium text-fg-1 truncate">{userName}</span>
-              <span className="block text-2xs text-fg-3 truncate">
+            <span className="ck-shell-footer-who">
+              <span className="block text-md font-semibold text-fg-1 truncate">{userName}</span>
+              <span className="block text-xs text-fg-3 truncate">
                 {user?.email || (user?.username ? `@${user.username}` : 'Member')}
               </span>
-            </Link>
-            <ThemeToggle />
-          </div>
-          {appConfig.crudkit_version && (
-            <div className="px-2 pt-1 text-2xs text-fg-3 font-mono opacity-60 select-all">
-              <a href="https://github.com/fenerum/crudkit" target="_blank" rel="noopener noreferrer" className="text-inherit">crudkit</a> v{appConfig.crudkit_version}
-            </div>
-          )}
-        </nav>
+            </span>
+          </Link>
+          <ThemeToggle />
+        </div>
 
-        {/* Main content area — sidebar is `lg:fixed` so only reserve its
-            240px gutter at lg+ viewports, otherwise the content takes the
-            full width and the hamburger reveals the sidebar as an overlay.
-            The assistant sits to the right of it: a column at lg+, an
-            overlay below. */}
-        <div className="flex flex-1 overflow-hidden lg:pl-[var(--sidebar-w)]">
-        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-          <Topbar
-            menuActive={menuActive}
-            setMenuActive={setMenuActive}
-            handleNavClick={handleNavClick}
-          />
-
-          {/* Scrollable content area */}
-          <div className={"flex-1 overflow-auto overflow-x-hidden " + (isPending ? "opacity-25 transition-opacity" : "")}>
-            <main id="main">
-              <div className="px-6 py-5">
-                <div className="innerContent">
-                  <Outlet />
-                </div>
-              </div>
+        <div className="ck-main">
+          <Topbar navOverlay={navOverlay} onOpenNav={showNav} />
+          <div className={"ck-main-scroll" + (isPending ? " opacity-25 transition-opacity" : "")}>
+            <main id="main" className="ck-content">
+              <Outlet />
             </main>
           </div>
         </div>
+
         {assistantValue.open && (
-          <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[var(--assistant-w)] border-l border-border-1 shadow-2xl lg:static lg:z-auto lg:shadow-none lg:flex-shrink-0">
+          <div className="ck-assistant">
             <AssistantSidebar onClose={() => setAssistantOpen(false)} />
           </div>
         )}
-        </div>
+
+        {scrim && <div className="ck-scrim" onClick={closeOverlays} aria-hidden="true" />}
 
         <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
         <JobTray />

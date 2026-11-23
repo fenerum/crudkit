@@ -61,7 +61,7 @@ export default function PageSearch({ placeholder = "Search this view…" }) {
         onChange={onChange}
         placeholder={placeholder}
         className="ck-input pl-7 pr-7"
-        style={{ width: 220, height: 26, fontSize: 12 }}
+        style={{ width: 220, height: 28 }}
         aria-label="Search this view"
       />
       {value && (

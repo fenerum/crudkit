@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { Icon, OverflowMenu, useScreenContext, useTopbarSlots } from '../../components/ui';
+import { Icon, OverflowMenu, PageHeader, useScreenContext } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -203,18 +203,40 @@ export default function List() {
     return items;
   }, [view, metadata?.type, metadata?.can_create, currentUrl, navigate]);
 
-  useTopbarSlots(() => {
-    if (!metadata) return {};
-    return {
-      // Breadcrumb already shows the verbose plural for the model — no need
-      // to repeat it as the topbar title.
-      middle: views && views.length > 1 ? (
-        <div className="flex items-center gap-1.5 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
+
+  if (isMetadataLoading || isViewsLoading || isViewLoading) {
+    return <div className="p-4 text-fg-3 text-sm animate-pulse">Loading metadata…</div>;
+  }
+  if (!metadata) return <div className="p-4 text-fg-3 text-sm">No metadata found</div>;
+
+  const displayData = objectList?.isPaginated ? objectList.results : objectList;
+  const refresh = () => {
+    setIsRefreshing(true);
+    refetch().finally(() => setIsRefreshing(false));
+  };
+
+  const header = (
+    <PageHeader
+      title={metadata.verbose_name_plural}
+      count={objectList ? (objectList.isPaginated ? objectList.count : displayData.length) : null}
+      actions={
+        <>
+          <OverflowMenu items={overflowItems} />
+          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary">
+            <Icon name="plus" size={14} color="currentColor" />
+            New
+            <span className="ck-kbd">N</span>
+          </Link>
+        </>
+      }
+      tabs={views && views.length > 0 && (
+        <div className="ck-view-tabs">
           {views.map((v: any) => (
             <button
               key={v.id}
               type="button"
-              className={`ck-gf flex-shrink-0 ${view?.id === v.id ? 'is-on' : ''}`}
+              className={`ck-tab ${view?.id === v.id ? 'is-on' : ''}`}
+              aria-pressed={view?.id === v.id}
               onClick={() => {
                 setCurrentPage(1);
                 navigate(url(type, null, {}, v.id));
@@ -224,140 +246,104 @@ export default function List() {
             </button>
           ))}
         </div>
-      ) : null,
-      pageSearch: (
-        <PageSearch
-          placeholder={`Search ${metadata?.verbose_name_plural?.toLowerCase() || 'items'}…`}
-        />
-      ),
-      right: (
-        <>
+      )}
+      toolbar={
+        <div className="ck-view-toolbar-right">
+          <PageSearch placeholder={`Search ${metadata.verbose_name_plural?.toLowerCase() || 'items'}…`} />
           <button
             type="button"
-            onClick={() => {
-              setIsRefreshing(true);
-              refetch().finally(() => setIsRefreshing(false));
-            }}
-            className="ck-icon-btn ck-icon-btn-sm"
+            onClick={refresh}
+            className="ck-icon-btn"
             title="Refresh data [r]"
             aria-label="Refresh"
             disabled={isListLoading || isRefreshing}
           >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className={`h-3.5 w-3.5 ${isRefreshing || isListLoading ? 'animate-spin' : ''}`}
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
+            <Icon name="refresh-cw" size={14} color="currentColor" className={isRefreshing || isListLoading ? 'animate-spin' : ''} />
           </button>
-          <OverflowMenu items={overflowItems} />
-        </>
-      ),
-      primary: (
-        <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary ck-btn-sm">
-          <Icon name="plus" size={12} color="currentColor" />
-          New
-          <span className="ck-kbd">N</span>
-        </Link>
-      ),
-    };
-  }, [metadata, view, views, type, currentUrl, isListLoading, isRefreshing, overflowItems, refetch, navigate, qStr]);
-
-  if (isMetadataLoading || isViewsLoading || isViewLoading) {
-    return <div className="p-4 text-fg-3 text-sm animate-pulse">Loading metadata…</div>;
-  }
-  if (!metadata) return <div className="p-4 text-fg-3 text-sm">No metadata found</div>;
-
-  const displayData = objectList?.isPaginated ? objectList.results : objectList;
+        </div>
+      }
+    />
+  );
 
   return (
-    <div className="flex flex-col">
-      <div className="w-full">
-        {isListLoading ? (
-          <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
-            <div className="animate-pulse flex flex-col space-y-4">
-              <div className="h-3 bg-bg-3 rounded w-1/4" />
-              <div className="space-y-2">
-                <div className="h-3 bg-bg-3 rounded" />
-                <div className="h-3 bg-bg-3 rounded w-5/6" />
-                <div className="h-3 bg-bg-3 rounded w-3/4" />
-                <div className="h-3 bg-bg-3 rounded w-4/6" />
-              </div>
+    <>
+      {header}
+      {isListLoading ? (
+        <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
+          <div className="animate-pulse flex flex-col space-y-4">
+            <div className="h-3 bg-bg-3 rounded w-1/4" />
+            <div className="space-y-2">
+              <div className="h-3 bg-bg-3 rounded" />
+              <div className="h-3 bg-bg-3 rounded w-5/6" />
+              <div className="h-3 bg-bg-3 rounded w-3/4" />
+              <div className="h-3 bg-bg-3 rounded w-4/6" />
             </div>
           </div>
-        ) : listError ? (
-          <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
-            <div className="text-danger text-sm">
-              Couldn&apos;t load data: {(listError as Error).message}
-              <div className="mt-3">
-                <button
-                  type="button"
-                  onClick={() => refetch()}
-                  className="ck-btn ck-btn-secondary ck-btn-sm"
-                >
-                  Retry
-                </button>
-              </div>
+        </div>
+      ) : listError ? (
+        <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
+          <div className="text-danger text-sm">
+            Couldn&apos;t load data: {(listError as Error).message}
+            <div className="mt-3">
+              <button
+                type="button"
+                onClick={() => refetch()}
+                className="ck-btn ck-btn-secondary ck-btn-sm"
+              >
+                Retry
+              </button>
             </div>
           </div>
-        ) : !objectList ? (
-          <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
-            <div className="text-fg-3 text-sm">No data found</div>
-          </div>
-        ) : view?.layout === 'gallery' ? (
-          <Gallery objectList={displayData} view={view} metadata={metadata} q={qStr} />
-        ) : view?.layout === 'kanban' ? (
-          <KanbanBoard
-            objectList={displayData}
-            view={view}
-            model={type}
-            metadata={metadata}
-            key={view?.id || 'default-kanban'}
-            q={qStr}
-          />
-        ) : view?.layout === 'swimlane' ? (
-          <Swimlane
-            objectList={displayData}
-            view={view}
-            model={type}
-            metadata={metadata}
-            refetch={refetch}
-            q={qStr}
-          />
-        ) : view?.layout === 'quadrant' ? (
-          <QuadrantView
-            objectList={displayData}
-            view={view}
-            metadata={metadata}
-          />
-        ) : view?.layout === 'conversation' ? (
-          <ConversationList
-            objectList={displayData}
-            view={view}
-            model={type}
-            metadata={metadata}
-            refetch={refetch}
-          />
-        ) : (
-          <ObjectList
-            objectList={displayData}
-            view={view}
-            model={type}
-            metadata={metadata}
-            pagination={objectList.isPaginated ? objectList : null}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-          />
-        )}
-      </div>
-    </div>
+        </div>
+      ) : !objectList ? (
+        <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
+          <div className="text-fg-3 text-sm">No data found</div>
+        </div>
+      ) : view?.layout === 'gallery' ? (
+        <Gallery objectList={displayData} view={view} metadata={metadata} q={qStr} />
+      ) : view?.layout === 'kanban' ? (
+        <KanbanBoard
+          objectList={displayData}
+          view={view}
+          model={type}
+          metadata={metadata}
+          key={view?.id || 'default-kanban'}
+          q={qStr}
+        />
+      ) : view?.layout === 'swimlane' ? (
+        <Swimlane
+          objectList={displayData}
+          view={view}
+          model={type}
+          metadata={metadata}
+          refetch={refetch}
+          q={qStr}
+        />
+      ) : view?.layout === 'quadrant' ? (
+        <QuadrantView
+          objectList={displayData}
+          view={view}
+          metadata={metadata}
+        />
+      ) : view?.layout === 'conversation' ? (
+        <ConversationList
+          objectList={displayData}
+          view={view}
+          model={type}
+          metadata={metadata}
+          refetch={refetch}
+        />
+      ) : (
+        <ObjectList
+          objectList={displayData}
+          view={view}
+          model={type}
+          metadata={metadata}
+          pagination={objectList.isPaginated ? objectList : null}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
+      )}
+    </>
   );
 }

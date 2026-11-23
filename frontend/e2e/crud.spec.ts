@@ -4,7 +4,7 @@ test('creates, edits and deletes a book', async ({ page }) => {
   const title = `E2E book ${Date.now()}`;
 
   await page.goto('/BOK');
-  await page.getByRole('banner').getByRole('link', { name: /^New/ }).click();
+  await page.getByRole('main').getByRole('link', { name: /^New/ }).click();
   await page.locator('input[name="title"]').fill(title);
   await page.getByRole('main').getByRole('combobox').fill('Calvino');
   await page.getByRole('option', { name: 'Italo Calvino' }).click();

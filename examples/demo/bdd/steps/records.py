@@ -39,7 +39,7 @@ from bdd.world import goto_with_change_stream, phrase
 
 @when(phrase("{name:Actor} starts a new {model:Model}"))
 def starts_a_new_record(world):
-    world.banner.get_by_role("link", name=re.compile(r"^New")).click()
+    world.main.get_by_role("link", name=re.compile(r"^New")).click()
 
 
 @given(phrase("{name:Actor} is filling in a new {model:Model}"))

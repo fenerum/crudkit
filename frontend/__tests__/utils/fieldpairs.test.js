@@ -202,3 +202,20 @@ describe('generateFieldPairs utility', () => {
     ]);
   });
 });
+describe('generateFieldPairs with fields the person may not see', () => {
+  const metadata = { fields: { name: {}, email: {}, phone: {} } };
+
+  test('leaves hidden fields out of a flat layout', () => {
+    expect(generateFieldPairs(metadata, { fields: ['name', 'special_terms', 'email', 'phone'] })).toEqual([
+      ['name', 'email'],
+      ['phone'],
+    ]);
+  });
+
+  test('leaves hidden fields out of a paired layout and drops emptied pairs', () => {
+    expect(generateFieldPairs(metadata, { fields: [['name', 'special_terms'], ['special_terms'], ['phone']] })).toEqual([
+      ['name'],
+      ['phone'],
+    ]);
+  });
+});

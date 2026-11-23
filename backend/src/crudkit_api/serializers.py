@@ -1,3 +1,4 @@
+import copy
 import functools
 import mimetypes
 
@@ -10,9 +11,17 @@ from rest_framework.fields import CharField, FileField
 
 from crudkit import dependencies
 from crudkit.authorization import get_authorized_queryset
+from crudkit.field_access import EDIT, field_access
 from crudkit.fields import DEFAULT_CURRENCY
 from crudkit.fields import MoneyField as CrudKitMoneyField
-from crudkit.models import CrudKitIDField, CrudKitPositiveIntegerField, get_ck_id, parse_ck_id
+from crudkit.models import (
+    CrudKitIDField,
+    CrudKitPositiveIntegerField,
+    field_value,
+    get_ck_id,
+    parse_ck_id,
+    same_value,
+)
 from crudkit.profile import get_object_images as crudkit_object_images
 from crudkit.utils import get_model_types
 
@@ -337,6 +346,17 @@ def _get_viewable(model, pk, context, data):
     return instance
 
 
+FIELD_NOT_EDITABLE = "You may not change this field."
+
+
+def context_user(context):
+    """The person a serializer works for, or None for code running on its own."""
+    if "user" in context:
+        return context["user"]
+    request = context.get("request")
+    return getattr(request, "user", None) if request is not None else None
+
+
 class GenericSerializer(serializers.ModelSerializer):
     serializer_field_mapping = _serializer_field_mapping
 
@@ -355,12 +375,24 @@ class GenericSerializer(serializers.ModelSerializer):
 
         to_be_removed = []
 
+        # Per-role field access: hidden fields are left out, read-only ones may
+        # be sent back unchanged but not changed (see `validate`).
+        access = field_access(context_user(self.context), self.Meta.model)
+        self.hidden_names = {name for name, level in access.items() if level is None}
+        self.read_only_names = {name for name, level in access.items() if level != EDIT} - self.hidden_names
+        for name in self.hidden_names & set(self.fields):
+            del self.fields[name]
+        for name in self.read_only_names & set(self.fields):
+            self.fields[name].required = False
+
         # Dynamically show fields
         # Skip field filtering for nested serializers (marked with _is_nested attribute)
         is_nested = getattr(self.__class__, "_is_nested", False)
         if "request" in self.context and not is_nested:
             request = self.context["request"]
             fields = request.GET.get("_fields").split(",") if request.GET.get("_fields") else self.fields
+            # A saved view may list a field this person may not see: it is left out, not an error.
+            fields = [field for field in fields if field not in self.hidden_names]
             for field in fields:
                 if field not in self.fields:
                     raise serializers.ValidationError(f"Field {field} not found")
@@ -375,6 +407,25 @@ class GenericSerializer(serializers.ModelSerializer):
                 to_be_removed.append(field_name)
         for field_name in set(to_be_removed):
             del self.fields[field_name]
+
+    def validate(self, attrs):
+        attrs = super().validate(attrs)
+        initial = self.initial_data if isinstance(getattr(self, "initial_data", None), dict) else {}
+        errors = {name: FIELD_NOT_EDITABLE for name in self.hidden_names if name in initial}
+        if self.read_only_names & set(attrs):
+            current = self.instance if isinstance(self.instance, models.Model) else self.Meta.model()
+            candidate = copy.copy(current)
+            for name in self.read_only_names & set(attrs):
+                setattr(candidate, name, attrs[name])
+                field = self.Meta.model._meta.get_field(name)
+                if same_value(field, field_value(current, field), field_value(candidate, field)):
+                    # Sent back as it was: nothing to write.
+                    del attrs[name]
+                else:
+                    errors[name] = FIELD_NOT_EDITABLE
+        if errors:
+            raise serializers.ValidationError(errors)
+        return attrs
 
     def _validate_model(self, instance):
         try:

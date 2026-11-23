@@ -5,6 +5,7 @@ from rest_framework import filters
 from rest_framework.exceptions import NotFound, ValidationError
 
 from crudkit.authorization import get_authorized_queryset
+from crudkit.field_access import hidden_fields
 from crudkit.models import View, parse_ck_id
 from crudkit.utils import get_model_types, resolve_variable_value
 
@@ -33,6 +34,12 @@ class BasicFilter(filters.BaseFilterBackend):
                 queryset = view_obj.badge_filter(queryset, request=request)
             else:
                 queryset = view_obj.filter(queryset, request=request)
+        # A person may not filter by a field they can't see, or they could work
+        # out its values; sorting by one is ignored. A saved view's own filters
+        # still apply: whoever shares a view decides what it lists.
+        hidden = hidden_fields(request.user, queryset.model)
+        if blocked := sorted(hidden & {name.split("__")[0] for name in request.query_params}):
+            raise ValidationError(f"You may not filter by {', '.join(blocked)}.")
         # Handle standard field filters
         for field in queryset.model._meta.get_fields():
             if field.name in request.query_params:
@@ -53,7 +60,10 @@ class BasicFilter(filters.BaseFilterBackend):
                 value = request.query_params[f"{field.name}__isnull"] == "True"
                 queryset = queryset.filter(**{f"{field.name}__isnull": value})
 
-        return order_queryset(queryset, get_order_fields(view_obj, request.query_params.get("_order_by")))
+        order_fields = get_order_fields(view_obj, request.query_params.get("_order_by"))
+        return order_queryset(
+            queryset, [name for name in order_fields if name.lstrip("-").split("__")[0] not in hidden]
+        )
 
 
 TEXT_FIELD_NAMES = {"name", "title", "label", "subject", "description", "text"}

@@ -325,7 +325,7 @@ def _create_record(user, arguments: dict, propose=False) -> dict:
         label = f"Create {model._meta.verbose_name}"
         return _propose(user, model, None, "create", {"type": model.TYPE_ID, "fields": fields}, label)
     instance = services.create_object(model, fields, user)
-    return records.serialize(model, [instance], depth=0)[0]
+    return records.serialize(model, [instance], depth=0, user=user)[0]
 
 
 def _update_record(user, arguments: dict, propose=False) -> dict:
@@ -335,7 +335,7 @@ def _update_record(user, arguments: dict, propose=False) -> dict:
         return _propose(user, model, instance, "patch", {"fields": fields})
     services.patch_fields(instance, fields, user)
     instance.refresh_from_db()
-    return records.serialize(model, [instance], depth=0)[0]
+    return records.serialize(model, [instance], depth=0, user=user)[0]
 
 
 def _run_action(user, arguments: dict, propose=False) -> dict:

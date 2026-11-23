@@ -345,6 +345,61 @@ id), which waits for Confirm like any other proposal. Agents aren't asked to,
 and all of an `AIC`'s fields are `approval_fields`, so MCP clients and agents
 can only propose edits.
 
+## Restricted fields
+
+Model permissions decide who may see and change a record type. Field
+permissions decide who may see and change a single field of it. They are
+ordinary Django permissions, so roles such as Legal or CEO are ordinary
+Django groups. A model declares its restricted fields:
+
+```python
+from crudkit.field_access import Restrict
+
+class Opportunity(BaseCrudKitModel):
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        restricted_fields = {"special_terms": Restrict.edit, "margin": Restrict.view}
+```
+
+- `Restrict.edit`: everyone who may see the record sees the field, read-only.
+  Changing it needs `crm.change_opportunity_special_terms`.
+- `Restrict.view`: seeing it also needs `crm.view_opportunity_margin` (or the
+  change permission). Everyone else doesn't see the field at all.
+- Fields not listed are open, as before.
+
+`migrate` creates the permissions (`crudkit.field_access.create_field_permissions`
+runs on `post_migrate`, as Django's own model permissions do), so a project
+needs no migration for them. Hand them to groups or people in the admin.
+Checks go through `user.has_perm`: active superusers always see and change
+every field, and custom auth backends are respected. Code running without a
+person is never limited. System check `crudkit.E005` reports a declaration
+that names an unknown field or level.
+
+Every reader and writer goes through `crudkit.field_access`, so a field is
+hidden or read-only the same way everywhere:
+
+- **REST API and the SPA.** Hidden fields are left out of records, nested
+  records, `_fields` (a shared view's column is dropped, not an error) and the
+  metadata (`fields`, `search_fields`). Read-only fields come back with
+  `editable: false` and `role_restricted: true`. Writing a hidden field, or
+  changing a read-only one, is refused with "You may not change this field.".
+  Sending a read-only value back unchanged, as the edit form does, is fine.
+- **Search, filters and sorting.** Hidden fields are not searched. A query
+  parameter that filters by one is refused, and sorting by one is ignored. A
+  saved view's own filters still apply, since whoever shares a view decides
+  what it lists.
+- **History and undo.** The History tab and change logs leave hidden fields
+  out. Undoing a change needs permission to change every field it touched.
+- **Bulk edits, imports, MCP and the assistant.** The same rules apply. MCP
+  `describe_types` lists only the fields the person may write, and
+  `get_record` and `list_records` leave hidden fields out. The assistant's
+  record descriptions and summaries leave them out too, unless a model writes
+  its own `get_ai_context()`, which then decides what it shows. A proposal is
+  only confirmed if both the person confirming it and the person who filed it
+  may change its fields.
+
+The SPA drops hidden columns from shared views and layouts. A board or chart
+that groups or plots by a hidden field opens as a plain list.
+
 ## History and undo
 
 Every write through the REST API, MCP, the assistant or a `@crm_action` (and

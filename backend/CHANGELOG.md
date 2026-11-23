@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Add restricted fields: fields only some people may change, or even see, guarded by
+  ordinary Django permissions, so roles are Django groups. Declare them with
+  `CrudKitSettings.restricted_fields = {"special_terms": Restrict.edit, "margin": Restrict.view}`
+  (`from crudkit.field_access import Restrict`). `migrate` creates
+  `<app>.change_<model>_<field>`, and `view_...` for `Restrict.view`, to hand out like any
+  other permission. Checks use `user.has_perm`, so superusers always have every field. The
+  REST API, metadata, search, filters, history, undo, bulk edits, imports, MCP and the
+  assistant all follow them: hidden fields are left out, read-only ones come back with
+  `editable: false` and `role_restricted: true`, and changing them is refused. Sending a
+  read-only value back unchanged is fine. The SPA drops hidden columns from shared views and
+  layouts. System check `crudkit.E005` reports a wrong declaration. No migration.
 - Let fields depend on other fields of the same record. `CrudKitSettings.dependent_fields =
   {"lost_reason": DependentField(when={"stage": "lost"}, required=True)}` makes a field apply
   only while other fields hold given values (hidden in forms and on the record page otherwise,

@@ -55,7 +55,7 @@ function AttachmentRow({ name, href }) {
                 <span className="truncate text-fg-1">{name}</span>
             </div>
             <a href={href} target="_blank" rel="noreferrer"
-               className="ml-3 flex-shrink-0 text-primary-300 hover:text-primary-200">Download</a>
+               className="ml-3 flex-shrink-0 text-link hover:text-link-hover">Download</a>
             {previewStyle && (
                 <div className="ck-att-preview" style={previewStyle}>
                     <img src={href} alt={name} />

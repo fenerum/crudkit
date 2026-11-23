@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- New look for the SPA: a light, dense, monochrome design is now the default, with one blue
+  accent (`#0A41E0`), Roboto and Roboto Mono (self-hosted in the wheel, no Google Fonts
+  request), 4px radii, 35px list rows, square status badges and borders instead of shadows.
+  Dark mode is still a click away and follows the same palette; a stored choice is kept.
+  `CRUDKIT_FRONTEND_CONFIG["brand_color"]` still replaces the accent in both themes.
+
 ## 0.10.0 (2026-11-23)
 
 - Add restricted fields: fields only some people may change, or even see, guarded by

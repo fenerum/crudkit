@@ -12,6 +12,7 @@ import { ToastContainer } from 'react-toastify';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import { isRealtimeConnected } from '../data/realtime';
 import BaseLayout from '../layouts/BaseLayout';
+import { ThemeProvider, useTheme } from '../components/ui';
 import ErrorBoundary from './ErrorBoundary';
 
 import LoginScreen from './routes/login';
@@ -70,9 +71,15 @@ function ChromeLayout() {
   );
 }
 
+function ThemedToasts() {
+  const { theme } = useTheme();
+  return <ToastContainer position="bottom-right" newestOnTop closeOnClick theme={theme} />;
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
       <BrowserRouter>
         <AuthProvider>
           <Routes>
@@ -103,8 +110,9 @@ export default function App() {
             </Route>
           </Routes>
         </AuthProvider>
-        <ToastContainer position="bottom-right" newestOnTop closeOnClick theme="dark" />
+        <ThemedToasts />
       </BrowserRouter>
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

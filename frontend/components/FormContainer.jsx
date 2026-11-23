@@ -119,7 +119,7 @@ export default function FormContainer({
         <ActionButton
           text={submitButtonText}
           onPress={onSubmit}
-          color="green"
+          color="indigo"
         />
       </div>
     </>

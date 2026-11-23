@@ -18,7 +18,7 @@ import JobTray from "../components/JobTray";
 import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
-import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
+import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
 import AssistantSidebar from "../components/Assistant/AssistantSidebar";
@@ -289,7 +289,6 @@ function BaseLayoutInner() {
     (menuActive ? "fixed inset-0 z-50 flex" : "hidden lg:flex");
 
   return (
-    <ThemeProvider>
     <CommandPaletteContext.Provider value={{open: paletteOpen, setOpen: setPaletteOpen}}>
       <AssistantContext.Provider value={assistantValue}>
       <PageSearchContext.Provider value={pageSearchValue}>
@@ -479,6 +478,5 @@ function BaseLayoutInner() {
       </PageSearchContext.Provider>
       </AssistantContext.Provider>
     </CommandPaletteContext.Provider>
-    </ThemeProvider>
   );
 }

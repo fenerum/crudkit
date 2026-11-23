@@ -59,7 +59,7 @@ export default function AllObjects() {
               <div className="px-4 py-3 border-b border-border-1">
                 <Link
                   to={`/${modelType}`}
-                  className="text-base font-semibold text-fg-1 hover:text-primary-300"
+                  className="text-base font-semibold text-fg-1 hover:text-link"
                 >
                   {metadata.verbose_name_plural || modelType}
                 </Link>
@@ -70,12 +70,12 @@ export default function AllObjects() {
                 </p>
               </div>
               <div className="px-4 py-3 border-t border-border-1 flex items-center justify-between">
-                <Link to={`/${modelType}`} className="text-xs text-primary-300 hover:text-primary-200">
+                <Link to={`/${modelType}`} className="text-xs text-link hover:text-link-hover">
                   Browse all
                 </Link>
                 <Link
                   to={`/${modelType}/create`}
-                  className="text-xs text-primary-300 hover:text-primary-200"
+                  className="text-xs text-link hover:text-link-hover"
                 >
                   Create new
                 </Link>

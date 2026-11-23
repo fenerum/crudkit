@@ -194,7 +194,7 @@ const TimeTracker = () => {
       {hasActiveWorkLog ? (
         <span className="inline-flex items-center gap-1.5 h-[26px] px-2 rounded-md bg-bg-2 border border-border-1 text-xs">
           <span className="ck-mono text-fg-1 font-medium">{formatDuration(elapsedTime)}</span>
-          <Link to={`/${activeObjectId}`} className="text-primary-300 hover:text-primary-200 ck-mono">
+          <Link to={`/${activeObjectId}`} className="text-link hover:text-link-hover ck-mono">
             {activeObjectId}
           </Link>
           <button

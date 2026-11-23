@@ -594,7 +594,7 @@ export default function ConversationList({objectList, view, model, metadata, ref
           <div className="flex items-center gap-2.5 min-w-0 flex-1">
             <Avatar name={String(headerLabel)} size={28} status="online" />
             <div className="flex flex-col min-w-0 flex-1">
-              <Link to={selectedRows[0] ? url(selectedRows[0]) : '#'} className="ck-cth-who hover:text-primary-300">
+              <Link to={selectedRows[0] ? url(selectedRows[0]) : '#'} className="ck-cth-who hover:text-link">
                 {String(headerLabel)}
               </Link>
               {selectedObject && subtitleField && metadata.fields[subtitleField] && (

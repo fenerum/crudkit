@@ -99,7 +99,7 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
     if (isAIField && value) {
         return (
             <span className="flex flex-row items-center gap-1">
-                <Icon name="sparkles" size={14} color="#3b82f6" />
+                <Icon name="sparkles" size={14} color="var(--primary-400)" />
                 {content}
             </span>
         );

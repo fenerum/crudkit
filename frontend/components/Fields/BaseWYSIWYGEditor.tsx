@@ -139,7 +139,7 @@ function SnippetPicker({ editor, modelType }) {
               key={snippet.id}
               type="button"
               onClick={() => insertSnippet(snippet)}
-              className="block w-full text-left px-2 py-1 text-sm rounded hover:bg-bg-3 hover:text-primary-300"
+              className="block w-full text-left px-2 py-1 text-sm rounded hover:bg-bg-3 hover:text-link"
             >
               {snippet.name}
             </button>
@@ -235,7 +235,7 @@ export default function BaseWYSIWYGEditor({
         openOnClick: false,
         HTMLAttributes: {
           class: 'underline',
-          style: 'color: var(--primary-300);',
+          style: 'color: var(--link);',
         },
       }),
       TextStyle,
@@ -451,7 +451,7 @@ export default function BaseWYSIWYGEditor({
             />
             <button
               onClick={setLink}
-              className="px-2 py-1 bg-primary-400 text-bg-1 rounded text-sm"
+              className="ck-btn ck-btn-primary ck-btn-sm"
             >
               Apply
             </button>

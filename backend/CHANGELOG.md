@@ -2,15 +2,16 @@
 
 ## Unreleased
 
-- Add roles and per-role field access. A `Role` (`ROL`) holds people through `RoleMember`
-  (`RLM`) rows, and `FieldAccess` (`FLA`) rules say which roles may view or edit one field of
-  a record type; a rule without a role is for everyone else. A field without rules stays open.
-  Once it has rules, a person gets the best access among their roles, and nobody covered means
-  the field is hidden. Superusers are never limited. The REST API, metadata, search, filters,
-  history, undo, bulk edits, imports, MCP and the assistant all follow the rules: hidden fields
-  are left out, read-only ones come back with `editable: false` and `role_restricted: true`,
-  and changing them is refused. Sending a read-only value back unchanged is fine. The SPA drops
-  hidden columns from shared views and layouts. Migration `crudkit.0009_roles_field_access`.
+- Add field permissions: fields only some people may change, or even see, guarded by
+  ordinary Django permissions, so roles are Django groups. Declare them with
+  `CrudKitSettings.field_permissions = {"special_terms": "change", "margin": "view"}`;
+  `migrate` creates `<app>.change_<model>_<field>` (and `view_...` for `"view"`), to hand
+  out like any other permission. Checks use `user.has_perm`, so superusers always have every
+  field. The REST API, metadata, search, filters, history, undo, bulk edits, imports, MCP and
+  the assistant all follow them: hidden fields are left out, read-only ones come back with
+  `editable: false` and `role_restricted: true`, and changing them is refused. Sending a
+  read-only value back unchanged is fine. The SPA drops hidden columns from shared views and
+  layouts. System check `crudkit.E004` reports a wrong declaration. No migration.
 
 ## 0.9.1 (2026-11-17)
 

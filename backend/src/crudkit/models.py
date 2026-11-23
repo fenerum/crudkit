@@ -459,6 +459,10 @@ class BaseCrudKitModel(models.Model):
         # A FeedEntry makes this model a kind of entry people add to records'
         # feeds (a call, a meeting, an email). See FeedEntry.
         feed_entry = None
+        # Fields only some people may change ("change") or even see ("view"),
+        # each guarded by a Django permission, e.g. {"special_terms": "change"}.
+        # See crudkit.field_access.
+        field_permissions = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):
@@ -1308,110 +1312,3 @@ class Job(BaseCrudKitModel):
         def get_authorized_queryset(user, queryset, action):
             return queryset.filter(created_by=user)
 
-
-class Role(BaseCrudKitModel):
-    """A named group of people, such as Legal or CEO, that field access rules
-    are granted to. People join a role through a `RoleMember` row."""
-
-    TYPE_ID = "ROL"
-
-    name = models.CharField(max_length=128, unique=True)
-    description = models.TextField(blank=True, default="")
-
-    class Meta:
-        ordering = ["name"]
-
-    def __str__(self):
-        return self.name
-
-    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
-        search_fields = ["name"]
-        default_inlines = [["RLM", ["user"]], ["FLA", ["model", "field", "access"]]]
-        # Roles decide who sees and changes what, so MCP clients and agents may only propose changes.
-        approval_fields = ["name"]
-
-
-class RoleMember(BaseCrudKitModel):
-    """One person holding one role."""
-
-    TYPE_ID = "RLM"
-
-    role = models.ForeignKey(Role, on_delete=models.CASCADE)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="crudkit_roles")
-
-    class Meta:
-        ordering = ["role", "user"]
-        verbose_name = "role member"
-
-    def __str__(self):
-        return f"{self.user} in {self.role}" if self.role_id and self.user_id else super().__str__()
-
-    def clean(self):
-        if not self.role_id or not self.user_id:
-            return
-        others = RoleMember.objects.filter(role_id=self.role_id, user_id=self.user_id, deleted=False)
-        if self.pk:
-            others = others.exclude(pk=self.pk)
-        if others.exists():
-            raise ValidationError({"user": _(f"{self.user} already has the role {self.role}.")})
-
-    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
-        allowed_prefills = ["role", "user"]
-        approval_fields = ["role", "user"]
-
-
-class FieldAccess(BaseCrudKitModel):
-    """Who may see and change one field of one record type.
-
-    A field without rules is open to everyone who may see the record. Once a
-    field has rules, a person gets the best access among the rules for their
-    roles and the rule for everyone else (no role). Anyone no rule covers
-    doesn't see the field at all. Superusers always may. See
-    `crudkit.field_access`."""
-
-    TYPE_ID = "FLA"
-
-    class Access(models.TextChoices):
-        VIEW = "view", "Can view"
-        EDIT = "edit", "Can edit"
-
-    model = ModelField(help_text="The record type the field belongs to.")
-    field = models.CharField(max_length=128, help_text="The field's name, e.g. special_terms.")
-    role = models.ForeignKey(
-        Role,
-        on_delete=models.CASCADE,
-        null=True,
-        blank=True,
-        help_text="Leave empty for everyone else.",
-    )
-    access = models.CharField(max_length=8, choices=Access.choices, default=Access.VIEW)
-
-    class Meta:
-        ordering = ["model", "field", "role"]
-        verbose_name = "field access"
-        verbose_name_plural = "field access"
-        indexes = [models.Index(fields=["model", "deleted"])]
-
-    def __str__(self):
-        who = self.role.name if self.role_id else "Everyone else"
-        return f"{self.model}.{self.field}: {who} {self.get_access_display().lower()}"
-
-    def clean(self):
-        model = get_model_types().get(self.model)
-        if model is None:
-            raise ValidationError({"model": _(f"Unknown record type '{self.model}'.")})
-        names = [f.name for f in model._meta.concrete_fields if not f.primary_key]
-        if self.field not in names:
-            raise ValidationError(
-                {"field": _(f"'{self.field}' is not a field of {model._meta.verbose_name}. Valid: {', '.join(names)}")}
-            )
-        others = FieldAccess.objects.filter(model=self.model, field=self.field, role_id=self.role_id, deleted=False)
-        if self.pk:
-            others = others.exclude(pk=self.pk)
-        if others.exists():
-            raise ValidationError({"role": _("This field already has a rule for this role.")})
-
-    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
-        allowed_prefills = ["model", "field", "role"]
-        search_fields = ["field"]
-        approval_fields = ["model", "field", "role", "access"]

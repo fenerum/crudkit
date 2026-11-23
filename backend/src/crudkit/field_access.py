@@ -1,10 +1,21 @@
-"""Per-role field access: who may see and change each field of a record type.
+"""Field permissions: who may see and change one field of a record type.
 
-Rules are `FieldAccess` rows. A field without rules is open to everyone who may
-see the record. Once a field has rules, a person gets the best access among
-the rules for the roles they hold (`RoleMember`) and the rule for everyone
-else (a rule without a role). A person no rule covers doesn't see the field.
-Superusers, and code running without a person (no user), are never limited.
+Built on Django's own permissions, so roles are ordinary Groups. A model
+declares its sensitive fields:
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        field_permissions = {"special_terms": "change", "margin": "view"}
+
+- `"change"`: everyone who may see the record sees the field; changing it
+  needs `<app>.change_<model>_<field>`.
+- `"view"`: seeing it also needs `<app>.view_<model>_<field>` (or the change
+  permission), and it is hidden from everyone else.
+
+The permissions are created on `migrate` (see `create_field_permissions`) and
+handed out to groups or people like any other. Checks go through
+`user.has_perm`, so superusers, inactive users and custom auth backends behave
+as everywhere else in Django. Code running without a person (no user) is
+never limited.
 
 Every reader and writer of records (the REST API, the metadata endpoint, MCP,
 the assistant, imports, bulk edits and undo) asks this module, so a field is
@@ -15,50 +26,39 @@ from django.core.exceptions import PermissionDenied
 
 VIEW = "view"
 EDIT = "edit"
-_RANK = {None: 0, VIEW: 1, EDIT: 2}
+CHANGE = "change"
+LEVELS = (VIEW, CHANGE)
 
 
-def _type_ids(model) -> list[str]:
-    """The model's TYPE_ID and those of the types it extends: a rule on a
-    parent type's field holds for the extending type too."""
-    ids = [getattr(model, "TYPE_ID", None)]
-    ids += [getattr(parent, "TYPE_ID", None) for parent in model._meta.get_parent_list()]
-    return [type_id for type_id in ids if type_id]
+def declared(model) -> dict[str, str]:
+    """`{field: "view" | "change"}`: the model's `CrudKitSettings.field_permissions`."""
+    return dict(getattr(getattr(model, "CrudKitSettings", None), "field_permissions", None) or {})
 
 
-def _unrestricted(user) -> bool:
-    return user is None or getattr(user, "is_superuser", False)
+def codename(model, field: str, action: str) -> str:
+    return f"{action}_{model._meta.model_name}_{field}"
+
+
+def permission_name(model, field: str, action: str) -> str:
+    """The full permission, as `user.has_perm` takes it: `crm.change_opportunity_special_terms`."""
+    return f"{model._meta.app_label}.{codename(model, field, action)}"
 
 
 def field_access(user, model) -> dict[str, str | None]:
-    """`{field: "view" | "edit" | None}` for the fields of `model` that have
-    rules; None means hidden. Fields left out are open."""
-    if _unrestricted(user) or not getattr(user, "is_authenticated", False):
-        return {} if _unrestricted(user) else _anonymous(model)
-    from crudkit.models import FieldAccess, RoleMember
-
-    rules = list(
-        FieldAccess.objects.filter(model__in=_type_ids(model), deleted=False).values_list("field", "role_id", "access")
-    )
-    if not rules:
+    """`{field: "view" | "edit" | None}` for the fields of `model` with field
+    permissions; None means hidden. Fields left out are open."""
+    rules = declared(model)
+    if not rules or user is None:
         return {}
-    roles = set(
-        RoleMember.objects.filter(user=user, deleted=False, role__deleted=False).values_list("role_id", flat=True)
-    )
     access: dict[str, str | None] = {}
-    for field, role_id, level in rules:
-        granted = level if role_id is None or role_id in roles else None
-        if _RANK[granted] >= _RANK[access.get(field)]:
-            access[field] = granted
+    for field, level in rules.items():
+        if user.has_perm(permission_name(model, field, CHANGE)):
+            access[field] = EDIT
+        elif level == CHANGE or user.has_perm(permission_name(model, field, VIEW)):
+            access[field] = VIEW
+        else:
+            access[field] = None
     return access
-
-
-def _anonymous(model) -> dict[str, str | None]:
-    """Someone not signed in: every restricted field is hidden."""
-    from crudkit.models import FieldAccess
-
-    fields = FieldAccess.objects.filter(model__in=_type_ids(model), deleted=False).values_list("field", flat=True)
-    return dict.fromkeys(fields)
 
 
 def hidden_fields(user, model) -> set[str]:
@@ -71,16 +71,39 @@ def read_only_fields(user, model) -> set[str]:
     return {name for name, level in field_access(user, model).items() if level != EDIT}
 
 
-def can_view_field(user, model, name: str) -> bool:
-    return name not in hidden_fields(user, model)
-
-
-def can_edit_field(user, model, name: str) -> bool:
-    return name not in read_only_fields(user, model)
-
-
 def require_editable_fields(user, model, names) -> None:
-    """Raise PermissionDenied naming the first of `names` that `user` may not change."""
+    """Raise PermissionDenied naming the fields of `names` that `user` may not change."""
     blocked = sorted(set(names) & read_only_fields(user, model))
     if blocked:
         raise PermissionDenied(f"You may not change {', '.join(blocked)}")
+
+
+def permissions_for(model) -> list[tuple[str, str]]:
+    """`(codename, name)` of the permissions the model's field permissions need."""
+    out = []
+    for field, level in declared(model).items():
+        try:
+            label = str(model._meta.get_field(field).verbose_name)
+        except Exception:
+            label = field
+        out.append((codename(model, field, CHANGE), f"Can change {label} of {model._meta.verbose_name}"))
+        if level == VIEW:
+            out.append((codename(model, field, VIEW), f"Can view {label} of {model._meta.verbose_name}"))
+    return out
+
+
+def create_field_permissions(**kwargs) -> None:
+    """Create the Permission rows every model's field permissions need, as
+    Django creates model permissions after `migrate`."""
+    from django.contrib.auth.models import Permission
+    from django.contrib.contenttypes.models import ContentType
+
+    from crudkit.utils import get_model_types
+
+    for model in get_model_types().values():
+        wanted = permissions_for(model)
+        if not wanted:
+            continue
+        content_type = ContentType.objects.get_for_model(model, for_concrete_model=False)
+        for code, name in wanted:
+            Permission.objects.get_or_create(content_type=content_type, codename=code, defaults={"name": name[:255]})

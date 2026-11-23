@@ -296,52 +296,58 @@ id), which waits for Confirm like any other proposal. Agents aren't asked to,
 and all of an `AIC`'s fields are `approval_fields`, so MCP clients and agents
 can only propose edits.
 
-## Roles and field access
+## Field permissions
 
-Model permissions decide who may see and change a record type; roles decide
-who may see and change one field of it. A `Role` (TYPE_ID `ROL`), such as
-Legal or CEO, holds people through `RoleMember` rows (`RLM`: a role and a
-user). A `FieldAccess` rule (`FLA`) names a record type (`model`), one of its
-`field`s, a `role` and the `access` it gives: `view` or `edit`. A rule without
-a role is for everyone else.
+Model permissions decide who may see and change a record type. Field
+permissions decide who may see and change a single field of it. They are
+ordinary Django permissions, so roles such as Legal or CEO are ordinary
+Django groups. A model declares its sensitive fields:
 
-- A field without rules is open, as before: anyone who may see the record sees
-  it, and anyone who may change the record changes it.
-- Once a field has rules, a person gets the best access among the rules for the
-  roles they hold and the rule for everyone else. Nobody covered means the
-  field is hidden from them.
-- Superusers, and code running without a person, are never limited.
-- A rule on a type's field also holds for types that extend it.
+```python
+class Opportunity(BaseCrudKitModel):
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        field_permissions = {"special_terms": "change", "margin": "view"}
+```
 
-So "special terms may only be filled in by Legal or the CEO, the rest of sales
-may read them" is three rules on `OPP.special_terms`: Legal `edit`, CEO `edit`,
-no role `view`. Leave out the last one and nobody else sees the field at all.
+- `"change"`: everyone who may see the record sees the field. Changing it
+  needs `crm.change_opportunity_special_terms`.
+- `"view"`: seeing it also needs `crm.view_opportunity_margin` (or the change
+  permission). Everyone else doesn't see the field at all.
+- Fields not listed are open, as before.
+
+`migrate` creates the permissions (`crudkit.field_access.create_field_permissions`
+runs on `post_migrate`, as Django's own model permissions do), so a project
+needs no migration for them. Hand them to groups or people in the admin.
+Checks go through `user.has_perm`: active superusers always see and change
+every field, and custom auth backends are respected. Code running without a
+person is never limited. System check `crudkit.E004` reports a declaration
+that names an unknown field or level.
 
 Every reader and writer goes through `crudkit.field_access`, so a field is
 hidden or read-only the same way everywhere:
 
 - **REST API and the SPA.** Hidden fields are left out of records, nested
   records, `_fields` (a shared view's column is dropped, not an error) and the
-  metadata (`fields`, `search_fields`). Read-only ones come back with
+  metadata (`fields`, `search_fields`). Read-only fields come back with
   `editable: false` and `role_restricted: true`. Writing a hidden field, or
-  changing a read-only one, is refused with "You may not change this field.";
-  sending a read-only value back unchanged, as the edit form does, is fine.
-- **Search, filters and sorting.** Hidden fields are not searched. Filtering by
-  one with a query parameter is refused, and sorting by one is ignored. A saved
-  view's own filters still apply: whoever shares a view decides what it lists.
+  changing a read-only one, is refused with "You may not change this field.".
+  Sending a read-only value back unchanged, as the edit form does, is fine.
+- **Search, filters and sorting.** Hidden fields are not searched. A query
+  parameter that filters by one is refused, and sorting by one is ignored. A
+  saved view's own filters still apply, since whoever shares a view decides
+  what it lists.
 - **History and undo.** The History tab and change logs leave hidden fields
-  out. Undoing a change needs the right to change every field it touched.
-- **Bulk edits, imports, MCP and the assistant.** The same rules: MCP
-  `describe_types` lists only what the person may write, `get_record` and
-  `list_records` leave hidden fields out, and the assistant's record
-  descriptions and summaries leave them out too (unless a model writes its own
-  `get_ai_context()`, which then decides). A proposal is only confirmed if both
-  the confirming person and its creator may change its fields.
+  out. Undoing a change needs permission to change every field it touched.
+- **Bulk edits, imports, MCP and the assistant.** The same rules apply. MCP
+  `describe_types` lists only the fields the person may write, and
+  `get_record` and `list_records` leave hidden fields out. The assistant's
+  record descriptions and summaries leave them out too, unless a model writes
+  its own `get_ai_context()`, which then decides what it shows. A proposal is
+  only confirmed if both the person confirming it and the person who filed it
+  may change its fields.
 
-The SPA drops hidden columns from shared views and layouts; a board or chart
-that groups or plots by a hidden field opens as a plain list. Roles and rules
-are ordinary records, managed from `/ROL` and `/FLA` by people with the model
-permissions on them; MCP clients and agents may only propose changes to them.
+The SPA drops hidden columns from shared views and layouts. A board or chart
+that groups or plots by a hidden field opens as a plain list.
 
 ## History and undo
 

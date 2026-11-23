@@ -7,6 +7,7 @@ from rest_framework.response import Response
 
 from crudkit import jobs
 from crudkit.decorators import crm_action
+from crudkit.dependencies import DependentField
 from crudkit.models import BaseCrudKitModel, EmailWYSIWYGEditorField, FeedEntry, WYSIWYGEditorField
 from library.tasks import fetch_reviews
 
@@ -56,6 +57,7 @@ class Reading(BaseCrudKitModel):
     priority = models.CharField(max_length=16, choices=Priority.choices, default=Priority.LOW)
     pages = models.PositiveIntegerField(null=True, blank=True)
     rating = models.PositiveIntegerField(null=True, blank=True)
+    finished_on = models.DateField(null=True, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
 
     def __str__(self):
@@ -84,6 +86,8 @@ class Reading(BaseCrudKitModel):
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
         search_fields = ["name"]
         celebrate = {"status": ["finished"]}
+        # Shows the dependent-fields feature: the date only applies once finished.
+        dependent_fields = {"finished_on": DependentField(when={"status": "finished"})}
 
 
 class Call(BaseCrudKitModel):

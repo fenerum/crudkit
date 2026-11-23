@@ -1,4 +1,4 @@
-@check:crudkit.E004 @endpoint:records.retrieve @endpoint:records.partial_update @endpoint:records.metadata
+@check:crudkit.E005 @endpoint:records.retrieve @endpoint:records.partial_update @endpoint:records.metadata
 Feature: Only some people may see or change a field
   Some fields are sensitive: special terms on a deal should only be filled in
   by Legal or the CEO, and some margins are not for everyone's eyes. A project
@@ -173,7 +173,7 @@ Feature: Only some people may see or change a field
     Scenario Outline: A restricted field declared wrongly is reported before the project starts
       Given <mistake>
       When the record types are checked
-      Then the record type check fails with "crudkit.E004" saying "<problem>"
+      Then the record type check fails with "crudkit.E005" saying "<problem>"
 
       Examples:
         | mistake                                          | problem                                  |

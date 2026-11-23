@@ -463,6 +463,9 @@ class BaseCrudKitModel(models.Model):
         # (Restrict.view), each guarded by a Django permission, e.g.
         # {"special_terms": Restrict.edit}. See crudkit.field_access.
         restricted_fields = {}
+        # Fields whose visibility, requiredness or allowed values follow other
+        # fields: {field: DependentField(...)}. See crudkit.dependencies.
+        dependent_fields = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

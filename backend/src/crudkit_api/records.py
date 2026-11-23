@@ -22,6 +22,7 @@ from crudkit.authorization import (
     has_model_permission,
     requires_approval,
 )
+from crudkit.dependencies import get_dependent_fields
 from crudkit.field_access import EDIT, field_access
 from crudkit.models import ChangeLog, View, ck_id_regex, parse_ck_id
 from crudkit.utils import get_model_types
@@ -235,6 +236,10 @@ def _type_detail(user, model) -> dict:
         if can_change
         else {},
         "approval_fields": list(getattr(model.CrudKitSettings, "approval_fields", [])),
+        "dependent_fields": {
+            name: {key: value for key, value in rule.as_metadata().items() if value}
+            for name, rule in get_dependent_fields(model).items()
+        },
         "can_create": has_model_permission(user, model, "add"),
         "can_update": can_change,
         "views": {view.id: view.name for view in _views(user).filter(model=model.TYPE_ID)},

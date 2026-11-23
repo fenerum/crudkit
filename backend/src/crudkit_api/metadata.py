@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db.models import Model
 
 from crudkit.authorization import get_authorized_queryset, has_model_permission
+from crudkit.dependencies import get_dependent_fields
 from crudkit.field_access import EDIT, field_access
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem, attachment_fields, get_feed_entry
@@ -150,6 +151,9 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
             # Read-only for this person's roles.
             fields[name]["editable"] = False
             fields[name]["role_restricted"] = True
+    rules = get_dependent_fields(model)
+    for name, meta in fields.items():
+        meta["depends_on"] = rules[name].as_metadata() if name in rules else None
     relations = [_relation_metadata(rel) for rel in model._meta.related_objects if not rel.hidden]
     for gen in _generic_relations():
         rm = gen["related_model_cls"]
@@ -302,6 +306,8 @@ def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
             entry["help_text"] = str(meta["help_text"])
         if meta.get("required"):
             entry["required"] = True
+        if meta.get("depends_on"):
+            entry["depends_on"] = {k: v for k, v in meta["depends_on"].items() if v}
         choices = meta.get("choices")
         if choices:
             entry["choices"] = [c[0] for c in choices]

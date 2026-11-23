@@ -4,6 +4,7 @@ from collections import defaultdict
 from django.apps import apps
 from django.core.checks import Error, Tags, register
 
+from crudkit import dependencies
 from crudkit.field_access import Restrict, declared
 from crudkit.models import BaseCrudKitModel, FeedEntry, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
@@ -89,6 +90,15 @@ def check_restricted_fields(app_configs, **kwargs):
             else:
                 continue
             errors.append(
-                Error(f"{model._meta.label}.CrudKitSettings.restricted_fields {problem}.", obj=model, id="crudkit.E004")
+                Error(f"{model._meta.label}.CrudKitSettings.restricted_fields {problem}.", obj=model, id="crudkit.E005")
             )
     return errors
+
+
+@register(Tags.models)
+def check_dependent_fields(app_configs, **kwargs):
+    return [
+        Error(f"{model._meta.label}.CrudKitSettings.dependent_fields {problem}.", obj=model, id="crudkit.E004")
+        for model in get_model_types().values()
+        for problem in dependencies.problems(model)
+    ]

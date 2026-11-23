@@ -21,6 +21,7 @@ from rest_framework.permissions import SAFE_METHODS, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from crudkit import dependencies
 from crudkit.audit import audit
 from crudkit.authorization import (
     get_authorized_queryset,
@@ -268,6 +269,7 @@ class GenericViewSet(AuditedViewMixin, viewsets.ModelViewSet):
                     setattr(to_stay_obj, field, getattr(objects_by_id[value], field))
                 to_stay_obj.updated_by = request.user
                 # The same model validation a PATCH gets (e.g. who an agent may run as).
+                dependencies.apply(to_stay_obj)
                 to_stay_obj.clean()
                 to_stay_obj.save()
                 ChangeLog.objects.create_from_objects(

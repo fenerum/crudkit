@@ -12,7 +12,19 @@
   assistant all follow them: hidden fields are left out, read-only ones come back with
   `editable: false` and `role_restricted: true`, and changing them is refused. Sending a
   read-only value back unchanged is fine. The SPA drops hidden columns from shared views and
-  layouts. System check `crudkit.E004` reports a wrong declaration. No migration.
+  layouts. System check `crudkit.E005` reports a wrong declaration. No migration.
+- Let fields depend on other fields of the same record. `CrudKitSettings.dependent_fields =
+  {"lost_reason": DependentField(when={"stage": "lost"}, required=True)}` makes a field apply
+  only while other fields hold given values (hidden in forms and on the record page otherwise,
+  and cleared on save), required while it applies, narrow its choices by another field
+  (`options_from` + `options`), or only accept linked records that share a value with this one
+  (`match`, e.g. a ticket of the deal's own customer; the picker filters to those). Every save
+  through the app enforces the rules: forms, the REST API, bulk edit, import, MCP, the assistant,
+  merge and undo. The metadata gains `depends_on` per field. System check `crudkit.E004`
+  reports a wrongly declared rule. The demo shows a reading's finished date once it is finished.
+  Declared in code, so no migration.
+- Bulk edit now gives a skipped record's reason as plain text when the record's own validation
+  refused it, instead of the raw error structure.
 
 ## 0.9.1 (2026-11-17)
 

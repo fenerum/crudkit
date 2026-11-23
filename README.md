@@ -69,6 +69,7 @@ That model now has:
 
 **Web UI**
 - Lists, forms and record pages generated from metadata, with nothing to configure per model
+- **Dependent fields**: fields that only show, are only required, or narrow their choices depending on other fields
 - Saved views as a **table, kanban, gallery, quadrant or swimlane**, with a visual filter builder and live counts in the menu
 - Layouts with related lists on record pages, and workspaces that group views into apps
 - ⌘K command palette that searches across every type, and "Create new…" straight from a picker

@@ -9,7 +9,7 @@ Feature: Which record types MCP clients can reach
   Scenario: The project's types are exposed, with AI context and agents
     Given Alice is a superuser
     When an MCP client acting for Alice asks which record types there are
-    Then the client is offered the record types "AI context", "agent", "topic", "customer", "ticket", "comment", "reminder", "urgent comment", "call" and "call recording"
+    Then the client is offered the record types "AI context", "agent", "topic", "customer", "ticket", "comment", "reminder", "urgent comment", "call", "call recording" and "deal"
 
   Scenario: A project can hide a type from MCP clients
     Given Alice can view customers

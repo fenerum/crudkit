@@ -9,6 +9,7 @@ from drf_extra_fields.fields import Base64FieldMixin, Base64ImageField
 from rest_framework import serializers
 from rest_framework.fields import CharField, FileField
 
+from crudkit import dependencies
 from crudkit.authorization import get_authorized_queryset
 from crudkit.field_access import EDIT, field_access
 from crudkit.fields import DEFAULT_CURRENCY
@@ -428,6 +429,7 @@ class GenericSerializer(serializers.ModelSerializer):
 
     def _validate_model(self, instance):
         try:
+            dependencies.apply(instance)
             instance.clean()
         except DjangoValidationError as exc:
             detail = getattr(exc, "message_dict", {"non_field_errors": exc.messages})

@@ -459,10 +459,10 @@ class BaseCrudKitModel(models.Model):
         # A FeedEntry makes this model a kind of entry people add to records'
         # feeds (a call, a meeting, an email). See FeedEntry.
         feed_entry = None
-        # Fields only some people may change ("change") or even see ("view"),
-        # each guarded by a Django permission, e.g. {"special_terms": "change"}.
-        # See crudkit.field_access.
-        field_permissions = {}
+        # Fields only some people may change (Restrict.edit) or even see
+        # (Restrict.view), each guarded by a Django permission, e.g.
+        # {"special_terms": Restrict.edit}. See crudkit.field_access.
+        restricted_fields = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

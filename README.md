@@ -65,7 +65,7 @@ That model now has:
 - Audit columns, soft delete and restore, merge that moves every related row to the record you keep
 - Change log and activity feed on every record: notes, plus the kinds of entries you declare (calls, meetings, emails)
 - External IDs for syncing with other systems, money and currency fields with exchange rates, time tracking
-- **Field permissions** on top of Django's: let only some groups see or change a field, such as special terms only Legal may fill in
+- **Restricted fields** on top of Django permissions: let only some groups see or change a field, such as special terms only Legal may fill in
 
 **Web UI**
 - Lists, forms and record pages generated from metadata, with nothing to configure per model

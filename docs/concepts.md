@@ -296,23 +296,25 @@ id), which waits for Confirm like any other proposal. Agents aren't asked to,
 and all of an `AIC`'s fields are `approval_fields`, so MCP clients and agents
 can only propose edits.
 
-## Field permissions
+## Restricted fields
 
 Model permissions decide who may see and change a record type. Field
 permissions decide who may see and change a single field of it. They are
 ordinary Django permissions, so roles such as Legal or CEO are ordinary
-Django groups. A model declares its sensitive fields:
+Django groups. A model declares its restricted fields:
 
 ```python
+from crudkit.field_access import Restrict
+
 class Opportunity(BaseCrudKitModel):
     class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
-        field_permissions = {"special_terms": "change", "margin": "view"}
+        restricted_fields = {"special_terms": Restrict.edit, "margin": Restrict.view}
 ```
 
-- `"change"`: everyone who may see the record sees the field. Changing it
-  needs `crm.change_opportunity_special_terms`.
-- `"view"`: seeing it also needs `crm.view_opportunity_margin` (or the change
-  permission). Everyone else doesn't see the field at all.
+- `Restrict.edit`: everyone who may see the record sees the field, read-only.
+  Changing it needs `crm.change_opportunity_special_terms`.
+- `Restrict.view`: seeing it also needs `crm.view_opportunity_margin` (or the
+  change permission). Everyone else doesn't see the field at all.
 - Fields not listed are open, as before.
 
 `migrate` creates the permissions (`crudkit.field_access.create_field_permissions`

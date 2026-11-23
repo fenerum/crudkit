@@ -144,7 +144,7 @@ Feature: Only some people may see or change a field
       When Carol changes the email of "Acme" to "carol@acme.test"
       Then it succeeds
 
-    Scenario: Fields without their own permission stay open to everyone who may see the record
+    Scenario: Fields that are not restricted stay open to everyone who may see the record
       Given only some people may change the email of customers
       When Bob changes the status of "Acme" to "churned"
       Then it succeeds
@@ -164,13 +164,13 @@ Feature: Only some people may see or change a field
 
   Rule: The permissions come from the project's declaration
 
-    Scenario: Each guarded field gets its permissions when the database is set up
+    Scenario: Each restricted field gets its permissions when the database is set up
       Given only some people may see the email of customers
       When the database is set up
       Then the permission "Can change email of customer" exists
       And the permission "Can view email of customer" exists
 
-    Scenario Outline: A field permission declared wrongly is reported before the project starts
+    Scenario Outline: A restricted field declared wrongly is reported before the project starts
       Given <mistake>
       When the record types are checked
       Then the record type check fails with "crudkit.E004" saying "<problem>"
@@ -178,4 +178,4 @@ Feature: Only some people may see or change a field
       Examples:
         | mistake                                          | problem                                  |
         | customers guard the field "colour"               | names 'colour', which is not a field     |
-        | customers guard the email at the level "edit"    | use one of view, change                  |
+        | customers guard the email at the level "write"   | use Restrict.edit or Restrict.view       |

@@ -4,7 +4,7 @@ from collections import defaultdict
 from django.apps import apps
 from django.core.checks import Error, Tags, register
 
-from crudkit.field_access import LEVELS, declared
+from crudkit.field_access import Restrict, declared
 from crudkit.models import BaseCrudKitModel, FeedEntry, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
 
@@ -77,18 +77,18 @@ def _feed_entry_problems(model, entry, types) -> list[str]:
 
 
 @register(Tags.models)
-def check_field_permissions(app_configs, **kwargs):
+def check_restricted_fields(app_configs, **kwargs):
     errors = []
     for model in get_model_types().values():
         names = {field.name for field in model._meta.concrete_fields if not field.primary_key}
         for field, level in declared(model).items():
             if field not in names:
                 problem = f"names {field!r}, which is not a field of the model"
-            elif level not in LEVELS:
-                problem = f"gives {field!r} the level {level!r}; use one of {', '.join(LEVELS)}"
+            elif level not in set(Restrict):
+                problem = f"gives {field!r} {level!r}; use Restrict.edit or Restrict.view"
             else:
                 continue
             errors.append(
-                Error(f"{model._meta.label}.CrudKitSettings.field_permissions {problem}.", obj=model, id="crudkit.E004")
+                Error(f"{model._meta.label}.CrudKitSettings.restricted_fields {problem}.", obj=model, id="crudkit.E004")
             )
     return errors

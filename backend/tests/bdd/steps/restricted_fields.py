@@ -1,10 +1,10 @@
-"""Field permissions: fields only some people may see or change.
+"""Restricted fields: fields only some people may see or change.
 
-Roles are Django groups, and each guarded field has its own Django permission.
+Roles are Django groups, and each restricted field has its own Django permission.
 
 Phrases this area adds:
 
-- `Given only some people may change the email of customers` (or `may see`): the field gets its permissions
+- `Given only some people may change the email of customers` (or `may see`): declares the field restricted
 - `Given the group "Legal" may change the email of customers` (or `may see`)
 - `Given Alice is in the group "Legal"` / `Given Alice is no longer in the group "Legal"`
 - `Given Alice may change the email of customers` (a permission of her own, without a group)
@@ -21,7 +21,7 @@ from django.contrib.auth.models import Group, Permission
 from parse import with_pattern
 from pytest_bdd import given, then, when
 
-from crudkit.field_access import codename, create_field_permissions, declared
+from crudkit.field_access import CHANGE, VIEW, Restrict, codename, create_field_permissions, declared
 from tests.bdd.steps.mcp import _rows
 from tests.bdd.steps.permissions import patch_for_scenario
 from tests.bdd.world import phrase as world_phrase
@@ -33,11 +33,11 @@ def phrase(pattern: str):
 
 @with_pattern(r"change|see")
 def _action(text):
-    return "view" if text == "see" else "change"
+    return VIEW if text == "see" else CHANGE
 
 
-def _guard(request, model, field, level):
-    patch_for_scenario(request, model.CrudKitSettings, "field_permissions", {**declared(model), field: level})
+def _guard(request, model, field, restrict):
+    patch_for_scenario(request, model.CrudKitSettings, "restricted_fields", {**declared(model), field: restrict})
     create_field_permissions()
 
 
@@ -50,17 +50,17 @@ def _permission(model, field, action) -> Permission:
 
 @given(phrase("only some people may {action:Action} the {field:Words} of {model:Model}"))
 def guarded(request, action, field, model):
-    _guard(request, model, field.replace(" ", "_"), action)
+    _guard(request, model, field.replace(" ", "_"), Restrict.view if action == VIEW else Restrict.edit)
 
 
 @given(phrase('{model:Model} guard the field "{field:Q}"'))
 def guard_unknown_field(request, model, field):
-    patch_for_scenario(request, model.CrudKitSettings, "field_permissions", {field: "change"})
+    patch_for_scenario(request, model.CrudKitSettings, "restricted_fields", {field: Restrict.edit})
 
 
 @given(phrase('{model:Model} guard the {field:Words} at the level "{level:Q}"'))
 def guard_wrong_level(request, model, field, level):
-    patch_for_scenario(request, model.CrudKitSettings, "field_permissions", {field.replace(" ", "_"): level})
+    patch_for_scenario(request, model.CrudKitSettings, "restricted_fields", {field.replace(" ", "_"): level})
 
 
 # Who gets the permissions, as set up by an administrator

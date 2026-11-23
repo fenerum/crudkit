@@ -16,7 +16,7 @@ from django.db.models import Count, Q
 from django.http import HttpResponseRedirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
 
-from crudkit import jobs
+from crudkit import dependencies, jobs
 from crudkit.audit import audit
 from crudkit.audit import current as current_audit
 from crudkit.authorization import (
@@ -474,7 +474,18 @@ def _error_text(error) -> str:
         return "You may not do that"
     if isinstance(error, ValidationError):
         return "; ".join(error.messages)
+    if isinstance(error, DRFValidationError):
+        return "; ".join(_detail_messages(error.detail))
     return str(error)
+
+
+def _detail_messages(detail) -> list[str]:
+    """The messages of a DRF error detail, however it is nested."""
+    if isinstance(detail, dict):
+        return [message for value in detail.values() for message in _detail_messages(value)]
+    if isinstance(detail, list):
+        return [message for value in detail for message in _detail_messages(value)]
+    return [str(detail)]
 
 
 def bulk_patch(model, ids, fields, user) -> dict[str, Any]:
@@ -688,6 +699,7 @@ def _revert_entry(entry, instance, user):
         instance.updated_by = user
         try:
             # The same model validation a PATCH gets (e.g. who an agent may run as).
+            update_fields += [name for name in dependencies.apply(instance) if name not in update_fields]
             instance.clean()
             with transaction.atomic():
                 instance.save(update_fields=update_fields)

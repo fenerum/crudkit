@@ -72,6 +72,8 @@ class Book(BaseCrudKitModel):
 - `feed_entry` — a `FeedEntry` that makes the model a kind of entry people add
   to other records' feeds, like a logged call or a sent email (see
   [Feed entries](#feed-entries)).
+- `dependent_fields` — fields that apply, are required or narrow their choices
+  depending on other fields (see [Dependent fields](#dependent-fields)).
 
 Project-wide configuration lives in ordinary Django settings with the
 `CRUDKIT_` prefix (`CRUDKIT_DEFAULT_CURRENCY`, `CRUDKIT_AI_MODEL`,
@@ -231,6 +233,53 @@ same way: `FeedItem.objects.create(parent_object=customer,
 related_object=call, ...)`. The system check `crudkit.E003` reports a
 `feed_entry` naming fields, an action, record types or attachments that don't
 exist.
+
+## Dependent fields
+
+Some fields only make sense in certain situations. A model says so with
+`CrudKitSettings.dependent_fields`, a `DependentField` per field:
+
+```python
+from crudkit.dependencies import DependentField
+
+class Deal(BaseCrudKitModel):
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        dependent_fields = {
+            "lost_reason": DependentField(when={"stage": "lost"}, required=True),
+            "special_terms": DependentField(when={"has_special_terms": True}),
+            "product": DependentField(
+                options_from="category",
+                options={"hardware": ["laptop", "phone"], "software": ["saas"]},
+            ),
+            "contact": DependentField(match={"company": "company"}),
+        }
+```
+
+- `when` — `{field: value or [values]}`: the field applies only while every
+  listed field holds one of its values (as stored: choice values, record IDs,
+  `True`/`False`). Otherwise forms and the record page leave it out, and saving
+  clears it, so a won deal never keeps a lost reason. The clearing is logged, so
+  undo brings the value back.
+- `required` — the field must be filled in while it applies ("Lost reason is
+  required when stage is Lost.").
+- `options_from` + `options` — a choice field's allowed values follow another
+  field. A value of `options_from` that `options` doesn't list, or an empty one,
+  leaves every choice open. Forms narrow the select and clear a choice that no
+  longer fits.
+- `match` — `{field on the linked record: field on this record}` for a foreign
+  key: the linked record must share that value, e.g. a contact of the deal's
+  company. The picker lists only those; nothing is enforced while this record's
+  field is empty.
+
+Rules are enforced in `crudkit.dependencies.apply()`, which runs before the
+model's `clean()` on every write through the app: forms and the REST API, bulk
+edit (a record that breaks a rule is skipped), import, MCP and the assistant,
+merge and undo. Plain ORM saves in project code are not checked. The metadata
+endpoint gives each field's rule as `depends_on` (`null` for fields without
+one), and `describe_types` passes it to the assistant. Rules live in code, so
+they need no migration. The system check `crudkit.E004` reports rules that name
+unknown fields, depend on themselves, can hide a field that may not be blank,
+or use `options` or `match` on the wrong kind of field.
 
 ## Saved views
 

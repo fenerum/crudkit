@@ -21,6 +21,7 @@ actions, history, notes and live updates.
   `Then the feed shows the email "S" sent with the file "f.txt"`
 - `Given Alice emailed "S" to "a@b.c" on "X"`, `When she replies to the email "S" on "X"`,
   `Then the email form is to "a@b.c" with the subject "Re: S"`
+- `Then the form asks for the finished on`, `Then the form does not ask for the finished on`
 - `Given Alice has "X" open`, `Given Alice is editing "X"`,
   `Then she is told the record changed elsewhere`, `When she loads the other change`
 """
@@ -30,7 +31,7 @@ import re
 from playwright.sync_api import expect
 from pytest_bdd import given, then, when
 
-from bdd.steps.common import field_input, fills_in, saves_it, searchable_select
+from bdd.steps.common import field_input, fills_in, form_scope, saves_it, searchable_select
 from bdd.world import goto_with_change_stream, phrase
 
 # Creating, editing and deleting
@@ -358,3 +359,16 @@ def loads_the_other_change(world):
     notice = changed_elsewhere_notice(world)
     notice.get_by_role("button", name="Reload").click()
     expect(notice).to_be_hidden()
+
+
+# Fields that depend on other fields
+
+
+@then(phrase("the form asks for the {field:Words}"))
+def form_asks_for(world, field):
+    expect(field_input(world, form_scope(world), field)).to_have_count(1)
+
+
+@then(phrase("the form does not ask for the {field:Words}"))
+def form_does_not_ask_for(world, field):
+    expect(field_input(world, form_scope(world), field)).to_have_count(0)

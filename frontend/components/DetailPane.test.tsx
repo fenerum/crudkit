@@ -35,3 +35,41 @@ describe("DetailPane help text", () => {
         expect(container.querySelector(".ck-vt-cell-help")).toBeNull();
     });
 });
+
+describe("DetailPane dependent fields", () => {
+    const dealMetadata = {
+        stage: { type: "CharField", verbose_name: "Stage", editable: true, depends_on: null },
+        lost_reason: {
+            type: "CharField", verbose_name: "Lost reason", editable: true,
+            depends_on: { when: { stage: ["lost"] }, required: true },
+        },
+    };
+
+    function DealForm({ stage }: { stage: string }) {
+        const methods = useForm({ defaultValues: { stage } });
+        return (
+            <FormProvider {...methods}>
+                <DetailPane field_pairs={[["stage"], ["lost_reason"]]} form={true} object={{ stage }} metadata={dealMetadata} />
+            </FormProvider>
+        );
+    }
+
+    test("leaves out a field that does not apply", () => {
+        const { container } = render(<DealForm stage="open" />);
+        const labels = [...container.querySelectorAll(".ck-vt-cell-l")].map((el) => el.textContent);
+        expect(labels).toEqual(["Stage"]);
+    });
+
+    test("shows and requires the field once it applies", () => {
+        const { container } = render(<DealForm stage="lost" />);
+        const labels = [...container.querySelectorAll(".ck-vt-cell-l")].map((el) => el.textContent);
+        expect(labels).toEqual(["Stage", "Lost reason*"]);
+    });
+
+    test("the read-only view follows the record's values", () => {
+        const { container } = render(
+            <DetailPane field_pairs={[["stage", "lost_reason"]]} form={null} object={{ stage: "open" }} metadata={dealMetadata} />
+        );
+        expect(container.querySelectorAll(".ck-vt-cell")).toHaveLength(1);
+    });
+});

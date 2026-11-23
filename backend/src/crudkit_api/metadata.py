@@ -15,6 +15,7 @@ from django.conf import settings
 from django.db.models import Model
 
 from crudkit.authorization import get_authorized_queryset, has_model_permission
+from crudkit.dependencies import get_dependent_fields
 from crudkit.fields import ModelField
 from crudkit.models import ExternalObject, FeedItem, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
@@ -141,6 +142,9 @@ def build_model_metadata(model, user=None) -> dict[str, Any]:
     """Return the model-level metadata payload served at /api/v1/<type>/metadata/."""
     mfc = _model_field_choices()
     fields = OrderedDict((field.name, _field_metadata(field, mfc)) for field in model._meta.fields)
+    rules = get_dependent_fields(model)
+    for name, meta in fields.items():
+        meta["depends_on"] = rules[name].as_metadata() if name in rules else None
     relations = [_relation_metadata(rel) for rel in model._meta.related_objects if not rel.hidden]
     for gen in _generic_relations():
         rm = gen["related_model_cls"]
@@ -291,6 +295,8 @@ def build_instance_metadata(instance: Model, user=None) -> dict[str, Any]:
             entry["help_text"] = str(meta["help_text"])
         if meta.get("required"):
             entry["required"] = True
+        if meta.get("depends_on"):
+            entry["depends_on"] = {k: v for k, v in meta["depends_on"].items() if v}
         choices = meta.get("choices")
         if choices:
             entry["choices"] = [c[0] for c in choices]

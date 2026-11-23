@@ -32,6 +32,10 @@ export default function ForeignKeyField({
   const [creating, setCreating] = React.useState<string | null>(null);
 
   const relatedModelType = metadata.related_model_type;
+  // Set by dependent fields (utils/dependentFields.ts): only offer linked records
+  // that match this record, e.g. tickets of the deal's customer.
+  const listFilter: Record<string, string> | undefined = metadata.list_filter;
+  const filterKey = listFilter ? JSON.stringify(listFilter) : "";
   const { metadata: relatedMetadata } = useMetadata(relatedModelType);
   const canCreate = !!(relatedMetadata?.can_create && relatedMetadata?.inline_create);
   const relatedName = relatedMetadata?.verbose_name || relatedModelType;
@@ -44,6 +48,7 @@ export default function ForeignKeyField({
 
     try {
       const response: any = await client.list(relatedModelType, {
+        ...(listFilter || {}),
         _q: inputValue,
         _fields: "id,label,object_images"
       });
@@ -65,7 +70,8 @@ export default function ForeignKeyField({
       console.error('Error fetching choices for', relatedModelType, err);
       return [];
     }
-  }, [relatedModelType, client, fieldName]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [relatedModelType, client, fieldName, filterKey]);
 
   const debouncedLoadOptions = React.useCallback((inputValue: string, callback: (options: any[]) => void) => {
     if (debounceTimeout) {
@@ -90,6 +96,8 @@ export default function ForeignKeyField({
       {({ value, onChange, onBlur, hasError }) => (
         <>
         <AsyncCreatableSelect
+          // Remount when the filter changes, so the default options reload.
+          key={filterKey}
           name={fieldName}
           value={toOption(value)}
           styles={{

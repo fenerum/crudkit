@@ -4,6 +4,7 @@ from collections import defaultdict
 from django.apps import apps
 from django.core.checks import Error, Tags, register
 
+from crudkit import dependencies
 from crudkit.models import BaseCrudKitModel, FeedEntry, attachment_fields, get_feed_entry
 from crudkit.utils import get_model_types
 
@@ -73,3 +74,12 @@ def _feed_entry_problems(model, entry, types) -> list[str]:
             f"names the attachments {entry.attachments!r}, which need a foreign key to the model and a file field"
         )
     return problems
+
+
+@register(Tags.models)
+def check_dependent_fields(app_configs, **kwargs):
+    return [
+        Error(f"{model._meta.label}.CrudKitSettings.dependent_fields {problem}.", obj=model, id="crudkit.E004")
+        for model in get_model_types().values()
+        for problem in dependencies.problems(model)
+    ]

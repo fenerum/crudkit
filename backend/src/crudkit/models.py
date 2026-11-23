@@ -455,6 +455,9 @@ class BaseCrudKitModel(models.Model):
         # A FeedEntry makes this model a kind of entry people add to records'
         # feeds (a call, a meeting, an email). See FeedEntry.
         feed_entry = None
+        # Fields whose visibility, requiredness or allowed values follow other
+        # fields: {field: DependentField(...)}. See crudkit.dependencies.
+        dependent_fields = {}
 
         @staticmethod
         def get_authorized_queryset(user, queryset, action):

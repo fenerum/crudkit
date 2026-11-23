@@ -12,6 +12,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
 from crudkit.decorators import crm_action
+from crudkit.dependencies import DependentField
 from crudkit.fields import AIBooleanField, AIForeignKeyField, AISummaryField, AITagsField, CurrencyField, MoneyField
 from crudkit.models import BaseCrudKitModel, CrudKitPositiveIntegerField, FeedEntry, WYSIWYGEditorField
 
@@ -168,3 +169,48 @@ class CallRecording(BaseCrudKitModel):
 
     def __str__(self):
         return self.recording.name
+
+
+class Deal(BaseCrudKitModel):
+    """Fixture model for dependent fields: fields that apply, are required or
+    narrow their choices depending on other fields of the same record."""
+
+    TYPE_ID = "DEA"
+
+    class Stage(models.TextChoices):
+        OPEN = "open"
+        WON = "won"
+        LOST = "lost"
+
+    class Category(models.TextChoices):
+        HARDWARE = "hardware"
+        SOFTWARE = "software"
+
+    class Product(models.TextChoices):
+        LAPTOP = "laptop"
+        PHONE = "phone"
+        SAAS = "saas"
+
+    name = models.CharField(max_length=255)
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    stage = models.CharField(max_length=16, choices=Stage.choices, default=Stage.OPEN)
+    lost_reason = models.CharField(max_length=255, blank=True, default="")
+    has_special_terms = models.BooleanField(default=False)
+    special_terms = models.TextField(blank=True, default="")
+    category = models.CharField(max_length=16, choices=Category.choices, blank=True, default="")
+    product = models.CharField(max_length=16, choices=Product.choices, blank=True, default="")
+    ticket = models.ForeignKey(Ticket, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    def __str__(self):
+        return self.name
+
+    class CrudKitSettings(BaseCrudKitModel.CrudKitSettings):
+        dependent_fields: ClassVar[dict] = {
+            "lost_reason": DependentField(when={"stage": "lost"}, required=True),
+            "special_terms": DependentField(when={"has_special_terms": True}),
+            "product": DependentField(
+                options_from="category",
+                options={"hardware": ["laptop", "phone"], "software": ["saas"]},
+            ),
+            "ticket": DependentField(match={"customer": "customer"}),
+        }

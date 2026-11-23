@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-11-23)
 
 - Add restricted fields: fields only some people may change, or even see, guarded by
   ordinary Django permissions, so roles are Django groups. Declare them with
@@ -12,7 +12,7 @@
   assistant all follow them: hidden fields are left out, read-only ones come back with
   `editable: false` and `role_restricted: true`, and changing them is refused. Sending a
   read-only value back unchanged is fine. The SPA drops hidden columns from shared views and
-  layouts. System check `crudkit.E005` reports a wrong declaration. No migration.
+  layouts. System check `crudkit.E005` reports a wrong declaration. No migration. (#91)
 - Let fields depend on other fields of the same record. `CrudKitSettings.dependent_fields =
   {"lost_reason": DependentField(when={"stage": "lost"}, required=True)}` makes a field apply
   only while other fields hold given values (hidden in forms and on the record page otherwise,
@@ -22,9 +22,9 @@
   through the app enforces the rules: forms, the REST API, bulk edit, import, MCP, the assistant,
   merge and undo. The metadata gains `depends_on` per field. System check `crudkit.E004`
   reports a wrongly declared rule. The demo shows a reading's finished date once it is finished.
-  Declared in code, so no migration.
+  Declared in code, so no migration. (#90)
 - Bulk edit now gives a skipped record's reason as plain text when the record's own validation
-  refused it, instead of the raw error structure.
+  refused it, instead of the raw error structure. (#90)
 
 ## 0.9.1 (2026-11-17)
 

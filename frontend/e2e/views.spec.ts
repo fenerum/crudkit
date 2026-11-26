@@ -168,7 +168,7 @@ test.describe('layouts', () => {
     }
     await page.locator('.ck-qt-row').filter({ hasText: 'Cities on the train' }).click();
     await expect(page).toHaveURL(/\/RDG\d+$/);
-    await expect(page.getByRole('banner').getByText('Cities on the train')).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Cities on the train' })).toBeVisible();
   });
 
   test('swimlane splits status columns into priority rows', async ({ page }) => {

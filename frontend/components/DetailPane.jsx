@@ -11,7 +11,7 @@ function Cell({ fieldName, form, value, metadata, errors, modelType, highlighted
         <div className={`ck-vt-cell ${form ? 'is-form' : ''} ${highlighted ? 'is-ai-filled' : ''}`}>
             <div className="ck-vt-cell-l">
                 {metadata.verbose_name}
-                {form && metadata.required && <span className="ck-req">*</span>}
+                {form && metadata.required && metadata.editable !== false && <span className="ck-req">*</span>}
             </div>
             <div className="ck-vt-cell-v">
                 <GenericDetailField
@@ -61,8 +61,15 @@ export default function DetailPane(props) {
     return <Pane {...props} values={props.object || {}} />;
 }
 
+// A form leaves out what can't be typed in and has nothing to show yet, such
+// as a new record's ID and timestamps.
+function isEmptyReadOnly(meta, value) {
+    return meta?.editable === false && (value == null || value === "");
+}
+
 function Pane({ field_pairs, form, object, metadata: rawMetadata, errors, modelType, highlighted, values }) {
     const { metadata, hidden } = resolveMetadata(rawMetadata, values);
+    const shown = (f) => f && !hidden.has(f) && !(form && isEmptyReadOnly(metadata[f], object?.[f]));
     return (
         <div className="flex flex-col gap-4">
             {form && form.non_field_errors && (
@@ -89,7 +96,7 @@ function Pane({ field_pairs, form, object, metadata: rawMetadata, errors, modelT
                     // field names. Normalise + drop empty slots before counting
                     // so a row of just `["text"]` lays out at full width.
                     // Fields that don't apply to the record as it stands are left out.
-                    const row = (Array.isArray(rawRow) ? rawRow : [rawRow]).filter((f) => f && !hidden.has(f));
+                    const row = (Array.isArray(rawRow) ? rawRow : [rawRow]).filter(shown);
                     if (row.length === 0) return null;
                     return (
                         <div

@@ -104,6 +104,12 @@ def not_offered_above(world, label):
     expect(view_tab(world, label)).to_have_count(0)
 
 
+@then(phrase('the view "{label:Q}" is open'))
+def view_is_open(world, label):
+    number = world.ids[label].removeprefix("VIW")
+    expect(world.page).to_have_url(re.compile(rf"/VIW/(VIW)?{number}(\?.*)?$"))
+
+
 @then(phrase('the view "{label:Q}" is offered in the sidebar'))
 def offered_in_sidebar(world, label):
     expect(sidebar_link(world, label)).to_be_visible()

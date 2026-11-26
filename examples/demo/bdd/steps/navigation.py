@@ -1,7 +1,7 @@
 """The rail of workspaces and the sidebar of views next to it.
 
 - `Given a workspace "W" with the view "V"`
-- `When Alice chooses the workspace "W"`
+- `When Alice chooses the workspace "W"`, `When she goes back to Home`
 - `When she collapses the sidebar`, `When she brings back the sidebar`
 - `Then the sidebar is hidden`
 """
@@ -22,6 +22,11 @@ def a_workspace(world, label, view):
 def chooses_workspace(world, label):
     rail = world.page.get_by_role("navigation", name="Workspaces")
     rail.get_by_role("button", name=world.text(label), exact=True).click()
+
+
+@when(phrase("{name:Actor} goes back to Home"))
+def goes_home(world):
+    world.page.get_by_role("navigation", name="Workspaces").get_by_role("link", name="Home", exact=True).click()
 
 
 @when(phrase("{name:Actor} collapses the sidebar"))

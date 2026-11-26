@@ -409,6 +409,11 @@ div[dir="auto"] > * {
   .ck-list-scroll { overflow-x: auto; }
   .ck-list-scroll > * { min-width: 640px; }
   .ck-lrow:hover { background: var(--bg-2); }
+  /* Row actions stay out of the way until the row is pointed at. */
+  @media (hover: hover) {
+    .ck-lrow .ck-row-action { opacity: 0; }
+    .ck-lrow:hover .ck-row-action, .ck-row-action:focus-visible { opacity: 1; }
+  }
   .ck-lrow.is-selected { background: var(--bg-selected); box-shadow: inset 2px 0 0 var(--primary-400); }
   .ck-lh-c {
     min-width: 0;
@@ -827,31 +832,10 @@ div[dir="auto"] > * {
   }
 
   /* ===== Tabbed record detail (variant D from the design system) ===== */
-  .ck-vt-tabs {
-    display: flex; align-items: center; gap: 2px;
-    border-bottom: 1px solid var(--border-1);
-    padding: 0;
-  }
-  .ck-vt-tab {
-    background: transparent; border: none; color: var(--fg-3);
-    font-family: var(--font-sans); font-size: 13px; font-weight: 400;
-    height: 32px; padding: 0 12px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 6px;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-  }
-  .ck-vt-tab:hover { color: var(--fg-1); }
-  .ck-vt-tab.is-on { color: var(--fg-1); font-weight: 500; border-bottom-color: var(--primary-400); }
-  .ck-vt-tab.is-on .ck-vt-tab-count { background: var(--accent-bg); color: var(--link); }
-  .ck-vt-tab.is-empty { color: var(--fg-4); }
-  .ck-vt-tab.is-empty .ck-vt-tab-count { background: transparent; color: var(--fg-4); }
-  .ck-vt-tab.is-empty:hover { color: var(--fg-2); }
-  .ck-vt-tab.is-empty.is-on { color: var(--fg-1); }
-  .ck-vt-tab-count {
-    font-family: var(--font-mono); font-size: 11px; color: var(--fg-3);
-    background: var(--bg-3); padding: 0 5px; border-radius: var(--r-md);
-    min-width: 18px; height: 17px; line-height: 17px; text-align: center;
-  }
+  .ck-tab.is-empty { color: var(--fg-4); }
+  .ck-tab.is-empty .ck-tab-count { background: transparent; color: var(--fg-4); }
+  .ck-tab.is-empty:hover { color: var(--fg-2); }
+  .ck-tab.is-empty.is-on { color: var(--fg-1); }
   .ck-vt-body { padding: 24px 0 48px; display: flex; flex-direction: column; gap: 24px; }
   /* Stack of per-row grids that visually merge into one bordered container.
      Each row gets its own `.ck-vt-cells` grid so rows can have different
@@ -897,8 +881,7 @@ div[dir="auto"] > * {
     to { background: var(--bg-1); box-shadow: inset 0 0 0 1px transparent; }
   }
   .ck-vt-cell-l {
-    flex: 0 0 auto;
-    min-width: 120px;
+    flex: 0 0 140px;
     font-size: 10.5px; font-weight: 500; color: var(--fg-3);
     letter-spacing: var(--track-wide); text-transform: uppercase;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -910,7 +893,6 @@ div[dir="auto"] > * {
     min-width: 0; max-width: 100%;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     overflow: hidden;
   }
   .ck-vt-cell-v > * {
@@ -937,7 +919,7 @@ div[dir="auto"] > * {
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-l,
   .ck-vt-cell:has(textarea) .ck-vt-cell-l,
   .ck-vt-cell:has(.ck-ro-text) .ck-vt-cell-l {
-    min-width: 0;
+    flex-basis: auto;
   }
   .ck-vt-cell:has(iframe) .ck-vt-cell-v,
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v,
@@ -1312,11 +1294,10 @@ div[dir="auto"] > * {
   .ck-swim-head { position: sticky; top: 0; z-index: 2; background: var(--border-1); }
   .ck-swim-head > div {
     background: var(--bg-1); padding: 10px 12px;
-    font-size: 10.5px; font-weight: 500; color: var(--fg-3);
-    text-transform: uppercase; letter-spacing: var(--track-wide);
-    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--fg-1);
+    display: flex; align-items: center; gap: 8px;
   }
-  .ck-swim-corner { color: var(--fg-3); }
+  .ck-swim-head > .ck-swim-corner { color: var(--fg-3); font-weight: 500; }
   .ck-swim-row > div {
     background: var(--bg-1); padding: 10px; min-height: 88px;
     display: flex; flex-direction: column; gap: 6px;
@@ -1327,7 +1308,7 @@ div[dir="auto"] > * {
   .ck-swim-row--alt > div { background: var(--bg-2); }
   .ck-swim-row--alt .ck-swim-row-head { background: var(--bg-3) !important; }
   .ck-srh-label { font-size: 12px; font-weight: 600; color: var(--fg-1); }
-  .ck-srh-meta { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); }
+  .ck-srh-meta { font-size: 11px; color: var(--fg-3); }
 
   .ck-swim-card {
     background: var(--bg-1); border: 1px solid var(--border-2); border-radius: var(--r-lg);
@@ -1433,7 +1414,7 @@ div[dir="auto"] > * {
   .ck-cr-body { flex: 1; min-width: 0; }
   .ck-cr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
   .ck-cr-who { font-size: 12px; font-weight: 600; color: var(--fg-1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ck-cr-when { font-size: 10px; color: var(--fg-3); font-family: var(--font-mono); flex-shrink: 0; white-space: nowrap; }
+  .ck-cr-when { font-size: 11px; color: var(--fg-3); flex-shrink: 0; white-space: nowrap; }
   .ck-cr-company { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ck-cr-preview { font-size: 12px; color: var(--fg-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
@@ -1835,7 +1816,13 @@ div[dir="auto"] > * {
     cursor: pointer;
   }
   .ck-navpanel-search:hover { background: var(--bg-5); }
-  .ck-navpanel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 72px; }
+  .ck-navpanel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 72px; display: flex; flex-direction: column; }
+  .ck-navpanel-empty {
+    margin: 2px 2px 0; padding: 10px 12px;
+    border: 1px dashed var(--border-3); border-radius: var(--r-md);
+    font-size: var(--text-xs); color: var(--fg-3); line-height: 1.45;
+  }
+  .ck-navpanel-version { margin-top: auto; padding: 20px 10px 0; font-size: var(--text-2xs); color: var(--fg-4); }
   .ck-navpanel-section {
     display: flex; align-items: center; justify-content: space-between;
     padding: 14px 10px 4px;
@@ -1887,19 +1874,25 @@ div[dir="auto"] > * {
   .ck-page-title::first-letter { text-transform: uppercase; }
   .ck-page-count { font-size: 13px; color: var(--fg-3); white-space: nowrap; }
   .ck-page-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  .ck-view-tabs {
-    display: flex; align-items: center; gap: 2px;
-    padding: 12px var(--gutter-x) 0;
+  .ck-view-bar {
+    display: flex; align-items: flex-end; gap: 12px;
+    margin-top: 12px; padding: 0 var(--gutter-x);
     border-bottom: 1px solid var(--border-2);
+    min-height: 41px;
+  }
+  .ck-view-tabs {
+    flex: 1 1 auto; min-width: 0;
+    display: flex; align-items: center; gap: 2px;
     overflow-x: auto; scrollbar-width: none;
   }
   .ck-view-tabs::-webkit-scrollbar { display: none; }
   .ck-view-tabs .ck-tab { flex-shrink: 0; }
-  .ck-view-toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 12px var(--gutter-x); }
-  .ck-view-toolbar-right { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+  .ck-view-toolbar { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-bottom: 6px; flex-shrink: 0; }
   /* A full-bleed view right under the header starts flush below it. */
   .ck-page-header + .ck-fullbleed { margin-top: 0; }
   .ck-page-header + :not(.ck-fullbleed) { margin-top: 4px; }
+  /* A header that is only a title (forms) needs room below it. */
+  .ck-page-title-row:last-child { padding-bottom: 16px; }
 
   /* ≤1200px: the assistant overlays the content. */
   @media (max-width: 1200px) {
@@ -1942,8 +1935,13 @@ div[dir="auto"] > * {
     .ck-page-title-row { flex-wrap: wrap; }
     .ck-page-title { font-size: 18px; }
     .ck-page-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
-    .ck-view-toolbar-right { margin-left: 0; width: 100%; }
-    .ck-view-toolbar-right > * { flex: 1; }
+    .ck-view-bar { flex-wrap: wrap; }
+    .ck-vt-cell:not(.is-form) { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .ck-vt-cell:not(.is-form) .ck-vt-cell-l { flex-basis: auto; }
+    .ck-vt-cell:not(.is-form) .ck-vt-cell-v { width: 100%; flex: none; }
+    .ck-view-tabs { flex-basis: 100%; }
+    .ck-view-toolbar { margin-left: 0; width: 100%; padding: 8px 0; }
+    .ck-view-toolbar > *, .ck-view-toolbar input { flex: 1; width: 100% !important; }
     .ck-btn .ck-kbd { display: none; }
   }
 }

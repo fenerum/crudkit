@@ -139,7 +139,7 @@ export default function BulkBar({ model, metadata, selected, onClear }) {
             {metadata.can_change && editableFields(metadata).length > 0 && (
                 <Button size="sm" icon="edit-3" onClick={() => setDialog("edit")}>Edit field</Button>
             )}
-            <OverflowMenu items={actionItems} label="Run action" shortcut={null} />
+            <OverflowMenu items={actionItems} label="Run action" shortcut={null} size="sm" />
             {metadata.can_change && count > 1 && (
                 <Link to={mergeUrl} className="ck-btn ck-btn-secondary ck-btn-sm">Merge</Link>
             )}

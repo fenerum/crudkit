@@ -7,12 +7,13 @@ import { useHotkeys } from "react-hotkeys-hook";
 // `shortcut` is the single-key trigger shown as a Kbd hint. If omitted, the
 // item is auto-assigned the next available digit (1–9). Pass an empty string
 // to opt out of any shortcut.
-// Renders a labeled "Actions" button with a keyboard shortcut (pass
-// `shortcut={null}` for none) and a menu anchored below-right.
+// Renders a quiet labeled "Actions" button (its keyboard shortcut, `shortcut={null}`
+// for none, is in the tooltip) and a menu anchored below-right.
 export default function OverflowMenu({
   items,
   label = "Actions",
   shortcut = ".",
+  size = null,
 }) {
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -136,11 +137,11 @@ export default function OverflowMenu({
         }}
         aria-haspopup="menu"
         aria-expanded={open}
-        className="ck-btn ck-btn-secondary ck-btn-sm"
+        title={shortcut ? `${label} [${shortcut}]` : undefined}
+        className={"ck-btn ck-btn-ghost" + (size === "sm" ? " ck-btn-sm" : "") + (open ? " bg-bg-3 text-fg-1" : "")}
       >
         {label}
-        <Icon name="chevron-down" size={11} color="currentColor" />
-        {shortcut && <Kbd>{shortcut}</Kbd>}
+        <Icon name="chevron-down" size={12} color="currentColor" />
       </button>
       {open && (
         <div

@@ -11,7 +11,7 @@ import {useHotkeys} from "react-hotkeys-hook";
 import {toast} from "react-toastify";
 import {useMutation} from "@tanstack/react-query";
 import {useAuth} from "../context/AuthContext";
-import {Avatar, Icon, IconButton} from "./ui";
+import {Avatar, Icon, IconButton, OverflowMenu} from "./ui";
 import SafeMarkdown from "../shared/SafeMarkdown";
 import MarkdownComposer from "../shared/MarkdownComposer";
 import {APPROVAL_HINT} from "../shared/ProposalPayload";
@@ -84,13 +84,7 @@ function Messages({parentId}) {
   useEffect(() => () => {
     if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
   }, []);
-  const connectionStatus = {
-    [ReadyState.CONNECTING]: 'Connecting',
-    [ReadyState.OPEN]: 'Open',
-    [ReadyState.CLOSING]: 'Closing',
-    [ReadyState.CLOSED]: 'Closed',
-    [ReadyState.UNINSTANTIATED]: 'Uninstantiated',
-  }[readyState];
+  const connected = readyState === ReadyState.OPEN;
 
   const [messages, setMessages] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -340,7 +334,7 @@ function Messages({parentId}) {
                 : "↵ to send · ⇧↵ for newline"}
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-2xs text-fg-3 font-mono">{connectionStatus}</span>
+            {!connected && <span className="text-xs text-fg-3">Connecting…</span>}
             {isTouch && (
               <button
                 type="submit"
@@ -553,8 +547,8 @@ export default function ConversationList({objectList, view, model, metadata, ref
                         )}
                       </span>
                       {object.updated_at && (
-                        <span className="ck-cr-when">
-                          {moment(object.updated_at).fromNow(true)}
+                        <span className="ck-cr-when" title={moment(object.updated_at).format('lll')}>
+                          {moment(object.updated_at).fromNow()}
                         </span>
                       )}
                     </div>
@@ -608,24 +602,23 @@ export default function ConversationList({objectList, view, model, metadata, ref
               )}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            {selectedObject && metadata.actions && metadata.actions.map((action) => (
-              <button
-                key={action.action}
-                type="button"
-                onClick={() => runAction(action)}
-                className="ck-btn ck-btn-secondary ck-btn-sm"
-                title={action.requires_approval ? APPROVAL_HINT : undefined}
-              >
-                <Icon name={action.requires_approval ? "shield" : "zap"} size={12} color="currentColor" />
-                {action.verbose_name}
-              </button>
-            ))}
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {selectedObject && (
+              <OverflowMenu
+                shortcut={null}
+                size="sm"
+                items={(metadata.actions || []).map((action) => ({
+                  label: action.verbose_name,
+                  icon: action.requires_approval ? "shield" : "zap",
+                  title: action.requires_approval ? APPROVAL_HINT : undefined,
+                  onSelect: () => runAction(action),
+                }))}
+              />
+            )}
             {selectedObject && editHref && (
-              <Link to={editHref} className="ck-btn ck-btn-primary ck-btn-sm">
+              <Link to={editHref} className="ck-btn ck-btn-primary ck-btn-sm" title="Edit [E]">
                 <Icon name="edit-3" size={12} color="currentColor" />
                 Edit
-                <span className="ck-kbd">E</span>
               </Link>
             )}
           </div>
@@ -648,7 +641,7 @@ export default function ConversationList({objectList, view, model, metadata, ref
         {/* Customer card */}
         {selectedObject && (
           <div>
-            <div className="ck-cs-head">Customer</div>
+            <div className="ck-cs-head">{metadata.verbose_name}</div>
             <Link to={url(selectedRows[0])} className="ck-cs-customer">
               <Avatar
                 name={String(headerLabel)}

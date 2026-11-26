@@ -210,10 +210,6 @@ export default function List() {
   if (!metadata) return <div className="p-4 text-fg-3 text-sm">No metadata found</div>;
 
   const displayData = objectList?.isPaginated ? objectList.results : objectList;
-  const refresh = () => {
-    setIsRefreshing(true);
-    refetch().finally(() => setIsRefreshing(false));
-  };
 
   const header = (
     <PageHeader
@@ -222,10 +218,9 @@ export default function List() {
       actions={
         <>
           <OverflowMenu items={overflowItems} />
-          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary">
+          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary" title="New [N]">
             <Icon name="plus" size={14} color="currentColor" />
             New
-            <span className="ck-kbd">N</span>
           </Link>
         </>
       }
@@ -248,19 +243,7 @@ export default function List() {
         </div>
       )}
       toolbar={
-        <div className="ck-view-toolbar-right">
-          <PageSearch placeholder={`Search ${metadata.verbose_name_plural?.toLowerCase() || 'items'}…`} />
-          <button
-            type="button"
-            onClick={refresh}
-            className="ck-icon-btn"
-            title="Refresh data [r]"
-            aria-label="Refresh"
-            disabled={isListLoading || isRefreshing}
-          >
-            <Icon name="refresh-cw" size={14} color="currentColor" className={isRefreshing || isListLoading ? 'animate-spin' : ''} />
-          </button>
-        </div>
+        <PageSearch placeholder={`Search ${metadata.verbose_name_plural?.toLowerCase() || 'items'}…`} />
       }
     />
   );

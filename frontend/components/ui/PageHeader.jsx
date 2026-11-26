@@ -1,6 +1,6 @@
-// The top of a list-style page: title and count, actions on the right, then
-// optional tabs and a toolbar row. Breaks out of the content gutters itself.
-export default function PageHeader({ title, count, actions, tabs, toolbar }) {
+// The top of a page: title and count, actions on the right, then one bar of
+// tabs with tools (search) at its right end. Breaks out of the content gutters itself.
+export default function PageHeader({ title, count = null, actions = null, tabs = null, toolbar = null }) {
   return (
     <div className="ck-page-header">
       <div className="ck-page-title-row">
@@ -10,8 +10,12 @@ export default function PageHeader({ title, count, actions, tabs, toolbar }) {
         </div>
         {actions && <div className="ck-page-actions">{actions}</div>}
       </div>
-      {tabs}
-      {toolbar && <div className="ck-view-toolbar">{toolbar}</div>}
+      {(tabs || toolbar) && (
+        <div className="ck-view-bar">
+          {tabs}
+          {toolbar && <div className="ck-view-toolbar">{toolbar}</div>}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@ import * as React from "react";
 import {useCallback, useEffect, useMemo, useRef, useState} from "react";
 import {useQueries} from "@tanstack/react-query";
 import {RealtimeProvider, useRealtimeConnected} from "@/data/realtime";
-import {Link, Outlet, useLocation} from "react-router-dom";
+import {Link, Outlet, useLocation, useNavigate} from "react-router-dom";
 import {useAuth} from "../context/AuthContext";
 import {WorkspaceProvider, useWorkspace} from "../context/WorkspaceContext";
 import {isMine, isVisibleToUser, useMenuViews, useWorkspaces, viewBadgeQuery} from "../hooks/useMenuViews";
@@ -18,7 +18,7 @@ import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
 import {ASSISTANT_OVERLAY_QUERY, NAV_OVERLAY_QUERY, useMediaQuery} from "../hooks/useMediaQuery";
-import {Avatar, Dot, Icon, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
+import {Avatar, hasIcon, Icon, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
 import AssistantSidebar from "../components/Assistant/AssistantSidebar";
@@ -26,7 +26,14 @@ import {AssistantContext, useAssistant} from "../components/Assistant/AssistantC
 
 const ASSISTANT_OPEN_KEY = "crudkit.assistant.open";
 const NAV_COLLAPSED_KEY = "crudkit.nav.collapsed";
-const VIEW_DOT_PALETTE = ['var(--stage-blue)', 'var(--stage-amber)', 'var(--stage-violet)', 'var(--stage-green)', 'var(--stage-rose)', 'var(--stage-slate)'];
+const LAYOUT_ICONS = {
+  list: 'table-2',
+  kanban: 'kanban',
+  gallery: 'layout-grid',
+  swimlane: 'rows',
+  conversation: 'messages-square',
+  quadrant: 'scatter-chart',
+};
 
 function viewHref(view) {
   return view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
@@ -40,11 +47,11 @@ function LinkOrButton({href, className, children, ...rest}) {
   return <button type="button" className={className} {...rest}>{children}</button>;
 }
 
-const NavItem = React.memo(function NavItem({href, icon, label, count, color, active, onClick}) {
+const NavItem = React.memo(function NavItem({href, icon, label, count, active, onClick}) {
   return (
     <LinkOrButton href={href} onClick={onClick} className={"ck-navleaf" + (active ? " is-active" : "")}>
       <span className="ck-navleaf-ico">
-        {color ? <Dot color={color} size={8} /> : <Icon name={icon} size={15} color="currentColor" />}
+        <Icon name={icon} size={15} color="currentColor" />
       </span>
       <span className="ck-navleaf-label">{label}</span>
       {count != null && count > 0 && <span className="ck-navleaf-count">{count}</span>}
@@ -88,13 +95,20 @@ function RailItem({href, icon, label, active, badge, onClick, ariaLabel}) {
   );
 }
 
-function Topbar({ navOverlay, onOpenNav }) {
+function Topbar({ navOverlay, navCollapsed, onOpenNav }) {
   const slots = useTopbarSlotsValue();
   const assistant = useAssistant();
+  const sidebarLabel = navOverlay ? "Open sidebar" : "Show sidebar";
   return (
     <header className="ck-topbar relative z-40 flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 flex-shrink-0">
-      {navOverlay && (
-        <button type="button" className="ck-icon-btn ck-icon-btn-sm" onClick={onOpenNav} aria-label="Open sidebar">
+      {(navOverlay || navCollapsed) && (
+        <button
+          type="button"
+          className="ck-icon-btn ck-icon-btn-sm"
+          onClick={onOpenNav}
+          aria-label={sidebarLabel}
+          title={sidebarLabel}
+        >
           <Icon name="panel-left" size={14} color="currentColor" />
         </button>
       )}
@@ -156,6 +170,7 @@ export default function BaseLayout() {
 
 function BaseLayoutInner() {
   const {pathname} = useLocation();
+  const navigate = useNavigate();
   const {user} = useAuth();
   useDocumentTitle();
 
@@ -289,6 +304,12 @@ function BaseLayoutInner() {
     setActiveWorkspaceId(id);
     showNav();
   }, [setActiveWorkspaceId, showNav]);
+  // A workspace opens on its first view, so the page matches the menu beside it.
+  const openWorkspace = useCallback((workspace) => {
+    selectWorkspace(workspace.id);
+    const first = resolveWorkspaceViews(workspace, workspaceViews)[0];
+    if (first) navigate(viewHref(first));
+  }, [selectWorkspace, workspaceViews, navigate]);
 
   const closeOverlays = useCallback(() => {
     setNavOpen(false);
@@ -316,30 +337,18 @@ function BaseLayoutInner() {
           <Link to="/" className="ck-rail-logo" aria-label={appConfig.app_name} onClick={handleNavClick}>
             <AppLogo />
           </Link>
+          {/* One item per workspace; Home is the default one, its menu every shared view. */}
           <div className="ck-rail-group">
-            {navCollapsed && !navOverlay && (
-              <RailItem icon="panel-left" label="Views" ariaLabel="Show sidebar" onClick={showNav} />
-            )}
-            <RailItem href="/" icon="home" label="Home" active={pathname === '/'} onClick={handleNavClick} />
-            {visibleWorkspaces.length > 0 && (
-              <RailItem
-                icon="columns"
-                label="All"
-                ariaLabel="All views"
-                active={!activeWorkspace}
-                onClick={() => selectWorkspace(null)}
-              />
-            )}
+            <RailItem href="/" icon="home" label="Home" active={!activeWorkspace} onClick={() => selectWorkspace(null)} />
             {visibleWorkspaces.map((workspace) => (
               <RailItem
                 key={workspace.id}
-                icon={workspace.icon || 'layout-grid'}
+                icon={hasIcon(workspace.icon) ? workspace.icon : 'layout-grid'}
                 label={workspace.name || 'Untitled'}
                 active={activeWorkspace?.id === workspace.id}
-                onClick={() => selectWorkspace(workspace.id)}
+                onClick={() => openWorkspace(workspace)}
               />
             ))}
-            <RailItem href="/WSP/create" icon="plus" label="New" ariaLabel="New workspace" onClick={handleNavClick} />
           </div>
           <div className="ck-rail-group ck-rail-foot">
             <RailItem icon="search" label="Search" onClick={() => setPaletteOpen(true)} />
@@ -357,6 +366,17 @@ function BaseLayoutInner() {
         <nav aria-label="Sidebar" className="ck-navpanel">
           <div className="ck-navpanel-header">
             <span className="ck-navpanel-title">{activeWorkspace ? activeWorkspace.name : appConfig.org_name}</span>
+            {!activeWorkspace && (
+              <Link
+                to="/WSP/create"
+                className="ck-navpanel-btn"
+                aria-label="New workspace"
+                title="New workspace"
+                onClick={handleNavClick}
+              >
+                <Icon name="plus" size={14} color="currentColor" />
+              </Link>
+            )}
             {activeWorkspace && (
               <Link
                 to={`/${activeWorkspace.id}/edit`}
@@ -380,9 +400,9 @@ function BaseLayoutInner() {
           </button>
 
           <div className="ck-navpanel-scroll">
-            {/* The active workspace's tabs, or all shared views */}
-            <NavSection title={activeWorkspace ? 'Views' : 'Workspace'}>
-              {(activeWorkspace ? workspaceTabs : workspaceViews).map((view, i) => {
+            {/* The workspace's menu: its views, or for Home every shared view */}
+            <NavSection title="Views">
+              {(activeWorkspace ? workspaceTabs : workspaceViews).map((view) => {
                 const href = viewHref(view);
                 const active = pathname === href
                   || (view.default && pathname.startsWith(`/${view.model}`) && !pathname.includes('/VIW/'));
@@ -390,7 +410,7 @@ function BaseLayoutInner() {
                   <NavItem
                     key={view.id}
                     href={href}
-                    color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
+                    icon={LAYOUT_ICONS[view.layout] || 'table-2'}
                     label={view.name || 'Untitled'}
                     count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                     active={active}
@@ -400,7 +420,7 @@ function BaseLayoutInner() {
               })}
               <NavItem
                 href="/all-objects"
-                icon="columns"
+                icon="layers"
                 label="All objects"
                 active={pathname === '/all-objects'}
                 onClick={handleNavClick}
@@ -421,13 +441,16 @@ function BaseLayoutInner() {
                 </Link>
               }
             >
-              {myViews.map((view, i) => {
+              {myViews.length === 0 && (
+                <p className="ck-navpanel-empty">Views you save for yourself show up here.</p>
+              )}
+              {myViews.map((view) => {
                 const href = viewHref(view);
                 return (
                   <NavItem
                     key={view.id}
                     href={href}
-                    color={VIEW_DOT_PALETTE[i % VIEW_DOT_PALETTE.length]}
+                    icon={LAYOUT_ICONS[view.layout] || 'table-2'}
                     label={view.name || 'Untitled'}
                     count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                     active={pathname === href}
@@ -438,7 +461,7 @@ function BaseLayoutInner() {
             </NavSection>
 
             {appConfig.crudkit_version && (
-              <div className="px-2.5 pt-5 text-2xs text-fg-4 font-mono select-all">
+              <div className="ck-navpanel-version font-mono select-all">
                 <a href="https://github.com/fenerum/crudkit" target="_blank" rel="noopener noreferrer" className="text-inherit">crudkit</a> v{appConfig.crudkit_version}
               </div>
             )}
@@ -464,7 +487,7 @@ function BaseLayoutInner() {
         </div>
 
         <div className="ck-main">
-          <Topbar navOverlay={navOverlay} onOpenNav={showNav} />
+          <Topbar navOverlay={navOverlay} navCollapsed={navCollapsed && !navOverlay} onOpenNav={showNav} />
           <div className={"ck-main-scroll" + (isPending ? " opacity-25 transition-opacity" : "")}>
             <main id="main" className="ck-content">
               <Outlet />

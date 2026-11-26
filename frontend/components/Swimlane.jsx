@@ -24,7 +24,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { url } from "../utils/urls";
 import { formatApiError } from "../utils/apiErrors";
-import { PriorityBars } from "./ui";
+import { Dot, PriorityBars, colorForStage } from "./ui";
 import { AMOUNT_FIELDS, findFieldByNames, priorityBadge } from "../utils/cardFields";
 import { appConfig } from "../utils/appConfig";
 
@@ -553,6 +553,7 @@ export default function Swimlane({ objectList, view, model, metadata, refetch, q
                         </div>
                         {columns.map(([id, label]) => (
                             <div key={id}>
+                                <Dot color={colorForStage(label || id)} size={8} />
                                 <span className="truncate">{label}</span>
                             </div>
                         ))}

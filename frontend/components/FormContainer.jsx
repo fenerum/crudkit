@@ -91,29 +91,19 @@ export default function FormContainer({
         modelType={modelType}
         highlighted={highlighted}
       />
-      <div className="mt-6 flex flex-row items-center justify-end gap-x-6 pb-8">
+      <div className="mt-6 flex flex-row items-center justify-end gap-2 pb-8">
         {deleteHref && (
-          <Link
-            to={deleteHref}
-            className="text-sm font-semibold leading-6 text-danger"
-          >
+          <Link to={deleteHref} className="ck-btn ck-btn-ghost text-danger mr-auto">
             Delete
           </Link>
         )}
         {onCancel ? (
-          <button
-            type="button"
-            onClick={onCancel}
-            className="text-sm font-semibold leading-6 text-fg-1"
-          >
-            Cancel [Esc]
+          <button type="button" onClick={onCancel} className="ck-btn ck-btn-secondary">
+            Cancel <span className="ck-kbd">Esc</span>
           </button>
         ) : (
-          <Link
-            to={cancelHref}
-            className="text-sm font-semibold leading-6 text-fg-1"
-          >
-            Cancel [Esc]
+          <Link to={cancelHref} className="ck-btn ck-btn-secondary">
+            Cancel <span className="ck-kbd">Esc</span>
           </Link>
         )}
         <ActionButton
@@ -124,8 +114,6 @@ export default function FormContainer({
       </div>
     </>
   );
-
-  const containerStyle = { padding: '1rem' };
 
   // `onSubmit` from useCreate/useEditForm is already a `formMethods.handleSubmit`
   // wrapper, so the form's submit handler just hands the event off to it. Wrapping
@@ -142,7 +130,7 @@ export default function FormContainer({
   if (formMethods) {
     return (
       <FormProvider {...formMethods}>
-        <form onSubmit={handleFormSubmit} style={containerStyle}>
+        <form onSubmit={handleFormSubmit}>
           {formContent}
           {/* Hidden submit button so Enter inside any text input triggers
               the form's onSubmit. The visible Save ActionButton stays a
@@ -154,7 +142,7 @@ export default function FormContainer({
   }
 
   return (
-    <div style={containerStyle}>
+    <div>
       {formContent}
     </div>
   );

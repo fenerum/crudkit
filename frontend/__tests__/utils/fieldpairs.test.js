@@ -17,11 +17,11 @@ describe('generateFieldPairs utility', () => {
     const result = generateFieldPairs(metadata);
     
     // Assert
-    // Should have two pairs: [id, name] and [email, phone]
-    // The 'deleted' field should be filtered out
+    // The record's own fields come first, the ID after them; 'deleted' is left out
     expect(result).toEqual([
-      ['id', 'name'],
-      ['email', 'phone'],
+      ['name', 'email'],
+      ['phone'],
+      ['id'],
     ]);
   });
   
@@ -99,8 +99,8 @@ describe('generateFieldPairs utility', () => {
     // Assert
     // The 'deleted' and 'merged_into' fields should be filtered out
     expect(result).toEqual([
-      ['id', 'name'],
-      ['active'],
+      ['name', 'active'],
+      ['id'],
     ]);
     
     // Additional verification
@@ -125,11 +125,10 @@ describe('generateFieldPairs utility', () => {
     const result = generateFieldPairs(metadata);
     
     // Assert
-    // Should have two full pairs and one with a single field
     expect(result).toEqual([
-      ['id', 'name'],
-      ['email', 'phone'],
-      ['address'],
+      ['name', 'email'],
+      ['phone', 'address'],
+      ['id'],
     ]);
   });
   
@@ -160,7 +159,8 @@ describe('generateFieldPairs utility', () => {
     
     // Assert
     expect(result).toEqual([
-      ['id', 'name'],
+      ['name'],
+      ['id'],
     ]);
   });
   
@@ -179,7 +179,8 @@ describe('generateFieldPairs utility', () => {
     // Assert
     // Should fall back to using metadata fields
     expect(result).toEqual([
-      ['id', 'name'],
+      ['name'],
+      ['id'],
     ]);
   });
   
@@ -198,10 +199,24 @@ describe('generateFieldPairs utility', () => {
     // Assert
     // Should fall back to using metadata fields
     expect(result).toEqual([
-      ['id', 'name'],
+      ['name'],
+      ['id'],
     ]);
   });
 });
+test('puts bookkeeping fields after the record\'s own, paired among themselves', () => {
+  const metadata = {
+    fields: { id: {}, created_by: {}, created_at: {}, name: {}, updated_by: {}, updated_at: {}, author: {}, published: {} },
+  };
+  expect(generateFieldPairs(metadata)).toEqual([
+    ['name', 'author'],
+    ['published'],
+    ['id', 'created_by'],
+    ['created_at', 'updated_by'],
+    ['updated_at'],
+  ]);
+});
+
 describe('generateFieldPairs with fields the person may not see', () => {
   const metadata = { fields: { name: {}, email: {}, phone: {} } };
 

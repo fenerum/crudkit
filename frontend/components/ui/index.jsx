@@ -13,7 +13,7 @@ export { default as PageSizeSelect } from './PageSizeSelect';
 export { default as PageHeader } from './PageHeader';
 export { default as ThemeToggle } from './ThemeToggle';
 export { ThemeProvider, useTheme } from './ThemeContext';
-export { mapIcon } from './iconMap';
+export { hasIcon, mapIcon } from './iconMap';
 export { AVATAR_PALETTE, hashName, colorForName, initialsFromName } from './avatarPalette';
 export { TopbarSlotsProvider, useTopbarSlots, useTopbarSlotsValue } from './TopbarSlots';
 export { PageSearchContext, usePageSearch } from './PageSearchContext';

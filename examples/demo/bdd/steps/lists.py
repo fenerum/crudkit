@@ -4,7 +4,8 @@
 - `Then the list has 1 record` / `Then the list is empty`
 - `Given Alice pages through the authors one at a time`, then
   `When she goes to the next page|the previous page|page 3|the last page`,
-  `Then the list is on page 2`, `Then there is no previous page|next page`
+  `Then the list is on page 2`, `Then there is no previous page|next page`,
+  `Then there are no other pages`
 - `When she shows 10 records per page` / `Then the list shows 10 records per page`
 - `When Alice selects "A", "B" and "C" in the books list` (this scenario's
   records) / `When she selects "Kindred" in the list` (the list on screen)
@@ -141,6 +142,13 @@ def no_next_page(world):
 def shows_per_page(world, count):
     pagination(world).get_by_text(re.compile(r"^\d+ / page$")).click()
     world.page.get_by_role("option", name=f"{count} / page", exact=True).click()
+
+
+@then("there are no other pages")
+def no_other_pages(world):
+    expect(showing(world, r"1–\d+ of \d+")).to_be_visible()
+    expect(world.main.get_by_role("button", name="Next")).to_have_count(0)
+    expect(world.main.get_by_role("button", name="Previous")).to_have_count(0)
 
 
 @then(phrase("the list shows {count:d} records per page"))

@@ -16,6 +16,12 @@ Feature: Managing books
     When she searches the list for "Unwritten"
     Then the list has 1 record
 
+  Scenario: A new book's form only shows what can be filled in
+    Given Alice is filling in a new book
+    Then the form asks for the name
+    But the form leaves out the id
+    And the form leaves out the created at
+
   Scenario: A book's page links to its author
     Given a book "Unwritten" with author "Italo Calvino"
     When Alice opens "Unwritten"

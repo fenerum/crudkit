@@ -15,6 +15,22 @@
   them into the top bar. Below 1200px the assistant opens over the content, below 900px
   the sidebar does too, and record lists scroll sideways on phones instead of squeezing
   their columns.
+- The icon rail holds only workspaces: Home is the default one (its menu is every shared
+  view, replacing "All"), and picking a workspace opens its first view. New workspace moved
+  to a "+" in Home's sidebar header, showing a collapsed sidebar to the top bar, and a
+  workspace icon name the SPA doesn't know falls back to a grid instead of a question mark.
+  The Actions menu button is a quiet text button at full height, its key in the tooltip.
+- Record, create and edit pages get the same page header: the record's name as the title
+  with its ID beside it, Actions and Edit on the right, and the record's tabs under it. Field
+  values line up next to their labels, and without a layout the record's own fields come
+  before its ID and timestamps. New-record forms leave out what can't be filled in (ID,
+  created/updated) and no longer open with required fields flagged as errors.
+- Lists show choice fields as status pills in the board's colours and priorities with the
+  board's bars; the per-row delete button only appears on hover; the search box sits in the
+  tab row; page buttons are hidden when everything fits on one page. Sidebar views show an
+  icon for their layout (table, board, gallery, lanes, inbox, quadrant) instead of a colour
+  dot. Board and inbox times read "19 hours ago". The time tracker's button reads "Track time"
+  and only shows on record pages (a running clock still shows everywhere).
 
 ## 0.10.0 (2026-11-23)
 

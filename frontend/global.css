@@ -151,8 +151,12 @@
   --dur-med:  140ms;
   --dur-slow: 240ms;
 
-  /* Layout */
-  --sidebar-w: 240px;
+  /* Layout — icon rail + nav panel on the left, assistant on the right */
+  --rail-w: 53px;
+  --nav-w: 200px;
+  --sidebar-w: calc(var(--rail-w) + var(--nav-w));
+  --gutter-x: 16px;
+  --gutter-y: 20px;
   --assistant-w: 420px;
   --topbar-h: 48px;
   --inspector-w: 400px;
@@ -341,13 +345,18 @@ div[dir="auto"] > * {
     line-height: 1;
   }
   /* On a filled button the chip is a translucent overlay of the fill. */
+  /* Inside a button the key is a small borderless tile that takes the button's tone. */
+  .ck-btn .ck-kbd {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 16px; height: 16px; padding: 0 4px; margin-right: -4px;
+    border: 0; border-radius: 3px;
+    font-size: 10px; font-weight: 500; color: inherit; opacity: 0.7;
+    background: color-mix(in srgb, currentColor 10%, transparent);
+  }
+  .ck-btn-sm .ck-kbd { min-width: 14px; height: 14px; margin-right: -2px; }
   .ck-btn-primary .ck-kbd,
   .ck-btn-danger .ck-kbd,
-  .ck-btn-success .ck-kbd {
-    color: var(--fg-on-accent);
-    background: rgba(255, 255, 255, 0.16);
-    border-color: rgba(255, 255, 255, 0.24);
-  }
+  .ck-btn-success .ck-kbd { opacity: 0.85; background: rgba(255, 255, 255, 0.2); }
 
   .ck-mono {
     font-family: var(--font-mono);
@@ -401,7 +410,15 @@ div[dir="auto"] > * {
     color: var(--fg-1);
     transition: background var(--dur-fast) var(--ease-out);
   }
+  /* Lists keep their density on narrow screens and scroll sideways instead. */
+  .ck-list-scroll { overflow-x: auto; }
+  .ck-list-scroll > * { min-width: 640px; }
   .ck-lrow:hover { background: var(--bg-2); }
+  /* Row actions stay out of the way until the row is pointed at. */
+  @media (hover: hover) {
+    .ck-lrow .ck-row-action { opacity: 0; }
+    .ck-lrow:hover .ck-row-action, .ck-row-action:focus-visible { opacity: 1; }
+  }
   .ck-lrow.is-selected { background: var(--bg-selected); box-shadow: inset 2px 0 0 var(--primary-400); }
   .ck-lh-c {
     min-width: 0;
@@ -820,32 +837,11 @@ div[dir="auto"] > * {
   }
 
   /* ===== Tabbed record detail (variant D from the design system) ===== */
-  .ck-vt-tabs {
-    display: flex; align-items: center; gap: 2px;
-    border-bottom: 1px solid var(--border-1);
-    padding: 0;
-  }
-  .ck-vt-tab {
-    background: transparent; border: none; color: var(--fg-3);
-    font-family: var(--font-sans); font-size: 13px; font-weight: 400;
-    height: 32px; padding: 0 12px; cursor: pointer;
-    display: inline-flex; align-items: center; gap: 6px;
-    border-bottom: 2px solid transparent; margin-bottom: -1px;
-    transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-  }
-  .ck-vt-tab:hover { color: var(--fg-1); }
-  .ck-vt-tab.is-on { color: var(--fg-1); font-weight: 500; border-bottom-color: var(--primary-400); }
-  .ck-vt-tab.is-on .ck-vt-tab-count { background: var(--accent-bg); color: var(--link); }
-  .ck-vt-tab.is-empty { color: var(--fg-4); }
-  .ck-vt-tab.is-empty .ck-vt-tab-count { background: transparent; color: var(--fg-4); }
-  .ck-vt-tab.is-empty:hover { color: var(--fg-2); }
-  .ck-vt-tab.is-empty.is-on { color: var(--fg-1); }
-  .ck-vt-tab-count {
-    font-family: var(--font-mono); font-size: 11px; color: var(--fg-3);
-    background: var(--bg-3); padding: 0 5px; border-radius: var(--r-md);
-    min-width: 18px; height: 17px; line-height: 17px; text-align: center;
-  }
-  .ck-vt-body { padding: 24px 0 48px; display: flex; flex-direction: column; gap: 24px; }
+  .ck-tab.is-empty { color: var(--fg-4); }
+  .ck-tab.is-empty .ck-tab-count { background: transparent; color: var(--fg-4); }
+  .ck-tab.is-empty:hover { color: var(--fg-2); }
+  .ck-tab.is-empty.is-on { color: var(--fg-1); }
+  .ck-vt-body { padding: 0 0 48px; display: flex; flex-direction: column; gap: 24px; }
   /* Stack of per-row grids that visually merge into one bordered container.
      Each row gets its own `.ck-vt-cells` grid so rows can have different
      column counts (1, 2, 3, 4 fields per line); the radii + duplicate borders
@@ -890,8 +886,7 @@ div[dir="auto"] > * {
     to { background: var(--bg-1); box-shadow: inset 0 0 0 1px transparent; }
   }
   .ck-vt-cell-l {
-    flex: 0 0 auto;
-    min-width: 120px;
+    flex: 0 0 140px;
     font-size: 10.5px; font-weight: 500; color: var(--fg-3);
     letter-spacing: var(--track-wide); text-transform: uppercase;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -903,7 +898,6 @@ div[dir="auto"] > * {
     min-width: 0; max-width: 100%;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
     overflow: hidden;
   }
   .ck-vt-cell-v > * {
@@ -930,7 +924,7 @@ div[dir="auto"] > * {
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-l,
   .ck-vt-cell:has(textarea) .ck-vt-cell-l,
   .ck-vt-cell:has(.ck-ro-text) .ck-vt-cell-l {
-    min-width: 0;
+    flex-basis: auto;
   }
   .ck-vt-cell:has(iframe) .ck-vt-cell-v,
   .ck-vt-cell:has(.ck-tiptap-editor) .ck-vt-cell-v,
@@ -1291,17 +1285,12 @@ div[dir="auto"] > * {
     background: transparent !important;
   }
 
-  /* Pull a child out of the BaseLayout main-body's px-6 py-5 padding so a
-     view (swimlane, pipeline, list) can render full-bleed against the
-     sidebar / topbar — matching the design's "list & pipeline views are
-     full-bleed" rule. The horizontal value matches Tailwind's px-6 = 24px
-     and the vertical value matches py-5 = 20px applied at BaseLayout. */
+  /* Pull a child out of the content gutters (.ck-content) so a view
+     (swimlane, list, conversation) renders full-bleed against the nav panel
+     and top bar. */
   .ck-fullbleed {
-    margin-left: -24px;
-    margin-right: -24px;
-    margin-top: -20px;
-    margin-bottom: -20px;
-    width: calc(100% + 48px);
+    margin: calc(-1 * var(--gutter-y)) calc(-1 * var(--gutter-x));
+    width: calc(100% + 2 * var(--gutter-x));
   }
 
   /* ===== Swimlane (pivot grid) ===== */
@@ -1310,11 +1299,10 @@ div[dir="auto"] > * {
   .ck-swim-head { position: sticky; top: 0; z-index: 2; background: var(--border-1); }
   .ck-swim-head > div {
     background: var(--bg-1); padding: 10px 12px;
-    font-size: 10.5px; font-weight: 500; color: var(--fg-3);
-    text-transform: uppercase; letter-spacing: var(--track-wide);
-    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; color: var(--fg-1);
+    display: flex; align-items: center; gap: 8px;
   }
-  .ck-swim-corner { color: var(--fg-3); }
+  .ck-swim-head > .ck-swim-corner { color: var(--fg-3); font-weight: 500; }
   .ck-swim-row > div {
     background: var(--bg-1); padding: 10px; min-height: 88px;
     display: flex; flex-direction: column; gap: 6px;
@@ -1325,7 +1313,7 @@ div[dir="auto"] > * {
   .ck-swim-row--alt > div { background: var(--bg-2); }
   .ck-swim-row--alt .ck-swim-row-head { background: var(--bg-3) !important; }
   .ck-srh-label { font-size: 12px; font-weight: 600; color: var(--fg-1); }
-  .ck-srh-meta { font-size: 11px; color: var(--fg-3); font-family: var(--font-mono); }
+  .ck-srh-meta { font-size: 11px; color: var(--fg-3); }
 
   .ck-swim-card {
     background: var(--bg-1); border: 1px solid var(--border-2); border-radius: var(--r-lg);
@@ -1385,7 +1373,8 @@ div[dir="auto"] > * {
     display: grid;
     grid-template-columns: 280px minmax(0, 1fr) 240px;
     grid-template-rows: minmax(0, 1fr);
-    height: calc(100vh - var(--topbar-h));
+    flex: 1 1 0;
+    min-height: 420px;
     overflow: hidden;
     background: var(--bg-1);
   }
@@ -1430,7 +1419,7 @@ div[dir="auto"] > * {
   .ck-cr-body { flex: 1; min-width: 0; }
   .ck-cr-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; min-width: 0; }
   .ck-cr-who { font-size: 12px; font-weight: 600; color: var(--fg-1); flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ck-cr-when { font-size: 10px; color: var(--fg-3); font-family: var(--font-mono); flex-shrink: 0; white-space: nowrap; }
+  .ck-cr-when { font-size: 11px; color: var(--fg-3); flex-shrink: 0; white-space: nowrap; }
   .ck-cr-company { font-size: 11px; color: var(--fg-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .ck-cr-preview { font-size: 12px; color: var(--fg-2); margin-top: 4px; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 
@@ -1715,6 +1704,248 @@ div[dir="auto"] > * {
   .widget-width-1 { grid-column: span 1 !important; }
   .widget-width-2 { grid-column: span 2 !important; }
   .widget-width-3 { grid-column: span 3 !important; }
+}
+
+/* ==========================================================================
+   App shell: icon rail | nav panel | content | assistant
+   ≥1200px all columns; ≤1200px the assistant overlays the content;
+   ≤900px the nav panel overlays too (the rail stays); ≤640px tighter gutters.
+   Keep the breakpoints in sync with layouts/BaseLayout.jsx.
+   ========================================================================== */
+
+@layer components {
+  .ck-shell {
+    display: grid;
+    grid-template-columns: var(--rail-w) var(--nav-w) minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+    height: 100vh;
+    position: relative;
+    background: var(--bg-1);
+    color: var(--fg-1);
+  }
+  .ck-shell.with-assistant { grid-template-columns: var(--rail-w) var(--nav-w) minmax(0, 1fr) var(--assistant-w); }
+  .ck-shell.is-nav-collapsed { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+  .ck-shell.is-nav-collapsed.with-assistant { grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--assistant-w); }
+  .ck-shell.is-nav-collapsed .ck-navpanel { display: none; }
+
+  .ck-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .ck-main-scroll { flex: 1; min-height: 0; overflow: auto; overflow-x: hidden; display: flex; flex-direction: column; }
+  .ck-content { flex: 1; display: flex; flex-direction: column; padding: var(--gutter-y) var(--gutter-x); }
+
+  .ck-assistant { border-left: 1px solid var(--border-2); min-width: 0; min-height: 0; }
+
+  .ck-scrim { position: fixed; inset: 0; background: var(--bg-overlay); z-index: 44; }
+
+  /* ---- Icon rail: Home, one item per workspace, Inbox ---- */
+  .ck-rail {
+    background: var(--bg-0);
+    border-right: 1px solid var(--border-2);
+    display: flex; flex-direction: column; align-items: center;
+    padding-bottom: 64px; /* clears .ck-shell-footer */
+    overflow-y: auto; overflow-x: hidden;
+    scrollbar-width: none;
+  }
+  .ck-rail-logo {
+    width: 100%; height: var(--topbar-h); flex-shrink: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+    border-bottom: 1px solid var(--border-1);
+    margin-bottom: 10px;
+  }
+  .ck-rail-version {
+    font-family: var(--font-mono); font-size: 6.5px; line-height: 1; letter-spacing: -0.02em; color: var(--fg-4);
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ck-rail-group { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+  .ck-rail-foot { margin-top: auto; padding-top: 12px; }
+  .ck-rail-item {
+    width: 46px; min-height: 44px; padding: 2px 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: transparent; border: 0; cursor: pointer;
+    color: var(--fg-3); user-select: none;
+    transition: color var(--dur-med) var(--ease-out);
+  }
+  .ck-rail-item:hover { color: var(--fg-1); }
+  .ck-rail-item.is-active { color: var(--primary-400); }
+  .ck-rail-ico {
+    position: relative;
+    width: 40px; height: 40px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 3px;
+    border-radius: var(--r-xl);
+    transition: background var(--dur-med) var(--ease-out);
+  }
+  .ck-rail-item.is-active .ck-rail-ico { background: var(--accent-bg); gap: 0; }
+  .ck-rail-initials {
+    width: 20px; height: 20px; border-radius: 5px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 600; letter-spacing: -0.02em;
+    color: var(--fg-1); background: var(--bg-1); box-shadow: inset 0 0 0 1px var(--border-3);
+  }
+  .ck-rail-item.is-active .ck-rail-initials { color: var(--link); box-shadow: inset 0 0 0 1px currentColor; }
+  .ck-rail-label {
+    font-size: 8.5px; font-weight: 500; line-height: 1; letter-spacing: -0.01em;
+    max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .ck-rail-item.is-active .ck-rail-label { display: none; }
+  .ck-rail-badge {
+    position: absolute; top: 2px; right: 1px;
+    min-width: 15px; height: 15px; padding: 0 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-family: var(--font-mono); font-size: 9.5px; font-weight: 500;
+    background: var(--danger-bg); color: var(--danger);
+    border-radius: var(--r-md);
+  }
+
+  /* ---- Nav panel: the active workspace's views ---- */
+  .ck-navpanel {
+    background: var(--bg-0);
+    border-right: 1px solid var(--border-2);
+    display: flex; flex-direction: column;
+    min-width: 0; min-height: 0;
+  }
+  .ck-navpanel-header {
+    height: var(--topbar-h); flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 10px 0 16px;
+    border-bottom: 1px solid var(--border-1);
+  }
+  .ck-navpanel-title {
+    flex: 1; min-width: 0;
+    font-size: 15px; font-weight: 600; letter-spacing: -0.01em; color: var(--fg-1);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .ck-navpanel-btn {
+    width: 26px; height: 26px; flex-shrink: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+    border: 1px solid var(--border-1); border-radius: var(--r-md);
+    background: var(--bg-1); color: var(--fg-3); cursor: pointer;
+  }
+  .ck-navpanel-btn:hover { background: var(--bg-3); color: var(--fg-1); }
+  .ck-navpanel-search {
+    margin: 10px 10px 6px;
+    height: 30px; flex-shrink: 0;
+    display: flex; align-items: center; gap: 6px;
+    padding: 0 8px;
+    border: 0; border-radius: var(--r-lg);
+    background: var(--bg-3); color: var(--fg-3);
+    font-family: var(--font-sans); font-size: 12.5px; text-align: left;
+    cursor: pointer;
+  }
+  .ck-navpanel-search:hover { background: var(--bg-5); }
+  .ck-navpanel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 8px 72px; }
+  .ck-navpanel-empty {
+    margin: 2px 2px 0; padding: 10px 12px;
+    border: 1px dashed var(--border-3); border-radius: var(--r-md);
+    font-size: var(--text-xs); color: var(--fg-3); line-height: 1.45;
+  }
+  .ck-navpanel-section {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 10px 4px;
+  }
+  .ck-navpanel-section:first-child { padding-top: 6px; }
+  .ck-navleaf {
+    display: flex; align-items: center; gap: 9px;
+    width: 100%; height: 32px; padding: 0 10px;
+    border: 0; border-radius: var(--r-lg);
+    background: transparent;
+    font-family: var(--font-sans); font-size: 13.5px; color: var(--fg-2); text-align: left;
+    cursor: pointer; user-select: none;
+  }
+  .ck-navleaf:hover { background: var(--bg-3); color: var(--fg-1); }
+  .ck-navleaf.is-active { background: var(--accent-bg); color: var(--link); font-weight: 500; }
+  .ck-navleaf-ico { color: var(--fg-3); flex-shrink: 0; display: inline-flex; }
+  .ck-navleaf.is-active .ck-navleaf-ico { color: var(--link); }
+  .ck-navleaf-label { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-navleaf-count { font-family: var(--font-mono); font-size: 11px; color: var(--fg-3); }
+
+  /* ---- Footer spanning rail + nav panel: who is signed in, theme ---- */
+  .ck-shell-footer {
+    position: absolute; left: 0; bottom: 0; z-index: 30;
+    width: var(--sidebar-w);
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-0);
+    border-top: 1px solid var(--border-2);
+    border-right: 1px solid var(--border-2);
+  }
+  .ck-shell-footer-me { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; color: inherit; }
+  .ck-shell-footer-me:hover { color: inherit; }
+  .ck-shell-footer-who { flex: 1; min-width: 0; line-height: 1.25; }
+  .ck-shell.is-nav-collapsed .ck-shell-footer { width: var(--rail-w); padding: 10px 0; justify-content: center; }
+  .ck-shell.is-nav-collapsed .ck-shell-footer-me { flex: none; }
+  .ck-shell.is-nav-collapsed .ck-shell-footer :is(.ck-shell-footer-who, .ck-theme-toggle) { display: none; }
+
+  /* ---- Top bar: breadcrumbs left, page slots + assistant right ---- */
+  .ck-crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; font-size: 13px; color: var(--fg-3); }
+
+  .ck-topbar-title { min-width: 0; font-size: var(--text-md); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-topbar-middle { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: stretch; gap: 8px; overflow: hidden; }
+  .ck-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+  /* ---- Tabs in the top bar (a list's views, a record's tabs), underlined on its border ---- */
+  .ck-topbar-tabs {
+    align-self: stretch; min-width: 0;
+    display: flex; align-items: stretch; gap: 2px;
+    overflow-x: auto; scrollbar-width: none;
+  }
+  .ck-topbar-tabs::-webkit-scrollbar { display: none; }
+  .ck-topbar-tabs .ck-tab { height: auto; flex-shrink: 0; padding: 0 10px; }
+
+  /* ≤1200px: the assistant overlays the content. */
+  @media (max-width: 1200px) {
+    .ck-shell.with-assistant { grid-template-columns: var(--rail-w) var(--nav-w) minmax(0, 1fr); }
+    .ck-shell.is-nav-collapsed.with-assistant { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+    .ck-rail, .ck-navpanel { position: relative; z-index: 46; }
+    .ck-shell-footer { z-index: 47; }
+    .ck-assistant {
+      position: fixed; top: 0; right: 0; bottom: 0; z-index: 45;
+      width: var(--assistant-w); max-width: 92vw;
+      box-shadow: var(--shadow-modal);
+    }
+  }
+
+  /* ≤900px: the nav panel overlays too, opened from the rail. */
+  @media (max-width: 900px) {
+    .ck-shell,
+    .ck-shell.with-assistant,
+    .ck-shell.is-nav-collapsed,
+    .ck-shell.is-nav-collapsed.with-assistant { grid-template-columns: var(--rail-w) minmax(0, 1fr); }
+    .ck-shell .ck-navpanel { display: none; }
+    .ck-shell.is-nav-open .ck-navpanel {
+      display: flex;
+      position: fixed; top: 0; bottom: 0; left: var(--rail-w);
+      width: 248px; max-width: calc(100vw - var(--rail-w));
+      box-shadow: var(--shadow-modal);
+    }
+    .ck-shell-footer { width: var(--rail-w); padding: 10px 0; justify-content: center; }
+    .ck-shell-footer-me { flex: none; }
+    .ck-shell-footer :is(.ck-shell-footer-who, .ck-theme-toggle) { display: none; }
+    .ck-shell.is-nav-open .ck-shell-footer { width: calc(var(--rail-w) + 248px); padding: 10px 12px; justify-content: flex-start; }
+    .ck-shell.is-nav-open .ck-shell-footer-me { flex: 1; }
+    .ck-shell.is-nav-open .ck-shell-footer .ck-shell-footer-who { display: block; }
+    .ck-shell.is-nav-open .ck-shell-footer .ck-theme-toggle { display: inline-flex; }
+  }
+
+  /* ≤640px: tighter gutters, header pieces stack. */
+  @media (max-width: 640px) {
+    :root { --gutter-x: 12px; --gutter-y: 16px; }
+    .ck-vt-cell:not(.is-form) { flex-direction: column; align-items: flex-start; gap: 2px; }
+    .ck-vt-cell:not(.is-form) .ck-vt-cell-l { flex-basis: auto; }
+    .ck-vt-cell:not(.is-form) .ck-vt-cell-v { width: 100%; flex: none; }
+    .ck-btn .ck-kbd { display: none; }
+    /* The top bar's tabs and search drop to rows of their own. */
+    .ck-topbar { flex-wrap: wrap; height: auto; }
+    .ck-topbar .ck-crumbs { flex: 1 1 0; min-width: 0; min-height: var(--topbar-h); }
+    .ck-topbar-title { flex: 1 1 0; }
+    .ck-topbar-middle:empty { display: none; }
+    .ck-topbar-middle {
+      order: 1; flex: 1 0 100%; height: 40px;
+      margin: 0 -12px; padding: 0 12px; border-top: 1px solid var(--border-1);
+    }
+    .ck-topbar-middle > svg { display: none; }
+    .ck-topbar-search { order: 2; flex: 1 0 100%; padding: 8px 0; }
+    .ck-topbar-search > *, .ck-topbar-search input { width: 100% !important; }
+  }
 }
 
 /* Multi-line error toasts (one line per field error). */

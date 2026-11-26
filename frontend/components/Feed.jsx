@@ -403,7 +403,7 @@ function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, onDone }
                 <div className="ck-composer-foot">
                     <span className="flex-1" />
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button type="button" onClick={onDone} className="ck-btn ck-btn-ghost ck-btn-sm">Discard</button>
+                        <button type="button" onClick={onDone} className="ck-btn ck-btn-secondary ck-btn-sm">Discard</button>
                         <button type="submit" disabled={busy} className="ck-btn ck-btn-primary ck-btn-sm">
                             <Icon name={action ? "send" : "plus"} size={12} color="currentColor" />
                             {busy ? "Saving…" : action?.verbose_name || `Add ${metadata.verbose_name}`}

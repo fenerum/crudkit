@@ -168,7 +168,7 @@ test.describe('layouts', () => {
     }
     await page.locator('.ck-qt-row').filter({ hasText: 'Cities on the train' }).click();
     await expect(page).toHaveURL(/\/RDG\d+$/);
-    await expect(page.getByRole('banner').getByText('Cities on the train')).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Cities on the train', { exact: true })).toBeVisible();
   });
 
   test('swimlane splits status columns into priority rows', async ({ page }) => {
@@ -190,13 +190,13 @@ test('private views only show to their owner, outside the shared menu', async ({
   await page.goto('/RDG');
 
   const sidebar = page.getByRole('navigation', { name: 'Sidebar' });
-  const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button', { name, exact: true })).toBeVisible();
+  const viewTabs = page.getByRole('banner');
+  await expect(viewTabs.getByRole('button', { name, exact: true })).toBeVisible();
   await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
 
   // Seeded view owned by another user; the admin is a superuser so the API returns it.
   const othersView = "Reader's private picks";
-  await expect(banner.getByRole('button', { name: othersView })).toBeHidden();
+  await expect(viewTabs.getByRole('button', { name: othersView })).toBeHidden();
   await expect(sidebar.getByRole('link', { name: othersView })).toBeHidden();
 });
 

@@ -43,6 +43,10 @@ Feature: Lists
     When she goes to the last page
     Then there is no next page
 
+  Scenario: A list that fits on one page offers no other pages
+    When Alice searches the books list for "Kindred"
+    Then there are no other pages
+
   Scenario: The chosen page size is remembered
     Given Alice is on the readings list
     When she shows 10 records per page

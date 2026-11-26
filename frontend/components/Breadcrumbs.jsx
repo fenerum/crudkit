@@ -4,11 +4,12 @@ import { useBreadcrumbs } from "../hooks/useBreadcrumbs";
 export default function Breadcrumbs() {
   const { crumbs } = useBreadcrumbs();
 
-  return crumbs.map((crumb, index) => {
-    const isLast = index === crumbs.length - 1;
+  // A list's views are tabs right after the trail, so the open view isn't a crumb.
+  return crumbs.filter((crumb) => !crumb.viewId).map((crumb, index, shown) => {
+    const isLast = index === shown.length - 1;
     return (
       <li key={index} data-breadcrumbs-title={isLast ? "true" : "false"}>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-2">
           <svg
             className="h-3 w-3 flex-shrink-0 text-fg-4"
             fill="none"
@@ -21,8 +22,8 @@ export default function Breadcrumbs() {
           <Link
             to={crumb.path}
             className={
-              "text-sm truncate capitalize transition-colors duration-fast " +
-              (isLast ? "text-fg-1 font-semibold" : "text-fg-2 hover:text-fg-1")
+              "text-md truncate capitalize transition-colors duration-fast " +
+              (isLast ? "text-fg-1 font-medium" : "text-fg-3 hover:text-fg-1")
             }
             aria-current={isLast ? "page" : undefined}
           >

@@ -19,7 +19,7 @@ from django.utils.translation import gettext_lazy as _
 from phonenumber_field.phonenumber import PhoneNumber
 
 from crudkit import audit
-from crudkit.fields import DEFAULT_CURRENCY, CurrencyField, ModelField
+from crudkit.fields import DEFAULT_CURRENCY, CurrencyField, IconField, ModelField
 from crudkit.utils import get_model_types, get_system_user
 
 
@@ -555,6 +555,11 @@ class View(BaseCrudKitModel):
         default=ViewLayoutChoices.LIST,
     )
     name = models.CharField(max_length=128)
+    icon = IconField(
+        blank=True,
+        null=True,
+        help_text=_("Shown in the sidebar; without one the layout's icon is shown"),
+    )
     default = models.BooleanField(blank=True, default=False)
     public = models.BooleanField(blank=True, default=True)
     show_in_menu = models.BooleanField(blank=True, default=True)
@@ -738,11 +743,10 @@ class Workspace(BaseCrudKitModel):
     TYPE_ID = "WSP"
 
     name = models.CharField(max_length=128)
-    icon = models.CharField(
-        max_length=64,
+    icon = IconField(
         blank=True,
         null=True,
-        help_text=_("Icon name shown in the workspace switcher"),
+        help_text=_("Shown in the rail; without one the rail shows the workspace's initials"),
     )
     public = models.BooleanField(blank=True, default=True)
     views = models.JSONField(

@@ -4,7 +4,7 @@ import { unique } from './helpers';
 test('shows related books in a tab and creates one prefilled', async ({ page }) => {
   await page.goto('/AUT1');
   const main = page.getByRole('main');
-  await main.getByRole('tab', { name: /^books/ }).click();
+  await page.getByRole('banner').getByRole('tab', { name: /^books/ }).click();
 
   await expect(page).toHaveURL(/[?&]tab=inline-BOK/);
   await expect(main.getByText('The Left Hand of Darkness')).toBeVisible();

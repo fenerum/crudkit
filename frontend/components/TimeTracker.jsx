@@ -222,19 +222,18 @@ const TimeTracker = () => {
             </svg>
           </button>
         </span>
-      ) : (
+      ) : isDetailPage && (
         <button
           type="button"
           className="ck-btn ck-btn-secondary ck-btn-sm"
-          disabled={!isDetailPage}
           onClick={() => startTracking.mutate()}
-          title={isDetailPage ? "Start time tracking" : "Open a record to track time"}
+          title="Start tracking time on this record"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          <span>Start</span>
+          <span>Track time</span>
         </button>
       )}
 
@@ -278,7 +277,7 @@ const TimeTracker = () => {
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              className="ck-btn ck-btn-ghost ck-btn-sm"
+              className="ck-btn ck-btn-secondary ck-btn-sm"
               onClick={() => setIsAdjustModalOpen(false)}
             >
               Cancel

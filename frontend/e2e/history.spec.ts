@@ -10,7 +10,7 @@ test('an edit can be reverted from the History tab', async ({ page, request }) =
   await expect(nameInput).toHaveValue(name);
   await nameInput.fill(`${name} (edited)`);
   await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('main').getByText(`${name} (edited)`)).toBeVisible();
+  await expect(page.getByRole('banner').getByText(`${name} (edited)`, { exact: true })).toBeVisible();
 
   await page.getByRole('tab', { name: 'History' }).click();
   await expect(page).toHaveURL(`/${reading.id}?tab=history`);
@@ -20,7 +20,7 @@ test('an edit can be reverted from the History tab', async ({ page, request }) =
 
   await expect(page.getByTestId('history-batch').first().getByText('Undo')).toBeVisible();
   await page.goto(`/${reading.id}`);
-  await expect(page.getByRole('main').getByText(name, { exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(name, { exact: true })).toBeVisible();
 });
 
 test('a delete can be undone from the toast, and a deleted record restored', async ({ page, request }) => {

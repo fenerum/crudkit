@@ -13,7 +13,7 @@ import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
 import { handleActionResult } from '../../utils/actionResult';
-import { Button, Icon, OverflowMenu, useTopbarSlots } from '../../components/ui';
+import { Button, Icon, Kbd, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
 import ProgressBar from '../../components/ProgressBar';
@@ -57,7 +57,7 @@ function InlineTab({ inline, parent_object_id }: any) {
   );
 }
 
-function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) {
+function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id, right, primary, notices }: any) {
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useMemo(() => new CrudKitAPIClient(), []);
 
@@ -124,52 +124,65 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
     setSearchParams(params, { replace: true });
   };
 
+  const tabs = (
+    <div className="ck-topbar-tabs" role="tablist">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'properties'}
+        className={`ck-tab ${tab === 'properties' ? 'is-on' : ''}`}
+        onClick={() => setTab('properties')}
+      >
+        <span className="capitalize" title={metadata?.verbose_name}>
+          {truncateLabel(metadata?.verbose_name) || 'Properties'}
+        </span>
+      </button>
+      {otherInlines.map((inline: any, i: number) => {
+        const [mdl, , , inlineMetadata] = inline;
+        const tabId = `inline-${mdl}`;
+        const count = inlineCounts[i]?.data;
+        const isEmpty = count === 0;
+        return (
+          <button
+            key={mdl}
+            type="button"
+            role="tab"
+            aria-selected={tab === tabId}
+            className={`ck-tab ${tab === tabId ? 'is-on' : ''} ${isEmpty ? 'is-empty' : ''}`}
+            onClick={() => setTab(tabId)}
+          >
+            <span className="capitalize" title={inlineMetadata.verbose_name_plural}>
+              {truncateLabel(inlineMetadata.verbose_name_plural)}
+            </span>
+            {count != null && <span className="ck-tab-count">{count}</span>}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'history'}
+        className={`ck-tab ${tab === 'history' ? 'is-on' : ''}`}
+        onClick={() => setTab('history')}
+      >
+        <span>History</span>
+      </button>
+    </div>
+  );
+
+  // The breadcrumbs end with the record's ID; its name follows them, then its tabs.
+  const countsKey = inlineCounts.map((q) => q.data).join(',');
+  useTopbarSlots(() => ({
+    title: object.label && object.label !== object.id ? { label: object.label } : undefined,
+    middle: tabs,
+    right,
+    primary,
+  }), [tab, countsKey, otherInlines.length, object.label, object.id, object.deleted, metadata]);
+
   return (
-    <div className="flex flex-col">
-      <div className="ck-vt-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'properties'}
-          className={`ck-vt-tab ${tab === 'properties' ? 'is-on' : ''}`}
-          onClick={() => setTab('properties')}
-        >
-          <span className="capitalize" title={metadata?.verbose_name}>
-            {truncateLabel(metadata?.verbose_name) || 'Properties'}
-          </span>
-        </button>
-        {otherInlines.map((inline: any, i: number) => {
-          const [mdl, , , inlineMetadata] = inline;
-          const tabId = `inline-${mdl}`;
-          const count = inlineCounts[i]?.data;
-          const isEmpty = count === 0;
-          return (
-            <button
-              key={mdl}
-              type="button"
-              role="tab"
-              aria-selected={tab === tabId}
-              className={`ck-vt-tab ${tab === tabId ? 'is-on' : ''} ${isEmpty ? 'is-empty' : ''}`}
-              onClick={() => setTab(tabId)}
-            >
-              <span className="capitalize" title={inlineMetadata.verbose_name_plural}>
-                {truncateLabel(inlineMetadata.verbose_name_plural)}
-              </span>
-              {count != null && <span className="ck-vt-tab-count">{count}</span>}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === 'history'}
-          className={`ck-vt-tab ${tab === 'history' ? 'is-on' : ''}`}
-          onClick={() => setTab('history')}
-        >
-          <span>History</span>
-        </button>
-      </div>
+    <>
       <div className="ck-vt-body">
+        {notices}
         {tab === 'properties' && (
           <>
             <DetailPane
@@ -214,7 +227,7 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id }: any) 
         })}
         {tab === 'history' && <History type={type} id={id} metadata={metadata} />}
       </div>
-    </div>
+    </>
   );
 }
 
@@ -223,7 +236,7 @@ function RunningJobs({ id }: { id: string }) {
   const jobs = useJobsFor(id).filter((job) => job.status === 'running');
   if (jobs.length === 0) return null;
   return (
-    <div className="mb-4 flex flex-col gap-2">
+    <div className="flex flex-col gap-2">
       {jobs.map((job) => (
         <div key={job.id} role="status" className="rounded-md border border-border-1 bg-bg-2 px-3 py-2">
           <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
@@ -241,7 +254,7 @@ function DeletedBanner({ object, onRestore, isRestoring }: any) {
   return (
     <div
       role="status"
-      className="mb-4 flex items-center gap-3 rounded-md border border-border-1 bg-bg-2 px-3 py-2 text-sm"
+      className="flex items-center gap-3 rounded-md border border-border-1 bg-bg-2 px-3 py-2 text-sm"
     >
       <span className="flex-1 text-fg-2">
         <span className="text-danger">●</span>{' '}
@@ -381,31 +394,9 @@ export default function Detail() {
       });
     }
     return items;
-    // `actionMutation` intentionally omitted: its `.mutate` reference is stable
-    // and including the wrapper object would cause `overflowItems` to retain a
-    // new identity each render, looping `useTopbarSlots`'s effect.
+    // `actionMutation` intentionally omitted: its `.mutate` reference is stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, metadata, layout, currentUrl, id, object, navigate]);
-
-  useTopbarSlots(() => {
-    if (!ready) return {};
-    return {
-      // The breadcrumb already shows the model and the bolded ID; just append
-      // the object's human label inline.
-      title: object.label && object.label !== object.id ? { label: object.label } : undefined,
-      primary: object.deleted ? undefined : (
-        <Link
-          to={url(object.id, 'edit', { next: currentUrl })}
-          className="ck-btn ck-btn-primary ck-btn-sm"
-        >
-          <Icon name="edit-3" size={12} color="currentColor" />
-          Edit
-          <span className="ck-kbd">E</span>
-        </Link>
-      ),
-      right: <OverflowMenu items={overflowItems} />,
-    };
-  }, [ready, metadata?.verbose_name, object?.label, object?.id, object?.deleted, currentUrl, overflowItems]);
 
   if (objectQuery.isPending || metadataQuery.isPending || layoutsQuery.isPending) {
     return <div className="px-1 py-6 text-sm text-fg-3 animate-pulse">Loading…</div>;
@@ -417,23 +408,33 @@ export default function Detail() {
   const fieldPairs = generateFieldPairs(metadata, layout);
 
   return (
-    <>
-      {object.deleted && (
-        <DeletedBanner
-          object={object}
-          onRestore={() => restoreMutation.mutate()}
-          isRestoring={restoreMutation.isPending}
-        />
+    <DetailWebTabs
+      fieldPairs={fieldPairs}
+      object={object}
+      metadata={metadata}
+      layout={layout}
+      type={type}
+      id={id}
+      right={<OverflowMenu items={overflowItems} size="sm" />}
+      primary={object.deleted ? null : (
+        <Link to={url(object.id, 'edit', { next: currentUrl })} className="ck-btn ck-btn-primary ck-btn-sm">
+          <Icon name="edit-3" size={12} color="currentColor" />
+          Edit
+          <Kbd>E</Kbd>
+        </Link>
       )}
-      <RunningJobs id={id} />
-      <DetailWebTabs
-        fieldPairs={fieldPairs}
-        object={object}
-        metadata={metadata}
-        layout={layout}
-        type={type}
-        id={id}
-      />
-    </>
+      notices={
+        <>
+          {object.deleted && (
+            <DeletedBanner
+              object={object}
+              onRestore={() => restoreMutation.mutate()}
+              isRestoring={restoreMutation.isPending}
+            />
+          )}
+          <RunningJobs id={id} />
+        </>
+      }
+    />
   );
 }

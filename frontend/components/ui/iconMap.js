@@ -12,7 +12,7 @@ import {
   Globe, GripVertical, Hash, HelpCircle, History, Home, Inbox, Info, Italic,
   Kanban, Layers, LayoutGrid, Link as LinkIcon, List, Lock, LogIn, LogOut, Mail,
   Menu, MessageCircle, MessageSquare, MessagesSquare, Minus, Moon, MoreHorizontal, MoreVertical,
-  PanelLeft, Paperclip, Pause, Phone, PhoneIncoming, PhoneOutgoing,
+  PanelLeft, Paperclip, Rows3, ScatterChart, Table2, Pause, Phone, PhoneIncoming, PhoneOutgoing,
   PieChart, Play, Plus, PlusCircle, RefreshCcw, RefreshCw, RotateCcw, Search, Send, Settings,
   ShieldCheck, Sparkles, Square, Star, StickyNote, Sun, Tag, Tags, Trash, Trash2,
   Unlock, Upload, User, UserPlus, Users, X,
@@ -205,7 +205,14 @@ const ICONS = {
   'layers': Layers,
   'grip-vertical': GripVertical,
   'corner-up-left': CornerUpLeft,
+  'table-2': Table2,
+  'rows': Rows3,
+  'scatter-chart': ScatterChart,
 };
+
+export function hasIcon(name) {
+  return Boolean(ICONS[ALIAS[name] || name]);
+}
 
 export function mapIcon(name) {
   if (!name) return HelpCircle;

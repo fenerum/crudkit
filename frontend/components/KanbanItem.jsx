@@ -78,9 +78,10 @@ export default function KanbanItem({ id, object, fieldList, metadata }) {
             <span
               className="ck-dc-meta"
               style={isStale ? { color: 'var(--warn)' } : undefined}
+              title={`Updated ${updatedAt.format('lll')}`}
             >
               <Icon name="clock" size={11} color="currentColor" />
-              {updatedAt.fromNow(true)}
+              {updatedAt.fromNow()}
             </span>
           )}
           <span className="ck-dc-spacer" />

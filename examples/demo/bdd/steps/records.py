@@ -21,7 +21,8 @@ actions, history, notes and live updates.
   `Then the feed shows the email "S" sent with the file "f.txt"`
 - `Given Alice emailed "S" to "a@b.c" on "X"`, `When she replies to the email "S" on "X"`,
   `Then the email form is to "a@b.c" with the subject "Re: S"`
-- `Then the form asks for the finished on`, `Then the form does not ask for the finished on`
+- `Then the form asks for the finished on`, `Then the form does not ask for the finished on`,
+  `Then the form leaves out the id`
 - `Given Alice has "X" open`, `Given Alice is editing "X"`,
   `Then she is told the record changed elsewhere`, `When she loads the other change`
 """
@@ -84,8 +85,10 @@ def sees_a_link(world, text):
 
 
 @then(phrase('its {field:Words} is "{value:Q}"'))
-def its_value_is(world, value):
-    expect(world.main.get_by_text(world.text(value), exact=True)).to_be_visible()
+def its_value_is(world, field, value):
+    label = world.page.locator(".ck-vt-cell-l", has_text=re.compile(rf"^{re.escape(field)}$", re.IGNORECASE))
+    cell = world.main.locator(".ck-vt-cell").filter(has=label)
+    expect(cell.locator(".ck-vt-cell-v")).to_have_text(world.text(value))
 
 
 @then(phrase('the page is about "{text:Q}"'))
@@ -100,7 +103,7 @@ def page_is_about(world, text):
 def opens_a_related_tab(world, model, label):
     world.open(label)
     plural = world.api.metadata(model)["verbose_name_plural"]
-    world.main.get_by_role("tab", name=re.compile(rf"^{plural}")).click()
+    world.banner.get_by_role("tab", name=re.compile(rf"^{plural}")).click()
 
 
 @when(phrase("{name:Actor} adds a new one from the tab"))
@@ -372,3 +375,9 @@ def form_asks_for(world, field):
 @then(phrase("the form does not ask for the {field:Words}"))
 def form_does_not_ask_for(world, field):
     expect(field_input(world, form_scope(world), field)).to_have_count(0)
+
+
+@then(phrase("the form leaves out the {field:Words}"))
+def form_leaves_out(world, field):
+    label = re.compile(rf"^{re.escape(field)}$", re.IGNORECASE)
+    expect(form_scope(world).locator(".ck-vt-cell-l").filter(has_text=label)).to_have_count(0)

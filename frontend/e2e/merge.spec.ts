@@ -18,7 +18,7 @@ test('merges two books, keeping a value from the second', async ({ page, request
   await page.getByRole('button', { name: 'Merge records' }).click();
 
   await expect(page).toHaveURL(`/${first.id}`);
-  await expect(page.getByRole('heading', { level: 1, name: `${tag} second`, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(`${tag} second`, { exact: true })).toBeVisible();
 
   await page.goto(`/BOK?q=${encodeURIComponent(tag)}`);
   await expect(page.getByRole('main').getByText('Showing 1–1 of 1')).toBeVisible();

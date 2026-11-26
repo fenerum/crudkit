@@ -13,7 +13,7 @@ import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
 import { handleActionResult } from '../../utils/actionResult';
-import { Button, Icon, Kbd, OverflowMenu, PageHeader } from '../../components/ui';
+import { Button, Icon, Kbd, OverflowMenu, useTopbarSlots } from '../../components/ui';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
 import ProgressBar from '../../components/ProgressBar';
@@ -57,7 +57,7 @@ function InlineTab({ inline, parent_object_id }: any) {
   );
 }
 
-function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id, actions, notices }: any) {
+function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id, right, primary, notices }: any) {
   const [searchParams, setSearchParams] = useSearchParams();
   const client = useMemo(() => new CrudKitAPIClient(), []);
 
@@ -125,7 +125,7 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id, actions
   };
 
   const tabs = (
-    <div className="ck-view-tabs" role="tablist">
+    <div className="ck-topbar-tabs" role="tablist">
       <button
         type="button"
         role="tab"
@@ -170,14 +170,17 @@ function DetailWebTabs({ fieldPairs, object, metadata, layout, type, id, actions
     </div>
   );
 
+  // The breadcrumbs end with the record's ID; its name follows them, then its tabs.
+  const countsKey = inlineCounts.map((q) => q.data).join(',');
+  useTopbarSlots(() => ({
+    title: object.label && object.label !== object.id ? { label: object.label } : undefined,
+    middle: tabs,
+    right,
+    primary,
+  }), [tab, countsKey, otherInlines.length, object.label, object.id, object.deleted, metadata]);
+
   return (
     <>
-      <PageHeader
-        title={object.label || object.id}
-        count={object.label && object.label !== object.id ? <span className="font-mono">{object.id}</span> : null}
-        actions={actions}
-        tabs={tabs}
-      />
       <div className="ck-vt-body">
         {notices}
         {tab === 'properties' && (
@@ -412,18 +415,14 @@ export default function Detail() {
       layout={layout}
       type={type}
       id={id}
-      actions={
-        <>
-          <OverflowMenu items={overflowItems} />
-          {!object.deleted && (
-            <Link to={url(object.id, 'edit', { next: currentUrl })} className="ck-btn ck-btn-primary">
-              <Icon name="edit-3" size={14} color="currentColor" />
-              Edit
-              <Kbd>E</Kbd>
-            </Link>
-          )}
-        </>
-      }
+      right={<OverflowMenu items={overflowItems} size="sm" />}
+      primary={object.deleted ? null : (
+        <Link to={url(object.id, 'edit', { next: currentUrl })} className="ck-btn ck-btn-primary ck-btn-sm">
+          <Icon name="edit-3" size={12} color="currentColor" />
+          Edit
+          <Kbd>E</Kbd>
+        </Link>
+      )}
       notices={
         <>
           {object.deleted && (

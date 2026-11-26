@@ -8,10 +8,10 @@ test('an open detail page shows changes made elsewhere', async ({ page, request 
   const reading = await createObject(request, 'RDG', { name });
 
   await gotoWithChangeStream(page, `/${reading.id}`);
-  await expect(page.getByRole('heading', { level: 1, name, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(name, { exact: true })).toBeVisible();
 
   await updateObject(request, reading.id, { name: `${name} (renamed)` });
-  await expect(page.getByRole('heading', { level: 1, name: `${name} (renamed)`, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(`${name} (renamed)`, { exact: true })).toBeVisible();
 });
 
 test('the edit form keeps typed values and offers a reload', async ({ page, request }) => {

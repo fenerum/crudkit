@@ -4,8 +4,9 @@ import { useBreadcrumbs } from "../hooks/useBreadcrumbs";
 export default function Breadcrumbs() {
   const { crumbs } = useBreadcrumbs();
 
-  return crumbs.map((crumb, index) => {
-    const isLast = index === crumbs.length - 1;
+  // A list's views are tabs right after the trail, so the open view isn't a crumb.
+  return crumbs.filter((crumb) => !crumb.viewId).map((crumb, index, shown) => {
+    const isLast = index === shown.length - 1;
     return (
       <li key={index} data-breadcrumbs-title={isLast ? "true" : "false"}>
         <div className="flex items-center gap-2">

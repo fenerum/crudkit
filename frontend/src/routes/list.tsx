@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { Icon, Kbd, OverflowMenu, PageHeader, useScreenContext } from '../../components/ui';
+import { Icon, Kbd, OverflowMenu, useScreenContext, useTopbarSlots } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -203,30 +203,13 @@ export default function List() {
     return items;
   }, [view, metadata?.type, metadata?.can_create, currentUrl, navigate]);
 
-
-  if (isMetadataLoading || isViewsLoading || isViewLoading) {
-    return <div className="p-4 text-fg-3 text-sm animate-pulse">Loading metadata…</div>;
-  }
-  if (!metadata) return <div className="p-4 text-fg-3 text-sm">No metadata found</div>;
-
-  const displayData = objectList?.isPaginated ? objectList.results : objectList;
-
-  const header = (
-    <PageHeader
-      title={metadata.verbose_name_plural}
-      count={objectList ? (objectList.isPaginated ? objectList.count : displayData.length) : null}
-      actions={
-        <>
-          <OverflowMenu items={overflowItems} />
-          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary">
-            <Icon name="plus" size={14} color="currentColor" />
-            New
-            <Kbd>N</Kbd>
-          </Link>
-        </>
-      }
-      tabs={views && views.length > 0 && (
-        <div className="ck-view-tabs">
+  // The top bar carries the page's chrome so the list gets the whole height:
+  // the views as tabs after the breadcrumbs, then search, actions and New.
+  useTopbarSlots(() => {
+    if (!metadata) return {};
+    return {
+      middle: views && views.length > 0 ? (
+        <div className="ck-topbar-tabs" aria-label="Views">
           {views.map((v: any) => (
             <button
               key={v.id}
@@ -242,16 +225,28 @@ export default function List() {
             </button>
           ))}
         </div>
-      )}
-      toolbar={
-        <PageSearch placeholder={`Search ${metadata.verbose_name_plural?.toLowerCase() || 'items'}…`} />
-      }
-    />
-  );
+      ) : null,
+      pageSearch: <PageSearch placeholder={`Search ${metadata.verbose_name_plural?.toLowerCase() || 'items'}…`} />,
+      right: <OverflowMenu items={overflowItems} size="sm" />,
+      primary: (
+        <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary ck-btn-sm">
+          <Icon name="plus" size={12} color="currentColor" />
+          New
+          <Kbd>N</Kbd>
+        </Link>
+      ),
+    };
+  }, [metadata, views, view?.id, type, currentUrl, overflowItems, navigate]);
+
+  if (isMetadataLoading || isViewsLoading || isViewLoading) {
+    return <div className="p-4 text-fg-3 text-sm animate-pulse">Loading metadata…</div>;
+  }
+  if (!metadata) return <div className="p-4 text-fg-3 text-sm">No metadata found</div>;
+
+  const displayData = objectList?.isPaginated ? objectList.results : objectList;
 
   return (
     <>
-      {header}
       {isListLoading ? (
         <div className="rounded-lg border border-border-1 bg-bg-2 p-6">
           <div className="animate-pulse flex flex-col space-y-4">

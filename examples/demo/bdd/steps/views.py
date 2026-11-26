@@ -74,8 +74,18 @@ def a_view_with_layout(world, layout, label, model):
     create_view(world, model, label, layout=layout, order_by="-created_at")
 
 
+@given(phrase('a {layout:Words} view "{label:Q}" of the {model:Model} with the {icon:Words} icon'))
+def a_view_with_icon(world, layout, label, model, icon):
+    create_view(world, model, label, layout=layout, icon=icon.replace(" ", "-"))
+
+
+def shows_icon(locator, icon):
+    """`icon` as a feature writes it ("layout grid"), drawn as that lucide icon."""
+    expect(locator.locator(f"svg.lucide-{icon.replace(' ', '-')}")).to_have_count(1)
+
+
 def view_tab(world, label):
-    return world.main.get_by_role("button", name=world.text(label), exact=True)
+    return world.banner.get_by_role("button", name=world.text(label), exact=True)
 
 
 def sidebar_link(world, label):
@@ -113,6 +123,11 @@ def view_is_open(world, label):
 @then(phrase('the view "{label:Q}" is offered in the sidebar'))
 def offered_in_sidebar(world, label):
     expect(sidebar_link(world, label)).to_be_visible()
+
+
+@then(phrase('the view "{label:Q}" has the {icon:Words} icon in the sidebar'))
+def view_icon_in_sidebar(world, label, icon):
+    shows_icon(sidebar_link(world, label), icon)
 
 
 @then(phrase('the view "{label:Q}" is not offered in the sidebar'))

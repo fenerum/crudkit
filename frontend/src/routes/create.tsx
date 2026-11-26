@@ -1,7 +1,6 @@
 import { useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { useCreateForm } from '../../utils/formHooks';
 import FormContainer from '../../components/FormContainer';
-import { PageHeader } from '../../components/ui';
 
 export default function Create() {
   const { segment } = useParams();
@@ -31,23 +30,20 @@ export default function Create() {
   const fieldPairs = getFieldPairs();
 
   return (
-    <>
-      <PageHeader title={`New ${metadataQuery.data?.verbose_name || ''}`.trim()} />
-      <FormContainer
-        isLoading={isLoading}
-        isError={isError}
-        errorMessage={errorMessage}
-        object={initialObject}
-        metadata={metadata}
-        fieldPairs={fieldPairs}
-        errors={errors}
-        onSubmit={handleSubmit}
-        submitButtonText="Create"
-        cancelHref={nextUrl || `/${type}/`}
-        formMethods={formMethods}
-        modelType={type}
-        highlightFields={assistantFill && Object.keys(assistantFill)}
-      />
-    </>
+    <FormContainer
+      isLoading={isLoading}
+      isError={isError}
+      errorMessage={errorMessage}
+      object={initialObject}
+      metadata={metadata}
+      fieldPairs={fieldPairs}
+      errors={errors}
+      onSubmit={handleSubmit}
+      submitButtonText="Create"
+      cancelHref={nextUrl || `/${type}/`}
+      formMethods={formMethods}
+      modelType={type}
+      highlightFields={assistantFill && Object.keys(assistantFill)}
+    />
   );
 }

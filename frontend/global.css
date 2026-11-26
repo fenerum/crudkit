@@ -841,7 +841,7 @@ div[dir="auto"] > * {
   .ck-tab.is-empty .ck-tab-count { background: transparent; color: var(--fg-4); }
   .ck-tab.is-empty:hover { color: var(--fg-2); }
   .ck-tab.is-empty.is-on { color: var(--fg-1); }
-  .ck-vt-body { padding: 24px 0 48px; display: flex; flex-direction: column; gap: 24px; }
+  .ck-vt-body { padding: 0 0 48px; display: flex; flex-direction: column; gap: 24px; }
   /* Stack of per-row grids that visually merge into one bordered container.
      Each row gets its own `.ck-vt-cells` grid so rows can have different
      column counts (1, 2, 3, 4 fields per line); the radii + duplicate borders
@@ -1775,6 +1775,13 @@ div[dir="auto"] > * {
     transition: background var(--dur-med) var(--ease-out);
   }
   .ck-rail-item.is-active .ck-rail-ico { background: var(--accent-bg); gap: 0; }
+  .ck-rail-initials {
+    width: 20px; height: 20px; border-radius: 5px;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 9.5px; font-weight: 600; letter-spacing: -0.02em;
+    color: var(--fg-1); background: var(--bg-1); box-shadow: inset 0 0 0 1px var(--border-3);
+  }
+  .ck-rail-item.is-active .ck-rail-initials { color: var(--link); box-shadow: inset 0 0 0 1px currentColor; }
   .ck-rail-label {
     font-size: 8.5px; font-weight: 500; line-height: 1; letter-spacing: -0.01em;
     max-width: 44px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -1871,36 +1878,18 @@ div[dir="auto"] > * {
   /* ---- Top bar: breadcrumbs left, page slots + assistant right ---- */
   .ck-crumbs { display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden; font-size: 13px; color: var(--fg-3); }
 
-  /* ---- Page header: title + count, actions, view tabs, toolbar ---- */
-  .ck-page-header { margin: calc(-1 * var(--gutter-y)) calc(-1 * var(--gutter-x)) 0; }
-  .ck-page-title-row { display: flex; align-items: flex-start; gap: 12px; padding: 20px var(--gutter-x) 0; }
-  .ck-page-title-group { display: flex; align-items: baseline; gap: 10px; min-width: 0; padding-top: 4px; }
-  .ck-page-title {
-    font-size: 20px; line-height: 1.2; font-weight: 600; letter-spacing: var(--track-snug);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .ck-page-title::first-letter { text-transform: uppercase; }
-  .ck-page-count { font-size: 13px; color: var(--fg-3); white-space: nowrap; }
-  .ck-page-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
-  .ck-view-bar {
-    display: flex; align-items: flex-end; gap: 12px;
-    margin-top: 12px; padding: 0 var(--gutter-x);
-    border-bottom: 1px solid var(--border-2);
-    min-height: 41px;
-  }
-  .ck-view-tabs {
-    flex: 1 1 auto; min-width: 0;
-    display: flex; align-items: center; gap: 2px;
+  .ck-topbar-title { min-width: 0; font-size: var(--text-md); color: var(--fg-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ck-topbar-middle { flex: 1; min-width: 0; align-self: stretch; display: flex; align-items: stretch; gap: 8px; overflow: hidden; }
+  .ck-topbar-actions { margin-left: auto; display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+
+  /* ---- Tabs in the top bar (a list's views, a record's tabs), underlined on its border ---- */
+  .ck-topbar-tabs {
+    align-self: stretch; min-width: 0;
+    display: flex; align-items: stretch; gap: 2px;
     overflow-x: auto; scrollbar-width: none;
   }
-  .ck-view-tabs::-webkit-scrollbar { display: none; }
-  .ck-view-tabs .ck-tab { flex-shrink: 0; }
-  .ck-view-toolbar { display: flex; align-items: center; gap: 6px; margin-left: auto; padding-bottom: 6px; flex-shrink: 0; }
-  /* A full-bleed view right under the header starts flush below it. */
-  .ck-page-header + .ck-fullbleed { margin-top: 0; }
-  .ck-page-header + :not(.ck-fullbleed) { margin-top: 4px; }
-  /* A header that is only a title (forms) needs room below it. */
-  .ck-page-title-row:last-child { padding-bottom: 16px; }
+  .ck-topbar-tabs::-webkit-scrollbar { display: none; }
+  .ck-topbar-tabs .ck-tab { height: auto; flex-shrink: 0; padding: 0 10px; }
 
   /* ≤1200px: the assistant overlays the content. */
   @media (max-width: 1200px) {
@@ -1940,17 +1929,22 @@ div[dir="auto"] > * {
   /* ≤640px: tighter gutters, header pieces stack. */
   @media (max-width: 640px) {
     :root { --gutter-x: 12px; --gutter-y: 16px; }
-    .ck-page-title-row { flex-wrap: wrap; }
-    .ck-page-title { font-size: 18px; }
-    .ck-page-actions { margin-left: 0; width: 100%; justify-content: flex-start; }
-    .ck-view-bar { flex-wrap: wrap; }
     .ck-vt-cell:not(.is-form) { flex-direction: column; align-items: flex-start; gap: 2px; }
     .ck-vt-cell:not(.is-form) .ck-vt-cell-l { flex-basis: auto; }
     .ck-vt-cell:not(.is-form) .ck-vt-cell-v { width: 100%; flex: none; }
-    .ck-view-tabs { flex-basis: 100%; }
-    .ck-view-toolbar { margin-left: 0; width: 100%; padding: 8px 0; }
-    .ck-view-toolbar > *, .ck-view-toolbar input { flex: 1; width: 100% !important; }
     .ck-btn .ck-kbd { display: none; }
+    /* The top bar's tabs and search drop to rows of their own. */
+    .ck-topbar { flex-wrap: wrap; height: auto; }
+    .ck-topbar .ck-crumbs { flex: 1 1 0; min-width: 0; min-height: var(--topbar-h); }
+    .ck-topbar-title { flex: 1 1 0; }
+    .ck-topbar-middle:empty { display: none; }
+    .ck-topbar-middle {
+      order: 1; flex: 1 0 100%; height: 40px;
+      margin: 0 -12px; padding: 0 12px; border-top: 1px solid var(--border-1);
+    }
+    .ck-topbar-middle > svg { display: none; }
+    .ck-topbar-search { order: 2; flex: 1 0 100%; padding: 8px 0; }
+    .ck-topbar-search > *, .ck-topbar-search input { width: 100% !important; }
   }
 }
 

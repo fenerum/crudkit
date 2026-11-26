@@ -1,7 +1,7 @@
 import { useParams, useSearchParams } from 'react-router-dom';
 import { useEditForm } from '../../utils/formHooks';
 import FormContainer from '../../components/FormContainer';
-import { Button, PageHeader } from '../../components/ui';
+import { Button } from '../../components/ui';
 import { url } from '../../utils/urls';
 
 export default function Edit() {
@@ -32,7 +32,6 @@ export default function Edit() {
 
   return (
     <>
-      <PageHeader title={`Edit ${object.label || id}`} />
       {remoteChanged && (
         <div
           role="status"

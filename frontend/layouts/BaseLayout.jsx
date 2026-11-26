@@ -18,7 +18,7 @@ import {useDocumentTitle} from "../hooks/useDocumentTitle";
 import {usePendingProposals} from "../hooks/usePendingProposals";
 import {useHotkeys} from "react-hotkeys-hook";
 import {ASSISTANT_OVERLAY_QUERY, NAV_OVERLAY_QUERY, useMediaQuery} from "../hooks/useMediaQuery";
-import {Avatar, hasIcon, Icon, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
+import {Avatar, hasIcon, Icon, initialsFromName, Kbd, ScreenProvider, ThemeToggle, TopbarSlotsProvider, useTopbarSlotsValue} from "../components/ui";
 import {CommandPaletteContext} from "../components/ui/CommandPaletteContext";
 import {PageSearchContext} from "../components/ui/PageSearchContext";
 import AssistantSidebar from "../components/Assistant/AssistantSidebar";
@@ -34,6 +34,11 @@ const LAYOUT_ICONS = {
   conversation: 'messages-square',
   quadrant: 'scatter-chart',
 };
+
+// A view's own icon, else its layout's.
+function viewIcon(view) {
+  return hasIcon(view.icon) ? view.icon : LAYOUT_ICONS[view.layout] || 'table-2';
+}
 
 function viewHref(view) {
   return view.default ? `/${view.model}` : `/${view.model}/VIW/${view.id}`;
@@ -75,6 +80,7 @@ function NavSection({title, action, children}) {
 
 // The rail labels sit under the icon and hide on the active item, so the
 // accessible name comes from aria-label.
+// Without an icon the item shows the label's initials.
 function RailItem({href, icon, label, active, badge, onClick, ariaLabel}) {
   return (
     <LinkOrButton
@@ -87,7 +93,9 @@ function RailItem({href, icon, label, active, badge, onClick, ariaLabel}) {
       title={ariaLabel || label}
     >
       <span className="ck-rail-ico">
-        <Icon name={icon} size={18} color="currentColor" />
+        {icon
+          ? <Icon name={icon} size={18} color="currentColor" />
+          : <span className="ck-rail-initials" aria-hidden="true">{initialsFromName(label)}</span>}
         <span className="ck-rail-label" aria-hidden="true">{label}</span>
         {badge > 0 && <span className="ck-rail-badge">{badge}</span>}
       </span>
@@ -123,17 +131,23 @@ function Topbar({ navOverlay, navCollapsed, onOpenNav }) {
       </nav>
 
       {slots.title && slots.title.label && (
-        <span className="text-md text-fg-2 truncate min-w-0">{slots.title.label}</span>
+        <span className="ck-topbar-title">{slots.title.label}</span>
       )}
 
-      {/* Middle slot — view switcher, tab strip, etc. */}
-      <div className="flex-1 min-w-0 flex items-center gap-2 overflow-hidden">
-        {slots.middle}
+      {/* Middle slot: the page's tabs, continuing the breadcrumbs */}
+      <div className="ck-topbar-middle">
+        {slots.middle && (
+          <>
+            <Icon name="chevron-right" size={12} color="var(--fg-4)" className="self-center flex-shrink-0" />
+            {slots.middle}
+          </>
+        )}
       </div>
 
-      <div className="flex items-center gap-1.5 flex-shrink-0">
+      {slots.pageSearch && <div className="ck-topbar-search">{slots.pageSearch}</div>}
+
+      <div className="ck-topbar-actions">
         {slots.viewSwitch}
-        {slots.pageSearch}
         {slots.right}
         <div className="hidden md:flex items-center">
           <TimeTracker />
@@ -350,7 +364,7 @@ function BaseLayoutInner() {
             {visibleWorkspaces.map((workspace) => (
               <RailItem
                 key={workspace.id}
-                icon={hasIcon(workspace.icon) ? workspace.icon : 'layout-grid'}
+                icon={hasIcon(workspace.icon) ? workspace.icon : null}
                 label={workspace.name || 'Untitled'}
                 active={activeWorkspace?.id === workspace.id}
                 onClick={() => openWorkspace(workspace)}
@@ -417,7 +431,7 @@ function BaseLayoutInner() {
                   <NavItem
                     key={view.id}
                     href={href}
-                    icon={LAYOUT_ICONS[view.layout] || 'table-2'}
+                    icon={viewIcon(view)}
                     label={view.name || 'Untitled'}
                     count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                     active={active}
@@ -457,7 +471,7 @@ function BaseLayoutInner() {
                   <NavItem
                     key={view.id}
                     href={href}
-                    icon={LAYOUT_ICONS[view.layout] || 'table-2'}
+                    icon={viewIcon(view)}
                     label={view.name || 'Untitled'}
                     count={view.show_badge_in_menu ? badgeCounts[view.id] : null}
                     active={pathname === href}

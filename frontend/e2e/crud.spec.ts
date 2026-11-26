@@ -4,7 +4,7 @@ test('creates, edits and deletes a book', async ({ page }) => {
   const title = `E2E book ${Date.now()}`;
 
   await page.goto('/BOK');
-  await page.getByRole('main').getByRole('link', { name: /^New/ }).click();
+  await page.getByRole('banner').getByRole('link', { name: /^New/ }).click();
   await page.locator('input[name="title"]').fill(title);
   await page.getByRole('main').getByRole('combobox').fill('Calvino');
   await page.getByRole('option', { name: 'Italo Calvino' }).click();
@@ -17,17 +17,17 @@ test('creates, edits and deletes a book', async ({ page }) => {
   await page.getByRole('main').getByRole('link', { name: /^BOK\d+$/ }).click();
   await expect(page).toHaveURL(/\/BOK\d+$/);
   const bookUrl = page.url();
-  await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(title, { exact: true })).toBeVisible();
   await expect(page.getByRole('main').getByRole('link', { name: 'Italo Calvino' })).toBeVisible();
 
-  await page.getByRole('main').getByRole('link', { name: /^Edit/ }).click();
+  await page.getByRole('banner').getByRole('link', { name: /^Edit/ }).click();
   const titleInput = page.locator('input[name="title"]');
   await expect(titleInput).toHaveValue(title);
   await titleInput.fill(`${title} (edited)`);
   await page.getByRole('button', { name: 'Save' }).click();
 
   await expect(page).toHaveURL(bookUrl);
-  await expect(page.getByRole('heading', { level: 1, name: `${title} (edited)`, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByText(`${title} (edited)`, { exact: true })).toBeVisible();
 
   await page.goto(`${bookUrl}/delete`);
   await page.getByRole('button', { name: 'Delete' }).click();

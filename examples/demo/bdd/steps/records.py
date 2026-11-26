@@ -40,7 +40,7 @@ from bdd.world import goto_with_change_stream, phrase
 
 @when(phrase("{name:Actor} starts a new {model:Model}"))
 def starts_a_new_record(world):
-    world.main.get_by_role("link", name=re.compile(r"^New")).click()
+    world.banner.get_by_role("link", name=re.compile(r"^New")).click()
 
 
 @given(phrase("{name:Actor} is filling in a new {model:Model}"))
@@ -51,7 +51,7 @@ def filling_in_a_new_record(world, model):
 @when(phrase('{name:Actor} edits "{label:Q}"'))
 def edits(world, label):
     world.open(label)
-    world.main.get_by_role("link", name=re.compile(r"^Edit")).click()
+    world.banner.get_by_role("link", name=re.compile(r"^Edit")).click()
 
 
 @when(phrase('{name:Actor} is about to delete "{label:Q}"'))
@@ -93,7 +93,7 @@ def its_value_is(world, field, value):
 
 @then(phrase('the page is about "{text:Q}"'))
 def page_is_about(world, text):
-    expect(world.main.get_by_role("heading", level=1, name=world.text(text))).to_be_visible()
+    expect(world.visible_text(text, world.banner).first).to_be_visible()
 
 
 # Related records
@@ -103,7 +103,7 @@ def page_is_about(world, text):
 def opens_a_related_tab(world, model, label):
     world.open(label)
     plural = world.api.metadata(model)["verbose_name_plural"]
-    world.main.get_by_role("tab", name=re.compile(rf"^{plural}")).click()
+    world.banner.get_by_role("tab", name=re.compile(rf"^{plural}")).click()
 
 
 @when(phrase("{name:Actor} adds a new one from the tab"))

@@ -22,7 +22,7 @@ test('creates a filtered saved view and switches to it', async ({ page }) => {
   await page.getByRole('main').getByRole('button', { name: 'Create', exact: true }).click();
 
   await expect(page).toHaveURL('/RDG');
-  await page.getByRole('main').getByRole('button', { name }).click();
+  await page.getByRole('banner').getByRole('button', { name }).click();
   await expect(page).toHaveURL(/\/RDG\/VIW\/VIW\d+$/);
   await expect(page).toHaveTitle(`${name} - CrudKit Demo`);
 
@@ -45,7 +45,7 @@ test.describe('layouts', () => {
   });
 
   const openView = (page, name: string) =>
-    page.getByRole('main').getByRole('button', { name, exact: true }).click();
+    page.getByRole('banner').getByRole('button', { name, exact: true }).click();
 
   test('kanban groups cards by status', async ({ page }) => {
     await openView(page, 'Board');
@@ -168,7 +168,7 @@ test.describe('layouts', () => {
     }
     await page.locator('.ck-qt-row').filter({ hasText: 'Cities on the train' }).click();
     await expect(page).toHaveURL(/\/RDG\d+$/);
-    await expect(page.getByRole('heading', { level: 1, name: 'Cities on the train' })).toBeVisible();
+    await expect(page.getByRole('banner').getByText('Cities on the train', { exact: true })).toBeVisible();
   });
 
   test('swimlane splits status columns into priority rows', async ({ page }) => {
@@ -190,7 +190,7 @@ test('private views only show to their owner, outside the shared menu', async ({
   await page.goto('/RDG');
 
   const sidebar = page.getByRole('navigation', { name: 'Sidebar' });
-  const viewTabs = page.getByRole('main');
+  const viewTabs = page.getByRole('banner');
   await expect(viewTabs.getByRole('button', { name, exact: true })).toBeVisible();
   await expect(sidebar.getByRole('link', { name, exact: true })).toBeVisible();
 
@@ -205,6 +205,6 @@ test('views without show_in_menu stay out of the sidebar', async ({ page, reques
   await createObject(request, 'VIW', { model: 'RDG', name, fields: ['name'], show_in_menu: false });
   await page.goto('/RDG');
 
-  await expect(page.getByRole('main').getByRole('button', { name, exact: true })).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('button', { name, exact: true })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Sidebar' }).getByRole('link', { name })).toBeHidden();
 });

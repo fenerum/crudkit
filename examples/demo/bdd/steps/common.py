@@ -221,6 +221,13 @@ def picks(world, value, field):
     world.page.get_by_role("option", name=world.text(value), exact=True).click()
 
 
+@then(phrase("the {field:Words} is picked from a list offering {texts:QList}"))
+def select_offers(world, field, texts):
+    searchable_select(world, field).click()
+    for text in texts:
+        expect(world.page.get_by_role("option", name=text, exact=True)).to_be_visible()
+
+
 def submit(world, button):
     """Submit the innermost form; a form in a dialog is done when its dialog closes."""
     dialogs = world.page.get_by_role("dialog")

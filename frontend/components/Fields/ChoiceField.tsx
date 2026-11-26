@@ -2,6 +2,7 @@ import * as React from "react";
 import Select from "react-select";
 import BaseField, { BaseFieldProps } from "./BaseField";
 import { selectStyles } from "./selectStyles";
+import { Icon } from "../ui";
 
 export interface ChoiceFieldProps extends BaseFieldProps {
   metadata: BaseFieldProps["metadata"] & {
@@ -58,6 +59,12 @@ export default function ChoiceField({
           placeholder={metadata.blank ? "Select..." : "Required - select an option"}
           noOptionsMessage={() => "No options available"}
           classNames={{ control: () => "w-full" }}
+          formatOptionLabel={metadata.type === "IconField" ? (option: any) => (
+            <span className="inline-flex items-center gap-2">
+              <Icon name={option.value} size={14} color="currentColor" />
+              {option.label}
+            </span>
+          ) : undefined}
           menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
           menuPosition="fixed"
         />

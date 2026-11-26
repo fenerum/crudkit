@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FormProvider } from "react-hook-form";
 import DetailPane from "./DetailPane";
+import { Kbd } from "./ui";
 import ActionButton from "./ActionButton";
 import { useHotkeys } from "react-hotkeys-hook";
 import { isModalOpen } from "./Modal";
@@ -93,17 +94,17 @@ export default function FormContainer({
       />
       <div className="mt-6 flex flex-row items-center justify-end gap-2 pb-8">
         {deleteHref && (
-          <Link to={deleteHref} className="ck-btn ck-btn-ghost text-danger mr-auto">
+          <Link to={deleteHref} className="ck-btn ck-btn-secondary text-danger mr-auto">
             Delete
           </Link>
         )}
         {onCancel ? (
           <button type="button" onClick={onCancel} className="ck-btn ck-btn-secondary">
-            Cancel <span className="ck-kbd">Esc</span>
+            Cancel <Kbd>Esc</Kbd>
           </button>
         ) : (
           <Link to={cancelHref} className="ck-btn ck-btn-secondary">
-            Cancel <span className="ck-kbd">Esc</span>
+            Cancel <Kbd>Esc</Kbd>
           </Link>
         )}
         <ActionButton

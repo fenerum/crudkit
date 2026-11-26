@@ -19,7 +19,9 @@
   view, replacing "All"), and picking a workspace opens its first view. New workspace moved
   to a "+" in Home's sidebar header, showing a collapsed sidebar to the top bar, and a
   workspace icon name the SPA doesn't know falls back to a grid instead of a question mark.
-  The Actions menu button is a quiet text button at full height, its key in the tooltip.
+  Standalone secondary buttons (Actions, Delete, Discard, Undo, Load older messages) get a
+  thin border so they don't vanish into the white page. Key hints on buttons (New N,
+  Edit E, Actions ., Cancel Esc) are small borderless tiles in the button's own tone.
 - Record, create and edit pages get the same page header: the record's name as the title
   with its ID beside it, Actions and Edit on the right, and the record's tabs under it. Field
   values line up next to their labels, and without a layout the record's own fields come
@@ -27,7 +29,8 @@
   created/updated) and no longer open with required fields flagged as errors.
 - Lists show choice fields as status pills in the board's colours and priorities with the
   board's bars; the per-row delete button only appears on hover; the search box sits in the
-  tab row; page buttons are hidden when everything fits on one page. Sidebar views show an
+  tab row; page buttons are hidden when everything fits on one page. The crudkit version moved
+  from the bottom of the sidebar to under the logo in the rail. Sidebar views show an
   icon for their layout (table, board, gallery, lanes, inbox, quadrant) instead of a colour
   dot. Board and inbox times read "19 hours ago". The time tracker's button reads "Track time"
   and only shows on record pages (a running clock still shows everywhere).

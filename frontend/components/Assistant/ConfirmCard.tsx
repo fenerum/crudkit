@@ -66,7 +66,7 @@ export default function ConfirmCard({
               <span className="text-xs text-fg-3">Undone.</span>
             ) : (
               onUndo && (
-                <button type="button" className="ck-btn ck-btn-ghost ck-btn-sm" onClick={onUndo}>
+                <button type="button" className="ck-btn ck-btn-secondary ck-btn-sm" onClick={onUndo}>
                   Undo
                 </button>
               )

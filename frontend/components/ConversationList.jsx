@@ -11,7 +11,7 @@ import {useHotkeys} from "react-hotkeys-hook";
 import {toast} from "react-toastify";
 import {useMutation} from "@tanstack/react-query";
 import {useAuth} from "../context/AuthContext";
-import {Avatar, Icon, IconButton, OverflowMenu} from "./ui";
+import {Avatar, Icon, IconButton, Kbd, OverflowMenu} from "./ui";
 import SafeMarkdown from "../shared/SafeMarkdown";
 import MarkdownComposer from "../shared/MarkdownComposer";
 import {APPROVAL_HINT} from "../shared/ProposalPayload";
@@ -237,7 +237,7 @@ function Messages({parentId}) {
               type="button"
               onClick={loadMoreMessages}
               disabled={isLoadingMore}
-              className="ck-btn ck-btn-ghost ck-btn-sm"
+              className="ck-btn ck-btn-secondary ck-btn-sm"
             >
               {isLoadingMore ? "Loading…" : "Load older messages"}
             </button>
@@ -616,9 +616,10 @@ export default function ConversationList({objectList, view, model, metadata, ref
               />
             )}
             {selectedObject && editHref && (
-              <Link to={editHref} className="ck-btn ck-btn-primary ck-btn-sm" title="Edit [E]">
+              <Link to={editHref} className="ck-btn ck-btn-primary ck-btn-sm">
                 <Icon name="edit-3" size={12} color="currentColor" />
                 Edit
+                <Kbd>E</Kbd>
               </Link>
             )}
           </div>

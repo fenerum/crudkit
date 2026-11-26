@@ -334,8 +334,15 @@ function BaseLayoutInner() {
       <TopbarSlotsProvider>
       <div className={shellClass}>
         <nav className="ck-rail" aria-label="Workspaces">
-          <Link to="/" className="ck-rail-logo" aria-label={appConfig.app_name} onClick={handleNavClick}>
+          <Link
+            to="/"
+            className="ck-rail-logo"
+            aria-label={appConfig.app_name}
+            title={appConfig.crudkit_version ? `crudkit v${appConfig.crudkit_version}` : undefined}
+            onClick={handleNavClick}
+          >
             <AppLogo />
+            {appConfig.crudkit_version && <span className="ck-rail-version">v{appConfig.crudkit_version}</span>}
           </Link>
           {/* One item per workspace; Home is the default one, its menu every shared view. */}
           <div className="ck-rail-group">
@@ -460,11 +467,6 @@ function BaseLayoutInner() {
               })}
             </NavSection>
 
-            {appConfig.crudkit_version && (
-              <div className="ck-navpanel-version font-mono select-all">
-                <a href="https://github.com/fenerum/crudkit" target="_blank" rel="noopener noreferrer" className="text-inherit">crudkit</a> v{appConfig.crudkit_version}
-              </div>
-            )}
           </div>
         </nav>
 

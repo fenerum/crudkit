@@ -277,7 +277,7 @@ const TimeTracker = () => {
           <div className="mt-4 flex justify-end gap-2">
             <button
               type="button"
-              className="ck-btn ck-btn-ghost ck-btn-sm"
+              className="ck-btn ck-btn-secondary ck-btn-sm"
               onClick={() => setIsAdjustModalOpen(false)}
             >
               Cancel

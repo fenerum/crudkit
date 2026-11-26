@@ -51,7 +51,7 @@ def filling_in_a_new_record(world, model):
 @when(phrase('{name:Actor} edits "{label:Q}"'))
 def edits(world, label):
     world.open(label)
-    world.main.get_by_role("link", name="Edit", exact=True).click()
+    world.main.get_by_role("link", name=re.compile(r"^Edit")).click()
 
 
 @when(phrase('{name:Actor} is about to delete "{label:Q}"'))

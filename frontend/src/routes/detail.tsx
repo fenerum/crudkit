@@ -13,7 +13,7 @@ import generateFieldPairs from '../../utils/fieldpairs';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
 import { handleActionResult } from '../../utils/actionResult';
-import { Button, Icon, OverflowMenu, PageHeader } from '../../components/ui';
+import { Button, Icon, Kbd, OverflowMenu, PageHeader } from '../../components/ui';
 import { APPROVAL_HINT } from '../../shared/ProposalPayload';
 import AgentRunOutput, { AGENT_RUN_BLOCK_FIELDS } from '../../components/AgentRunOutput';
 import ProgressBar from '../../components/ProgressBar';
@@ -416,9 +416,10 @@ export default function Detail() {
         <>
           <OverflowMenu items={overflowItems} />
           {!object.deleted && (
-            <Link to={url(object.id, 'edit', { next: currentUrl })} className="ck-btn ck-btn-primary" title="Edit [E]">
+            <Link to={url(object.id, 'edit', { next: currentUrl })} className="ck-btn ck-btn-primary">
               <Icon name="edit-3" size={14} color="currentColor" />
               Edit
+              <Kbd>E</Kbd>
             </Link>
           )}
         </>

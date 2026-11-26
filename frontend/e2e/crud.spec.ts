@@ -20,7 +20,7 @@ test('creates, edits and deletes a book', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: title, exact: true })).toBeVisible();
   await expect(page.getByRole('main').getByRole('link', { name: 'Italo Calvino' })).toBeVisible();
 
-  await page.getByRole('main').getByRole('link', { name: 'Edit', exact: true }).click();
+  await page.getByRole('main').getByRole('link', { name: /^Edit/ }).click();
   const titleInput = page.locator('input[name="title"]');
   await expect(titleInput).toHaveValue(title);
   await titleInput.fill(`${title} (edited)`);

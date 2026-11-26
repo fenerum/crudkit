@@ -8,7 +8,7 @@ import KanbanBoard from '../../components/Kanban';
 import Swimlane from '../../components/Swimlane';
 import QuadrantView from '../../components/QuadrantView';
 import ConversationList from '../../components/ConversationList';
-import { Icon, OverflowMenu, PageHeader, useScreenContext } from '../../components/ui';
+import { Icon, Kbd, OverflowMenu, PageHeader, useScreenContext } from '../../components/ui';
 import PageSearch from '../../components/PageSearch';
 import { useHotkeys } from 'react-hotkeys-hook';
 import { url } from '../../utils/urls';
@@ -218,9 +218,10 @@ export default function List() {
       actions={
         <>
           <OverflowMenu items={overflowItems} />
-          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary" title="New [N]">
+          <Link to={url(type, 'create', { next: currentUrl })} className="ck-btn ck-btn-primary">
             <Icon name="plus" size={14} color="currentColor" />
             New
+            <Kbd>N</Kbd>
           </Link>
         </>
       }

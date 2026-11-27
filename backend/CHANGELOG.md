@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.0 (2026-11-27)
+
+- A light, dense, monochrome design is now the default look. Dark stays one click away and a
+  stored choice is kept. One blue accent, zinc neutrals, borders instead of shadows, square
+  status badges, and dense lists with mono right-aligned numbers. The `brand_color` hook still
+  replaces the accent in both themes. Roboto and Roboto Mono ship self-hosted in the wheel
+  (OFL-1.1), so the app no longer requests Google Fonts. Existing theme token names are
+  unchanged; new ones are `--link`, `--accent-bg`, `--bg-selected`, `--bg-overlay` and
+  `--fg-on-accent`. (#93)
+- A new shell. An icon rail on the left holds Home, "All" plus one item per workspace, New
+  workspace, Search, and the Inbox with a count of pending proposals; it replaces the
+  workspace picker in the sidebar header. The sidebar lists the chosen workspace's views and
+  can be collapsed, staying collapsed after a reload. List pages get their own header with the
+  title, record count, Actions, New, the saved views as tabs, search and refresh. On narrow
+  screens the assistant and then the sidebar open over the content, and record lists scroll
+  sideways instead of squeezing their columns. (#93)
+- Fix all of a model's views being highlighted at once in the sidebar. (#93)
+
 ## Unreleased
 
 - New look for the SPA: a light, dense, monochrome design is now the default, with one blue

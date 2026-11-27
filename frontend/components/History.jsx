@@ -50,7 +50,7 @@ function Value({ field, value }) {
   if (value === null || value === undefined || value === '') return <span className="text-fg-4">—</span>;
   if (typeof value === 'string' && CK_ID.test(value)) {
     return (
-      <Link to={url(value)} className="text-primary-300 hover:underline">
+      <Link to={url(value)} className="text-link hover:underline">
         {value}
       </Link>
     );

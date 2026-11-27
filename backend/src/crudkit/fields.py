@@ -44,6 +44,34 @@ class FieldChoiceField(models.CharField):
         super().__init__(*args, **kwargs)
 
 
+# Icons the SPA can draw (frontend/components/ui/iconMap.js); a frontend test
+# keeps the two in step.
+ICON_NAMES = (
+    "home", "inbox", "mail", "messages-square", "phone", "calendar", "clock",
+    "users", "user", "building", "briefcase", "dollar-sign", "credit-card",
+    "file-text", "sticky-note", "tag", "star", "bell", "zap", "shield", "activity",
+    "list", "table-2", "kanban", "layout-grid", "columns", "rows", "layers",
+    "bar-chart", "pie-chart", "scatter-chart", "globe", "settings", "sparkles",
+)
+ICON_CHOICES = [(name, name.replace("-", " ").capitalize()) for name in ICON_NAMES]
+
+
+class IconField(models.CharField):
+    """The name of an icon, picked from ICON_CHOICES."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("max_length", 64)
+        kwargs["choices"] = ICON_CHOICES
+        super().__init__(*args, **kwargs)
+
+    def deconstruct(self):
+        # The list grows with the SPA's icons; keeping it out of migrations
+        # means adding one needs no migration.
+        name, path, args, kwargs = super().deconstruct()
+        kwargs.pop("choices", None)
+        return name, path, args, kwargs
+
+
 class CurrencyField(models.CharField):
     """
     A field for storing currency codes with helper methods for formatting

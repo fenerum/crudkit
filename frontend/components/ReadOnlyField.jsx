@@ -49,6 +49,11 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
     const content = <>
         {metadata.type === "JSONField" || metadata.type === "AITagsField" ? (
             <span>{JSON.stringify(value)}</span>
+        ) : value && metadata.type === "IconField" ? (
+            <span className="inline-flex items-center gap-2">
+                <Icon name={value} size={14} color="currentColor" />
+                {choiceLabel(metadata, value)}
+            </span>
         ) : value && metadata.type === "ImageField" ? (
             <img src={value} className="h-5 w-5 rounded-full" width={50} height={50} alt="" />
         ) : value && metadata.type === "DateTimeField" ? (
@@ -99,7 +104,7 @@ export default function ReadOnlyField({ value, metadata, link = true, expandable
     if (isAIField && value) {
         return (
             <span className="flex flex-row items-center gap-1">
-                <Icon name="sparkles" size={14} color="#3b82f6" />
+                <Icon name="sparkles" size={14} color="var(--primary-400)" />
                 {content}
             </span>
         );

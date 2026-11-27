@@ -1,6 +1,8 @@
 import * as React from "react";
 import Select from "react-select";
 import BaseField, { BaseFieldProps } from "./BaseField";
+import { selectStyles } from "./selectStyles";
+import { Icon } from "../ui";
 
 export interface ChoiceFieldProps extends BaseFieldProps {
   metadata: BaseFieldProps["metadata"] & {
@@ -52,51 +54,17 @@ export default function ChoiceField({
             onChange(selectedOption ? selectedOption.value : "");
           }}
           onBlur={onBlur}
-          styles={{
-            control: (base: any, state: any) => ({
-              ...base,
-              minHeight: '34px',
-              backgroundColor: 'var(--bg-2)',
-              borderColor: hasError
-                ? 'var(--danger)'
-                : state.isFocused
-                  ? 'var(--primary-400)'
-                  : 'var(--border-1)',
-              boxShadow: state.isFocused ? 'var(--shadow-focus)' : 'none',
-              '&:hover': {
-                borderColor: state.isFocused ? 'var(--primary-400)' : 'var(--border-2)',
-              },
-              borderRadius: 'var(--r-sm)',
-              position: 'relative',
-              zIndex: 1
-            }),
-            singleValue: (base: any) => ({ ...base, color: 'var(--fg-1)' }),
-            input: (base: any) => ({ ...base, color: 'var(--fg-1)' }),
-            placeholder: (base: any) => ({ ...base, color: 'var(--fg-3)' }),
-            menu: (base: any) => ({
-              ...base,
-              backgroundColor: 'var(--bg-4)',
-              border: '1px solid var(--border-2)',
-              boxShadow: 'var(--shadow-menu)',
-              zIndex: 9999
-            }),
-            option: (base: any, state: any) => ({
-              ...base,
-              backgroundColor: state.isSelected
-                ? 'var(--bg-5)'
-                : state.isFocused
-                  ? 'var(--bg-3)'
-                  : 'transparent',
-              color: 'var(--fg-1)',
-              cursor: 'pointer',
-            }),
-            indicatorSeparator: (base: any) => ({ ...base, backgroundColor: 'var(--border-1)' }),
-            menuPortal: (base: any) => ({ ...base, zIndex: 9999 })
-          }}
+          styles={selectStyles({ hasError })}
           isClearable={metadata.blank}
           placeholder={metadata.blank ? "Select..." : "Required - select an option"}
           noOptionsMessage={() => "No options available"}
           classNames={{ control: () => "w-full" }}
+          formatOptionLabel={metadata.type === "IconField" ? (option: any) => (
+            <span className="inline-flex items-center gap-2">
+              <Icon name={option.value} size={14} color="currentColor" />
+              {option.label}
+            </span>
+          ) : undefined}
           menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
           menuPosition="fixed"
         />

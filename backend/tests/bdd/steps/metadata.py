@@ -12,6 +12,7 @@ The description of a record type (what forms are built from)
 - `Then the field "name" is required` / `is optional` / `cannot be edited`
 - `Then the field "name" holds at most 255 characters` / `defaults to "active"`
 - `Then the field "status" offers the choices "active" and "churned"` / `offers every record type as a choice`
+  / `offers every icon the app can draw as a choice`
 - `Then the field "topic" links to topics`
 - `Then the field "fields" is explained with "Format:"`
 - `Then the field "body" is described as rich text` (see KINDS)
@@ -39,7 +40,7 @@ The description of one record (what the assistant reads)
 from parse import with_pattern
 from pytest_bdd import given, then, when
 
-from crudkit.fields import FieldChoiceField, ModelField
+from crudkit.fields import ICON_NAMES, FieldChoiceField, IconField, ModelField
 from crudkit.models import EmailWYSIWYGEditorField, WYSIWYGEditorField
 from crudkit.utils import get_model_types
 from crudkit_api.metadata import build_instance_metadata
@@ -53,6 +54,7 @@ KINDS = {
     "email bodies": EmailWYSIWYGEditorField,
     "choosing a record type": ModelField,
     "choosing a field": FieldChoiceField,
+    "choosing an icon": IconField,
 }
 
 
@@ -149,6 +151,11 @@ def offers_choices(world, name, labels):
 @then(phrase('the field "{name:Q}" offers every record type as a choice'))
 def offers_record_types(world, name):
     assert [choice[0] for choice in _field(world, name)["choices"]] == sorted(get_model_types())
+
+
+@then(phrase('the field "{name:Q}" offers every icon the app can draw as a choice'))
+def offers_icons(world, name):
+    assert [choice[0] for choice in _field(world, name)["choices"]] == list(ICON_NAMES)
 
 
 @then(phrase('the field "{name:Q}" links to {model:Model}'))

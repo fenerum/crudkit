@@ -9,5 +9,5 @@ test('opens a book from the list and follows its author link', async ({ page }) 
   await main.getByRole('link', { name: 'Octavia E. Butler' }).click();
 
   await expect(page).toHaveURL(/\/AUT\d+$/);
-  await expect(page.getByRole('banner').getByText('Octavia E. Butler')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('Octavia E. Butler', { exact: true })).toBeVisible();
 });

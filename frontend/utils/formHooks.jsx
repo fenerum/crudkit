@@ -147,11 +147,13 @@ export function useCreateForm({ type, params = {}, onCreated = null, initialValu
   // Apply prefills onto the form whenever the initial query resolves.
   // (react-query v5 dropped `onSuccess`, so we wire this through useEffect.)
   // `initialValues` win over server prefills, which may send blanks for them.
+  // Blanks aren't validated yet: a new form doesn't open full of "required".
   useEffect(() => {
     if (!initialQuery.data) return;
     const fields = metadataQuery.data?.fields || {};
     for (const [key, value] of Object.entries({ ...initialQuery.data, ...initialValues })) {
-      formMethods.setValue(key, toFormValue(fields[key], value), { shouldValidate: true });
+      const shouldValidate = value != null && value !== '';
+      formMethods.setValue(key, toFormValue(fields[key], value), { shouldValidate });
     }
   }, [initialQuery.data, initialValues, formMethods, metadataQuery.data]);
 

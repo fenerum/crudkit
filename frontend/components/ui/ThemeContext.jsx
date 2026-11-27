@@ -5,14 +5,14 @@ import { appConfig } from '../../utils/appConfig';
 const STORAGE_KEY = `${appConfig.storage_prefix}-theme`;
 
 function readInitialTheme() {
-  if (typeof window === 'undefined' || !window.localStorage) return 'dark';
+  if (typeof window === 'undefined' || !window.localStorage) return 'light';
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (stored === 'light' || stored === 'dark') return stored;
   } catch {
     // localStorage unavailable (private mode) — fall through.
   }
-  return 'dark';
+  return 'light';
 }
 
 // Pre-paint: set the data-theme attribute as soon as this module loads, so
@@ -27,7 +27,7 @@ if (typeof document !== 'undefined') {
 }
 
 export const ThemeContext = createContext({
-  theme: 'dark',
+  theme: 'light',
   setTheme: () => {},
   toggleTheme: () => {},
 });

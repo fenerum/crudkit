@@ -1,4 +1,5 @@
 import BaseField, { BaseFieldProps } from "./BaseField";
+import { inputClass } from "./inputClass";
 
 interface TextFieldProps extends BaseFieldProps {
   metadata: BaseFieldProps["metadata"] & {
@@ -37,9 +38,7 @@ export default function TextField({
           required={metadata.required}
           maxLength={metadata.max_length}
           rows={5}
-          className={`block w-full rounded-md border-0 py-1.5 text-fg-1 bg-bg-2 ring-1 ring-inset ${
-            hasError ? 'ring-danger' : 'ring-border-1'
-          } placeholder:text-fg-3 focus:ring-2 focus:ring-inset focus:ring-primary-400 sm:text-sm sm:leading-6`}
+          className={inputClass(hasError)}
         />
       )}
     </BaseField>

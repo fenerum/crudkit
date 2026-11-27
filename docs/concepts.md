@@ -308,12 +308,17 @@ the same view may appear in any number of workspaces. Workspaces can be
 `public` or private to their creator, and are themselves CrudKit models
 managed through the generic API (`/api/v1/WSP/`) and the generic SPA forms.
 
-Workspaces only shape the sidebar: picking one from the sidebar-header
-switcher replaces the shared-views section with that workspace's tabs. Search,
-the command palette, "All objects", and direct links are unaffected. The
-active workspace is client-side state persisted in localStorage — URLs stay
-flat. A deployment with no `Workspace` rows renders the classic sidebar and
-never shows the switcher.
+Workspaces only shape the sidebar: each one is an item in the icon rail on the
+far left (its `icon`, or its initials when it has none, with its name under
+it), after Home. Picking one opens its
+first view and makes the sidebar that workspace's menu of views; Home is the
+default workspace, whose menu is every shared view. New workspaces are made
+from the "+" in Home's sidebar header. Search, the command palette, "All
+objects", and direct links are unaffected. The active workspace is client-side
+state persisted in localStorage — URLs stay flat. A deployment with no
+`Workspace` rows shows only Home, Search and Inbox in the rail. In the sidebar a
+view shows its own `icon`, else its layout's. Both `icon` fields are an
+`IconField`: a dropdown of the icons the SPA can draw (`crudkit.fields.ICON_NAMES`).
 
 ## AI context
 
@@ -618,10 +623,10 @@ by `frontend/scripts/postbuild.mjs`):
 
 At startup the SPA parses that script tag (`frontend/utils/appConfig.ts`) and
 merges it over defaults: `app_name`, `org_name`, `logo_url`, `brand_color`
-(any CSS color; replaces the indigo accent — buttons, selection, focus rings —
+(any CSS color; replaces the blue accent — buttons, selection, focus rings —
 in both themes), `auth_mode` (`password` or `saml`), `storage_prefix`,
-`conversation_link_pattern`, `default_currency`, `crudkit_version` (shown at
-the bottom of the sidebar).
+`conversation_link_pattern`, `default_currency`, `crudkit_version` (shown under
+the logo in the icon rail).
 Branding is therefore a runtime concern of the host project — nothing is
 compiled into the bundle.
 

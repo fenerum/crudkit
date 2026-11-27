@@ -41,7 +41,7 @@ export default function Modal({ onClose, className = "max-w-md", children }) {
   return createPortal(
     <div
       className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: "rgba(0,0,0,0.6)" }}
+      style={{ background: "var(--bg-overlay)" }}
       onClick={(e) => {
         e.stopPropagation();
         onClose();

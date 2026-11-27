@@ -1,8 +1,9 @@
 @page:/<segment>/VIW/<view> @layout:list
 Feature: Saved views
   A saved view is a named, filtered way of looking at a list. Views are
-  offered above the list and in the sidebar. A private view is only offered
-  to the person who made it, and a view can stay out of the sidebar.
+  offered above the list and in the sidebar, by their own icon or else their
+  layout's. A private view is only offered to the person who made it, and a
+  view can stay out of the sidebar.
 
   Background:
     Given Alice is signed in
@@ -36,3 +37,10 @@ Feature: Saved views
     Then the view "Not in the menu" is offered above the list
     And the view "All readings" is offered in the sidebar
     But the view "Not in the menu" is not offered in the sidebar
+
+  Scenario: A view is shown in the sidebar by its own icon, else its layout's
+    Given a list view "Starred" of the readings with the star icon
+    And a kanban view "Plain board" of the readings
+    When Alice opens the readings list
+    Then the view "Starred" has the star icon in the sidebar
+    And the view "Plain board" has the kanban icon in the sidebar

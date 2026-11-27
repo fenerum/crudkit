@@ -3,10 +3,10 @@ import { type Page, expect, test } from '@playwright/test';
 // One active work log per user: this is the only spec that starts a timer,
 // and it always leaves none running so a failed run can't poison the next.
 async function stopRunningTimer(page: Page) {
-  await page.goto('/RDG');
+  await page.goto('/RDG1');
   const banner = page.getByRole('banner');
   const stop = banner.getByRole('button', { name: 'Stop time tracking' });
-  await expect(stop.or(banner.getByRole('button', { name: 'Start' }))).toBeVisible();
+  await expect(stop.or(banner.getByRole('button', { name: 'Track time' }))).toBeVisible();
   if (await stop.isVisible()) {
     await stop.click();
     await expect(page.getByText('Time tracking stopped')).toBeVisible();
@@ -18,10 +18,11 @@ test.afterEach(({ page }) => stopRunningTimer(page));
 
 test('starts and stops time tracking on an object', async ({ page }) => {
   const banner = page.getByRole('banner');
-  await expect(banner.getByRole('button', { name: 'Start' })).toBeDisabled();
+  await page.goto('/RDG');
+  await expect(banner.getByRole('button', { name: 'Track time' })).toHaveCount(0);
 
   await page.goto('/RDG1');
-  await banner.getByRole('button', { name: 'Start' }).click();
+  await banner.getByRole('button', { name: 'Track time' }).click();
   await expect(page.getByText('Time tracking started')).toBeVisible();
   await expect(banner.getByRole('button', { name: 'Stop time tracking' })).toBeVisible();
   await expect(banner.getByText(/^\d+:\d\d$/)).toBeVisible();
@@ -32,5 +33,5 @@ test('starts and stops time tracking on an object', async ({ page }) => {
 
   await banner.getByRole('button', { name: 'Stop time tracking' }).click();
   await expect(page.getByText('Time tracking stopped')).toBeVisible();
-  await expect(banner.getByRole('button', { name: 'Start' })).toBeVisible();
+  await expect(banner.getByRole('button', { name: 'Track time' })).toBeVisible();
 });

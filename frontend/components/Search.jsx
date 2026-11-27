@@ -223,7 +223,7 @@ export default function Search() {
                   <div className="px-4 py-1 flex justify-between items-center">
                     <span className="eyebrow">{key}</span>
                     <button
-                      className="text-xs text-primary-300 hover:text-primary-200"
+                      className="text-xs text-link hover:text-link-hover"
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();

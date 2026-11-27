@@ -17,13 +17,13 @@ function extractNumeric(obj, fieldName) {
 }
 
 const PALETTE = [
-  '#7B7FFF', // primary
-  '#4BA3F5', // stage-blue
-  '#3DD68C', // stage-green
-  '#9B6BFF', // stage-violet
-  '#F5B544', // stage-amber
-  '#F0616D', // stage-rose
-  '#7D828D', // stage-slate
+  'var(--primary-400)',
+  'var(--stage-blue)',
+  'var(--stage-green)',
+  'var(--stage-violet)',
+  'var(--stage-amber)',
+  'var(--stage-rose)',
+  'var(--stage-slate)',
 ];
 
 function colorFor(label) {

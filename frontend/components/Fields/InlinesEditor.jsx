@@ -22,8 +22,10 @@ import CrudKitAPIClient from "../../data/api";
 import BaseField from "./BaseField";
 import { Icon } from "../ui";
 import { FieldList } from "./FieldsEditor";
+import { selectStyles } from "./selectStyles";
 
 const apiClient = new CrudKitAPIClient();
+const FIELD_SELECT_STYLES = selectStyles();
 
 function InlineCard({ id, mdl, fields, modelLabel, onFieldsChange, onRemove }) {
   const [open, setOpen] = useState(false);
@@ -84,41 +86,6 @@ function InlineCard({ id, mdl, fields, modelLabel, onFieldsChange, onRemove }) {
   );
 }
 
-// Match the ChoiceField look so this dropdown feels like the rest of the
-// form. Search-as-you-type comes for free with react-select.
-const SELECT_STYLES = {
-  control: (base, state) => ({
-    ...base,
-    minHeight: '34px',
-    backgroundColor: 'var(--bg-2)',
-    borderColor: state.isFocused ? 'var(--primary-400)' : 'var(--border-1)',
-    boxShadow: state.isFocused ? 'var(--shadow-focus)' : 'none',
-    '&:hover': { borderColor: state.isFocused ? 'var(--primary-400)' : 'var(--border-2)' },
-    borderRadius: 'var(--r-sm)',
-  }),
-  singleValue: (base) => ({ ...base, color: 'var(--fg-1)' }),
-  input: (base) => ({ ...base, color: 'var(--fg-1)' }),
-  placeholder: (base) => ({ ...base, color: 'var(--fg-3)' }),
-  menu: (base) => ({
-    ...base,
-    backgroundColor: 'var(--bg-4)',
-    border: '1px solid var(--border-2)',
-    boxShadow: 'var(--shadow-menu)',
-    zIndex: 9999,
-  }),
-  option: (base, state) => ({
-    ...base,
-    backgroundColor: state.isSelected
-      ? 'var(--bg-5)'
-      : state.isFocused
-        ? 'var(--bg-3)'
-        : 'transparent',
-    color: 'var(--fg-1)',
-    cursor: 'pointer',
-  }),
-  indicatorSeparator: (base) => ({ ...base, backgroundColor: 'var(--border-1)' }),
-  menuPortal: (base) => ({ ...base, zIndex: 9999 }),
-};
 
 function ModelPicker({ choices, onSelect, disabled }) {
   const [selected, setSelected] = useState(null);
@@ -138,7 +105,7 @@ function ModelPicker({ choices, onSelect, disabled }) {
           isSearchable
           isDisabled={disabled}
           placeholder="Add an inline…"
-          styles={SELECT_STYLES}
+          styles={FIELD_SELECT_STYLES}
           menuPortalTarget={typeof document !== 'undefined' ? document.body : undefined}
           menuPosition="fixed"
         />

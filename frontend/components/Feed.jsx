@@ -55,7 +55,7 @@ function AttachmentRow({ name, href }) {
                 <span className="truncate text-fg-1">{name}</span>
             </div>
             <a href={href} target="_blank" rel="noreferrer"
-               className="ml-3 flex-shrink-0 text-primary-300 hover:text-primary-200">Download</a>
+               className="ml-3 flex-shrink-0 text-link hover:text-link-hover">Download</a>
             {previewStyle && (
                 <div className="ck-att-preview" style={previewStyle}>
                     <img src={href} alt={name} />
@@ -403,7 +403,7 @@ function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, onDone }
                 <div className="ck-composer-foot">
                     <span className="flex-1" />
                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                        <button type="button" onClick={onDone} className="ck-btn ck-btn-ghost ck-btn-sm">Discard</button>
+                        <button type="button" onClick={onDone} className="ck-btn ck-btn-secondary ck-btn-sm">Discard</button>
                         <button type="submit" disabled={busy} className="ck-btn ck-btn-primary ck-btn-sm">
                             <Icon name={action ? "send" : "plus"} size={12} color="currentColor" />
                             {busy ? "Saving…" : action?.verbose_name || `Add ${metadata.verbose_name}`}

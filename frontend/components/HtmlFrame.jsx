@@ -11,7 +11,7 @@ const BASE_STYLE = `<style>
   h1 { font-size: 1.25em; } h2 { font-size: 1.15em; } h3 { font-size: 1.05em; }
   ul, ol { margin: 0 0 0.75em; padding-left: 1.5em; }
   li { margin-bottom: 0.25em; }
-  a { color: #4f46e5; text-decoration: none; } a:hover { text-decoration: underline; }
+  a { color: #0a41e0; text-decoration: none; } a:hover { text-decoration: underline; }
   hr { border: none; border-top: 1px solid #e5e7eb; margin: 0.75em 0; }
   code { background: #f3f4f6; padding: 0.15em 0.35em; border-radius: 3px; font-size: 0.9em; }
   pre { background: #f3f4f6; padding: 0.75em; border-radius: 4px; overflow-x: auto; }

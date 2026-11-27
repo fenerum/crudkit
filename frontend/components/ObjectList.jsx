@@ -4,7 +4,28 @@ import BulkBar from "./BulkBar.jsx";
 import ReadOnlyField from "./ReadOnlyField.jsx";
 import { url } from "../utils/urls";
 import { isNumericField } from "../utils/numbers";
-import { Icon, PageRange, PageSizeSelect, useScreenContext } from "./ui";
+import { choiceLabel } from "../utils/choices";
+import { PRIORITY_FIELDS, priorityLevel } from "../utils/cardFields";
+import { Icon, PageRange, PageSizeSelect, PriorityBars, StageBadge, useScreenContext } from "./ui";
+
+// Choices read as status pills, in the board's column colours; priorities
+// get the board's bars next to their label.
+function Cell({ field, value, meta }) {
+    if (meta?.choices && value != null && value !== "") {
+        const label = choiceLabel(meta, value);
+        const level = PRIORITY_FIELDS.includes(field.toLowerCase()) ? priorityLevel(label) : null;
+        if (level != null) {
+            return (
+                <span className="inline-flex items-center gap-2">
+                    <PriorityBars level={level} />
+                    {label}
+                </span>
+            );
+        }
+        return <StageBadge value={label} />;
+    }
+    return <ReadOnlyField field={field} value={value} metadata={meta} />;
+}
 
 export default function ObjectList({
     objectList,
@@ -47,8 +68,7 @@ export default function ObjectList({
     return (
         <form
             id="bulk"
-            className="ck-fullbleed flex flex-col"
-            style={{ minHeight: 'calc(100vh - var(--topbar-h))' }}
+            className="ck-fullbleed flex flex-col flex-1"
         >
             {selectedRows.length > 0 && (
                 <BulkBar
@@ -59,7 +79,7 @@ export default function ObjectList({
                 />
             )}
 
-            <div className="bg-bg-1 flex-1">
+            <div className="ck-list-scroll bg-bg-1 flex-1">
                 <div className="ck-list-head">
                     <div className="ck-lh-c" style={{ flex: '0 0 28px' }}>
                         <input
@@ -121,7 +141,7 @@ export default function ObjectList({
                                         className={`ck-lh-c${isNumericField(metadata.fields[field]) ? ' ck-num' : ''}`}
                                         style={{ flex: i === 0 ? '2 1 0' : '1 1 0' }}
                                     >
-                                        <ReadOnlyField field={field} value={object[field]} metadata={metadata.fields[field]} />
+                                        <Cell field={field} value={object[field]} meta={metadata.fields[field]} />
                                     </div>
                                 )) : (
                                     <div className="ck-lh-c" style={{ flex: '2 1 0' }}>{object.label}</div>
@@ -129,9 +149,9 @@ export default function ObjectList({
                                 <div className="ck-lh-c justify-end" style={{ flex: '0 0 28px' }}>
                                     <Link
                                         to={url(object.id, 'delete')}
-                                        className="ck-icon-btn ck-icon-btn-sm"
-                                        style={{ color: 'var(--danger)' }}
+                                        className="ck-icon-btn ck-icon-btn-sm ck-row-action"
                                         aria-label="Delete"
+                                        title="Delete"
                                     >
                                         <Icon name="trash-2" size={12} color="currentColor" />
                                     </Link>
@@ -150,7 +170,7 @@ export default function ObjectList({
             {/* Pagination */}
             {isPaginated && (
                 <div
-                    className="sticky bottom-0 z-10 flex items-center justify-between border-t border-border-1 bg-bg-1 px-3.5 py-2"
+                    className="sticky bottom-0 z-10 flex items-center justify-between border-t border-border-1 bg-bg-1 px-4 py-2"
                 >
                     <PageRange
                         page={pagination.current_page}
@@ -165,53 +185,57 @@ export default function ObjectList({
                                 onChange={onPageSizeChange}
                             />
                         )}
-                        <button
-                            type="button"
-                            onClick={() => handlePageChange(pagination.previous)}
-                            disabled={!pagination.previous}
-                            className="ck-icon-btn ck-icon-btn-sm"
-                            aria-label="Previous"
-                        >
-                            <Icon name="chevron-right" size={12} color="currentColor" style={{ transform: 'scaleX(-1)' }} />
-                        </button>
-                        {[...Array(pagination.total_pages).keys()].map(page => {
-                            const pageNumber = page + 1;
-                            const isCurrent = pageNumber === pagination.current_page;
-                            const show =
-                                pageNumber === 1 ||
-                                pageNumber === pagination.total_pages ||
-                                (pageNumber >= pagination.current_page - 1 && pageNumber <= pagination.current_page + 1);
-                            if (!show) {
-                                if (pageNumber === 2 || pageNumber === pagination.total_pages - 1) {
-                                    return <span key={`e-${pageNumber}`} className="px-1.5 text-xs text-fg-3">…</span>;
-                                }
-                                return null;
-                            }
-                            return (
+                        {pagination.total_pages > 1 && (
+                            <>
                                 <button
-                                    key={pageNumber}
                                     type="button"
-                                    onClick={() => {
-                                        const u = new URL(window.location.href);
-                                        u.searchParams.set('page', String(pageNumber));
-                                        handlePageChange(u.toString());
-                                    }}
-                                    className={"ck-btn ck-btn-sm " + (isCurrent ? "ck-btn-primary" : "ck-btn-ghost")}
-                                    aria-current={isCurrent ? "page" : undefined}
+                                    onClick={() => handlePageChange(pagination.previous)}
+                                    disabled={!pagination.previous}
+                                    className="ck-icon-btn ck-icon-btn-sm"
+                                    aria-label="Previous"
                                 >
-                                    {pageNumber}
+                                    <Icon name="chevron-right" size={12} color="currentColor" style={{ transform: 'scaleX(-1)' }} />
                                 </button>
-                            );
-                        })}
-                        <button
-                            type="button"
-                            onClick={() => handlePageChange(pagination.next)}
-                            disabled={!pagination.next}
-                            className="ck-icon-btn ck-icon-btn-sm"
-                            aria-label="Next"
-                        >
-                            <Icon name="chevron-right" size={12} color="currentColor" />
-                        </button>
+                                {[...Array(pagination.total_pages).keys()].map(page => {
+                                    const pageNumber = page + 1;
+                                    const isCurrent = pageNumber === pagination.current_page;
+                                    const show =
+                                        pageNumber === 1 ||
+                                        pageNumber === pagination.total_pages ||
+                                        (pageNumber >= pagination.current_page - 1 && pageNumber <= pagination.current_page + 1);
+                                    if (!show) {
+                                        if (pageNumber === 2 || pageNumber === pagination.total_pages - 1) {
+                                            return <span key={`e-${pageNumber}`} className="px-1.5 text-xs text-fg-3">…</span>;
+                                        }
+                                        return null;
+                                    }
+                                    return (
+                                        <button
+                                            key={pageNumber}
+                                            type="button"
+                                            onClick={() => {
+                                                const u = new URL(window.location.href);
+                                                u.searchParams.set('page', String(pageNumber));
+                                                handlePageChange(u.toString());
+                                            }}
+                                            className={"ck-btn ck-btn-sm " + (isCurrent ? "ck-btn-primary" : "ck-btn-ghost")}
+                                            aria-current={isCurrent ? "page" : undefined}
+                                        >
+                                            {pageNumber}
+                                        </button>
+                                    );
+                                })}
+                                <button
+                                    type="button"
+                                    onClick={() => handlePageChange(pagination.next)}
+                                    disabled={!pagination.next}
+                                    className="ck-icon-btn ck-icon-btn-sm"
+                                    aria-label="Next"
+                                >
+                                    <Icon name="chevron-right" size={12} color="currentColor" />
+                                </button>
+                            </>
+                        )}
                     </nav>
                 </div>
             )}

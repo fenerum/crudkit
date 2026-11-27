@@ -13,7 +13,7 @@ test('finds objects across models and opens the chosen one', async ({ page }) =>
   await results.filter({ hasText: 'Book club: Kindred' }).click();
 
   await expect(page).toHaveURL(/\/RDG\d+$/);
-  await expect(page.getByRole('banner').getByText('Book club: Kindred')).toBeVisible();
+  await expect(page.getByRole('banner').getByText('Book club: Kindred', { exact: true })).toBeVisible();
 });
 
 test('offers "Show all" when a type has more results than shown', async ({ page, request }) => {

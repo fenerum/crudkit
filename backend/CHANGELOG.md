@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+- New look for the SPA: a light, dense, monochrome design is now the default, with one blue
+  accent (`#0A41E0`), Roboto and Roboto Mono (self-hosted in the wheel, no Google Fonts
+  request), 4px radii, 35px list rows, square status badges and borders instead of shadows.
+  Dark mode is still a click away and follows the same palette; a stored choice is kept.
+  `CRUDKIT_FRONTEND_CONFIG["brand_color"]` still replaces the accent in both themes.
+- New app shell: an icon rail on the far left switches workspaces (replacing the
+  workspace picker in the sidebar header) and holds Home, New workspace, Search and Inbox
+  with its pending count. The sidebar next to it lists the workspace's views and can be
+  collapsed; the choice is remembered. The content gets the whole height below one top bar:
+  after the breadcrumbs come the page's tabs (a list's saved views, a record's tabs; the
+  open view is the selected tab rather than a crumb), then search, Actions and New or Edit.
+  A record's name follows its ID in the breadcrumbs. On phones the tabs and search drop to
+  rows of their own. Below 1200px the assistant opens over the content, below 900px
+  the sidebar does too, and record lists scroll sideways on phones instead of squeezing
+  their columns.
+- The icon rail holds only workspaces: Home is the default one (its menu is every shared
+  view, replacing "All"), and picking a workspace opens its first view. New workspace moved
+  to a "+" in Home's sidebar header and showing a collapsed sidebar to the top bar.
+  Standalone secondary buttons (Actions, Delete, Discard, Undo, Load older messages) get a
+  thin border so they don't vanish into the white page. Key hints on buttons (New N,
+  Edit E, Actions ., Cancel Esc) are small borderless tiles in the button's own tone.
+- Record pages: field values line up next to their labels, and without a layout the record's own fields come
+  before its ID and timestamps. New-record forms leave out what can't be filled in (ID,
+  created/updated) and no longer open with required fields flagged as errors.
+- Lists show choice fields as status pills in the board's colours and priorities with the
+  board's bars; the per-row delete button only appears on hover; page buttons are hidden when everything fits on one page. The crudkit version moved
+  from the bottom of the sidebar to under the logo in the rail. Sidebar views show an
+  icon for their layout (table, board, gallery, lanes, inbox, quadrant) instead of a colour
+  dot. Board and inbox times read "19 hours ago". The time tracker's button reads "Track time"
+  and only shows on record pages (a running clock still shows everywhere).
+- Workspace and view icons are picked from a dropdown of the icons the SPA can draw (new
+  `crudkit.fields.IconField`, choices in `ICON_NAMES`; growing the list needs no migration).
+  A workspace without an icon shows its initials in the rail; views get an optional `icon`
+  shown in the sidebar instead of their layout's. Migration `0009_icons` adds `View.icon` and
+  clears workspace icons the list doesn't offer, so those show initials until one is picked.
+
 ## 0.10.0 (2026-11-23)
 
 - Add restricted fields: fields only some people may change, or even see, guarded by

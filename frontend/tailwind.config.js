@@ -6,6 +6,8 @@ export default {
     './components/**/*.{js,jsx,ts,tsx}',
     './layouts/**/*.{js,jsx,ts,tsx}',
     './context/**/*.{js,jsx,ts,tsx}',
+    './shared/**/*.{js,jsx,ts,tsx}',
+    './utils/**/*.{js,jsx,ts,tsx}',
   ],
   theme: {
     extend: {
@@ -39,6 +41,12 @@ export default {
           600: 'var(--primary-600)',
           700: 'var(--primary-700)',
         },
+        selected: 'var(--bg-selected)',
+        'accent-bg': 'var(--accent-bg)',
+        link: {
+          DEFAULT: 'var(--link)',
+          hover: 'var(--link-hover)',
+        },
         success: 'var(--success)',
         warn: 'var(--warn)',
         danger: 'var(--danger)',
@@ -53,8 +61,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        mono: ['JetBrains Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'monospace'],
+        sans: ['Roboto', 'ui-sans-serif', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
+        mono: ['Roboto Mono', 'ui-monospace', 'SF Mono', 'Menlo', 'Consolas', 'monospace'],
       },
       fontSize: {
         '2xs': '10px',
@@ -65,10 +73,10 @@ export default {
         lg:    '14px',
         xl:    '16px',
         '2xl': '20px',
-        '3xl': '24px',
-        '4xl': '32px',
-        '5xl': '44px',
-        '6xl': '60px',
+        '3xl': '22px',
+        '4xl': '28px',
+        '5xl': '36px',
+        '6xl': '44px',
       },
       borderRadius: {
         sm:   'var(--r-sm)',
@@ -89,12 +97,12 @@ export default {
         focus: 'var(--shadow-focus)',
       },
       transitionTimingFunction: {
-        'out-ck': 'cubic-bezier(0.2, 0, 0, 1)',
+        'out-ck': 'cubic-bezier(0.2, 0.8, 0.2, 1)',
       },
       transitionDuration: {
-        fast: '120ms',
-        med:  '180ms',
-        slow: '260ms',
+        fast: '80ms',
+        med:  '140ms',
+        slow: '240ms',
       },
     },
   },

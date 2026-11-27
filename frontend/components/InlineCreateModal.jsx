@@ -35,7 +35,7 @@ export default function InlineCreateModal({ type, initialText, prefill, onCreate
 
   return (
     <Modal onClose={onClose} className="max-w-[80vw] h-[80vh] overflow-y-auto">
-      <h2 className="text-lg font-semibold text-fg-1 px-4">
+      <h2 className="text-lg font-semibold text-fg-1 mb-4">
         New {metadata?.verbose_name || type}
       </h2>
       <FormContainer

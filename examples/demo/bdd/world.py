@@ -24,7 +24,15 @@ PASSWORD = "admin"
 EMAIL = "admin@example.com"
 
 # Record types by the word a feature uses for them.
-MODELS = {"author": "AUT", "book": "BOK", "reading": "RDG", "view": "VIW", "call": "CAL", "email": "EML"}
+MODELS = {
+    "author": "AUT",
+    "book": "BOK",
+    "reading": "RDG",
+    "view": "VIW",
+    "workspace": "WSP",
+    "call": "CAL",
+    "email": "EML",
+}
 
 # Well inside simplejwt's default five-minute access token lifetime.
 TOKEN_SECONDS = 60

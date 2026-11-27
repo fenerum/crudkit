@@ -1,8 +1,8 @@
-@field:WYSIWYGEditorField @field:EmailWYSIWYGEditorField @field:ModelField @field:FieldChoiceField
+@field:WYSIWYGEditorField @field:EmailWYSIWYGEditorField @field:ModelField @field:FieldChoiceField @field:IconField
 Feature: Special kinds of fields
   Besides plain text, numbers and links, CrudKit offers a few kinds of fields
   that tell the app which editor to show: rich text, email bodies, a choice of
-  record type and a choice of field. Projects use them on their own record
+  record type, a choice of field and a choice of icon. Projects use them on their own record
   types and the forms follow.
 
   Background:
@@ -29,3 +29,9 @@ Feature: Special kinds of fields
     When Alice looks up the description of customers
     Then the field "sort field" is described as choosing a field
     And the field "sort field" holds at most 128 characters
+
+  Scenario: An icon field offers the icons the app can draw
+    When Alice looks up the description of workspaces
+    Then the field "icon" is described as choosing an icon
+    And the field "icon" offers every icon the app can draw as a choice
+    And the field "icon" is optional

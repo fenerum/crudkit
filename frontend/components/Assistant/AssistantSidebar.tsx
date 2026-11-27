@@ -301,23 +301,18 @@ export default function AssistantSidebar({ onClose }: Props) {
   );
 
   return (
-    <aside className="flex flex-col h-full bg-bg-1" aria-label={`${assistantName} chat`}>
-      <div className="flex items-center gap-2 px-3 border-b border-border-1" style={{ height: 'var(--topbar-h)' }}>
+    <aside className="flex flex-col h-full bg-bg-0" aria-label={`${assistantName} chat`}>
+      <div className="flex items-center gap-2 pl-4 pr-2 border-b border-border-1" style={{ height: 'var(--topbar-h)' }}>
         {avatarUrl ? (
-          <img src={avatarUrl} className="w-6 h-6 rounded-full" alt={assistantName} />
+          <img src={avatarUrl} className="w-5 h-5 rounded" alt={assistantName} />
         ) : (
-          <div
-            className="w-6 h-6 rounded-full bg-primary-400 flex items-center justify-center text-white text-xs font-bold"
-            aria-hidden="true"
-          >
-            {assistantName.charAt(0)}
-          </div>
+          <span className="w-1.5 h-1.5 rounded-full bg-primary-400" aria-hidden="true" />
         )}
-        <div className="flex-1 leading-tight min-w-0">
-          <div className="text-sm font-semibold text-fg-1">{assistantName}</div>
-          <div className="text-2xs text-fg-3">
+        <div className="flex-1 flex items-baseline gap-2 min-w-0">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-fg-1 truncate">{assistantName}</span>
+          <span className="text-xs text-fg-3 truncate">
             {busy ? 'Working…' : state === 'open' ? 'Ready' : state === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
-          </div>
+          </span>
         </div>
         <button
           type="button"
@@ -335,42 +330,46 @@ export default function AssistantSidebar({ onClose }: Props) {
       </div>
 
       <div
-        className="flex items-center gap-1.5 px-3 py-1.5 border-b border-border-1 text-2xs text-fg-3"
+        className="flex items-center gap-1.5 px-4 py-1.5 border-b border-border-1 text-xs text-fg-3 font-mono"
         data-testid="assistant-screen"
       >
         <Icon name="eye" size={12} color="currentColor" />
         <span className="truncate">{screenLabel(screen)}</span>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-3 py-3 space-y-3 text-sm">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3.5 text-md">
         {items.length === 0 && !busy && (
-          <div className="flex flex-col gap-2 pt-2">
-            <div className="text-xs text-fg-3">Ask about what you are looking at, or try:</div>
-            {suggestionsFor(screen).map((suggestion) => (
-              <button
-                key={suggestion}
-                type="button"
-                className="ck-btn ck-btn-secondary ck-btn-sm justify-start text-left"
-                onClick={() => ask(suggestion)}
-                disabled={state !== 'open'}
-              >
-                {suggestion}
-              </button>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="text-sm text-fg-3">Ask about what you are looking at.</div>
+            <div className="eyebrow mt-2">Try</div>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestionsFor(screen).map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  className="ck-suggest"
+                  onClick={() => ask(suggestion)}
+                  disabled={state !== 'open'}
+                >
+                  <Icon name="sparkles" size={12} color="currentColor" />
+                  {suggestion}
+                </button>
+              ))}
+            </div>
           </div>
         )}
         {items.map((it) => {
           if (it.kind === 'user') {
             return (
               <div key={it.id} className="flex justify-end">
-                <div className="ck-bubble ck-bubble-out max-w-[85%] whitespace-pre-wrap break-words">{it.text}</div>
+                <div className="ck-bubble ck-bubble-user max-w-[85%] whitespace-pre-wrap break-words">{it.text}</div>
               </div>
             );
           }
           if (it.kind === 'assistant') {
             return (
               <div key={it.id} className="flex justify-start">
-                <div className="ck-bubble ck-bubble-in max-w-[95%]">
+                <div className="ck-bubble ck-bubble-in ck-bubble-ai">
                   <SafeMarkdown source={it.text} />
                 </div>
               </div>
@@ -416,7 +415,7 @@ export default function AssistantSidebar({ onClose }: Props) {
         })}
         {draft && (
           <div className="flex justify-start">
-            <div className="ck-bubble ck-bubble-in max-w-[95%]" data-testid="assistant-draft">
+            <div className="ck-bubble ck-bubble-in ck-bubble-ai" data-testid="assistant-draft">
               <SafeMarkdown source={draft} />
             </div>
           </div>
@@ -435,9 +434,9 @@ export default function AssistantSidebar({ onClose }: Props) {
         </div>
       )}
 
-      <div className="border-t border-border-1 p-2">
+      <div className="m-3 rounded-lg border border-border-3 bg-bg-1 px-2.5 py-2 focus-within:border-primary-400 focus-within:shadow-focus">
         <textarea
-          className="w-full bg-bg-2 text-fg-1 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary-400 resize-none"
+          className="w-full bg-transparent text-fg-1 text-md p-0 border-0 resize-none focus:outline-none focus:ring-0 placeholder:text-fg-4"
           rows={2}
           placeholder={state === 'open' ? `Ask ${assistantName}…` : 'Connecting…'}
           value={input}
@@ -446,7 +445,7 @@ export default function AssistantSidebar({ onClose }: Props) {
           disabled={state !== 'open'}
         />
         <div className="flex justify-between items-center mt-1">
-          <div className="text-2xs text-fg-3">Enter to send · Shift+Enter for newline</div>
+          <div className="text-xs text-fg-4">Enter to send · Shift+Enter for newline</div>
           <button
             type="button"
             className="ck-btn ck-btn-primary ck-btn-sm"

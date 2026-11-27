@@ -38,7 +38,7 @@ const ListWidgetRenderer = ({
         </div>
         <div className="flex-1 flex items-center justify-center">
           <div className="flex flex-col items-center">
-            <svg className="animate-spin h-6 w-6 text-primary-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <svg className="animate-spin h-6 w-6 text-link" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -107,7 +107,7 @@ const ListWidgetRenderer = ({
                 <td className="w-16 px-3 py-2">
                   <Link 
                     to={url(object.id)}
-                    className="text-xs font-mono text-fg-3 hover:text-primary-300"
+                    className="text-xs font-mono text-fg-3 hover:text-link"
                   >
                     {object.id}
                   </Link>
@@ -142,7 +142,7 @@ const ListWidgetRenderer = ({
       <div className="p-3 border-t border-border-1 bg-bg-2 flex justify-center">
         <Link 
           to={`/${data.object}`}
-          className="text-xs font-medium text-primary-300 hover:text-primary-200"
+          className="text-xs font-medium text-link hover:text-link-hover"
         >
           View all
         </Link>

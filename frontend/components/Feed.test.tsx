@@ -130,7 +130,10 @@ describe("FeedItem", () => {
 describe("Feed composer", () => {
   const feedMetadata = { verbose_name_plural: "feed items", fields: {} };
 
-  test("offers a tab per kind, creates the entry from the record, then runs its action", async () => {
+  // The kind's submit button sits both in the tab bar and below the form.
+  test.each([["above", 0], ["below", 1]])(
+    "offers a tab per kind, creates the entry from the record, then runs its action (sent from %s)",
+    async (_position, index) => {
     api.metadata = { CAL: callMetadata({ fields: ["subject"], action: "send_summary" }) };
     api.create.mockResolvedValue({ id: "CAL1", label: "Renewal chat" });
     api.action.mockResolvedValue({ messages: ["Summary sent"] });
@@ -141,7 +144,9 @@ describe("Feed composer", () => {
 
     fireEvent.click(await screen.findByRole("tab", { name: "Call" }));
     fireEvent.change(await screen.findByRole("textbox"), { target: { value: "Renewal chat" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send summary" }));
+    const buttons = screen.getAllByRole("button", { name: "Send summary" });
+    expect(buttons).toHaveLength(2);
+    fireEvent.click(buttons[index]);
 
     await waitFor(() => expect(api.action).toHaveBeenCalledWith("CAL", "CAL1", "send_summary"));
     expect(api.create).toHaveBeenCalledWith("CAL", { subject: "Renewal chat" }, { from_object: "AUT1" });

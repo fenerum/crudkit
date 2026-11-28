@@ -18,6 +18,7 @@ actions, history, notes and live updates.
 - `Then the composer offers "Note", "Call" and "Email"`, `When Alice logs a call "C" on "X"`,
   `Then the feed shows the call "C"`
 - `When Alice writes the email "S" to "a@b.c" on "X"`, `When she attaches the file "f.txt"`, `When she sends it`,
+  `When she sends it from the top of the composer`,
   `Then the feed shows the email "S" sent with the file "f.txt"`
 - `Given Alice emailed "S" to "a@b.c" on "X"`, `When she replies to the email "S" on "X"`,
   `Then the email form is to "a@b.c" with the subject "Re: S"`
@@ -279,7 +280,7 @@ def logs_a_call(world, summary, label):
     world.open(label)
     composer(world).get_by_role("tab", name="Call").click()
     field_input(world, composer(world), "summary").fill(world.new_name(summary))
-    composer(world).get_by_role("button", name="Add call").click()
+    composer(world).locator(".ck-composer-foot").get_by_role("button", name="Add call").click()
 
 
 @then(phrase('the feed shows the call "{summary:Q}"'))
@@ -303,7 +304,12 @@ def attaches_a_file(world, filename):
 
 @when(phrase("{name:Actor} sends it"))
 def sends_it(world):
-    composer(world).get_by_role("button", name="Send").click()
+    composer(world).locator(".ck-composer-foot").get_by_role("button", name="Send").click()
+
+
+@when(phrase("{name:Actor} sends it from the top of the composer"))
+def sends_it_from_the_top(world):
+    composer(world).locator(".ck-composer-tabs").get_by_role("button", name="Send").click()
 
 
 @then(phrase('the feed shows the email "{subject:Q}" sent with the file "{filename:Q}"'))

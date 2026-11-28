@@ -32,6 +32,13 @@ Feature: The feed of a record
     Then she is told "Email sent to author@example.com"
     And the feed shows the email "Reading in May" sent with the file "programme.txt"
 
+  Scenario: An email can be sent from above the form as well as below it
+    When Alice writes the email "Reading in May" to "author@example.com" on "Correspondent"
+    And she attaches the file "programme.txt"
+    And she sends it from the top of the composer
+    Then she is told "Email sent to author@example.com"
+    And the feed shows the email "Reading in May" sent with the file "programme.txt"
+
   Scenario: Replying to an email starts one on the same subject to the same person
     Given Alice emailed "Reading in May" to "author@example.com" on "Correspondent"
     When she replies to the email "Reading in May" on "Correspondent"

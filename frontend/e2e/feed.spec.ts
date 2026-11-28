@@ -23,7 +23,7 @@ test('logs a call on an author feed', async ({ page }) => {
   const composer = page.locator('#feed-form');
   await composer.getByRole('tab', { name: 'Call' }).click();
   await composer.locator('input[name="summary"]').fill(summary);
-  await composer.getByRole('button', { name: 'Add call' }).click();
+  await composer.locator('.ck-composer-foot').getByRole('button', { name: 'Add call' }).click();
 
   await expect(page.getByRole('main').locator('.ck-act', { hasText: summary })).toContainText('logged a call');
 });
@@ -40,7 +40,8 @@ test('sends an email with a file attached from an author feed', async ({ page })
     mimeType: 'text/plain',
     buffer: Buffer.from('Doors open at 7pm.'),
   });
-  await composer.getByRole('button', { name: 'Send' }).click();
+  // The tab bar has its own Send, besides the one below the form.
+  await composer.locator('.ck-composer-tabs').getByRole('button', { name: 'Send' }).click();
 
   await expect(page.getByText('Email sent to author@example.com').first()).toBeVisible();
   const row = page.getByRole('main').locator('.ck-act', { hasText: subject });

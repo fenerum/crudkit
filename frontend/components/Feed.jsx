@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import moment from "moment-timezone";
 import DOMPurify from "dompurify";
 import { Link, useLocation, useNavigate } from "react-router-dom";
@@ -328,7 +329,7 @@ function NoteForm({ parentId, metadata, parentType, onPosted }) {
 
 // The form for adding one kind of feed entry: its declared fields, files when
 // it keeps attachments, and its action, run once the record is created.
-function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, onDone }) {
+function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, toolbar, onDone }) {
     const navigate = useNavigate();
     const queryClient = useQueryClient();
     const entry = metadata.feed_entry;
@@ -375,6 +376,10 @@ function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, onDone }
     const blocks = fields.filter((name) => isBlock(metadata.fields[name]));
     const action = metadata.actions?.find((candidate) => candidate.action === entry.action);
     const busy = createMutation.isPending;
+    const submitLabel = <>
+        <Icon name={action ? "send" : "plus"} size={12} color="currentColor" />
+        {busy ? "Saving…" : action?.verbose_name || `Add ${metadata.verbose_name}`}
+    </>;
 
     return (
         <FormProvider {...formMethods}>
@@ -405,12 +410,18 @@ function EntryForm({ type, metadata, parentId, parentMetadata, replyTo, onDone }
                     <div className="flex items-center gap-1.5 flex-shrink-0">
                         <button type="button" onClick={onDone} className="ck-btn ck-btn-secondary ck-btn-sm">Discard</button>
                         <button type="submit" disabled={busy} className="ck-btn ck-btn-primary ck-btn-sm">
-                            <Icon name={action ? "send" : "plus"} size={12} color="currentColor" />
-                            {busy ? "Saving…" : action?.verbose_name || `Add ${metadata.verbose_name}`}
+                            {submitLabel}
                         </button>
                     </div>
                 </div>
             </form>
+            {/* Outside the form in the DOM, so it submits by handler rather than type="submit". */}
+            {toolbar && createPortal(
+                <button type="button" onClick={handleSubmit} disabled={busy} className="ck-btn ck-btn-primary ck-btn-sm">
+                    {submitLabel}
+                </button>,
+                toolbar,
+            )}
         </FormProvider>
     );
 }
@@ -451,6 +462,8 @@ export default function Feed({ model, parent_object_id, metadata, related_field_
     const [replyTo, setReplyTo] = useState(null);
     // Bumped when a kind's form is sent or discarded, so it starts over.
     const [versions, setVersions] = useState({});
+    // Where the active kind's form puts a second submit button, above the form.
+    const [toolbar, setToolbar] = useState(null);
 
     const openTab = (tab) => {
         setActiveTab(tab);
@@ -492,6 +505,7 @@ export default function Feed({ model, parent_object_id, metadata, related_field_
                         {kinds.map((type) => (
                             <KindTab key={type} type={type} active={activeTab === type} onSelect={openTab} />
                         ))}
+                        <div ref={setToolbar} className="ml-auto flex items-center pr-1.5" />
                     </div>
                     {metadata.fields?.body && (
                         <div hidden={activeTab !== "note"}>
@@ -504,7 +518,8 @@ export default function Feed({ model, parent_object_id, metadata, related_field_
                         return (
                             <div key={`${type}:${replyId}:${versions[type] || 0}`} hidden={activeTab !== type}>
                                 <KindForm type={type} parentId={parent_object_id} parentMetadata={parentMetadata}
-                                          replyTo={replyId} onDone={() => done(type)} />
+                                          replyTo={replyId} toolbar={activeTab === type ? toolbar : null}
+                                          onDone={() => done(type)} />
                             </div>
                         );
                     })}

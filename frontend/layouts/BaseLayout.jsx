@@ -78,8 +78,8 @@ function NavSection({title, action, children}) {
   );
 }
 
-// The rail labels sit under the icon and hide on the active item, so the
-// accessible name comes from aria-label.
+// The rail label under the icon is aria-hidden, so the accessible name comes
+// from aria-label.
 // Without an icon the item shows the label's initials.
 function RailItem({href, icon, label, active, badge, onClick, ariaLabel}) {
   return (
